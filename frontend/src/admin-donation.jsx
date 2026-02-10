@@ -1,11 +1,32 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
+import { apiRequest } from './api.js'
 
 function AdminDonation() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [donorName, setDonorName] = useState('')
   const [bloodType, setBloodType] = useState('')
   const [contactDonor, setContactDonor] = useState('')
+  const [donors, setDonors] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadDonors = async () => {
+    try {
+      setIsLoading(true)
+      setError('')
+      const data = await apiRequest('/api/admin/donors')
+      setDonors(data)
+    } catch (err) {
+      setError(err.message || 'Failed to load donors')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadDonors()
+  }, [])
 
   const handleOpenModal = () => {
     setIsModalOpen(true)
@@ -18,10 +39,23 @@ function AdminDonation() {
     setContactDonor('')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Placeholder for future submit logic
-    handleCloseModal()
+    try {
+      await apiRequest('/api/admin/donors', {
+        method: 'POST',
+        body: JSON.stringify({
+          donorName,
+          bloodType,
+          contactPhone: contactDonor,
+        }),
+      })
+      // Refresh table so new donor appears immediately
+      await loadDonors()
+      handleCloseModal()
+    } catch (err) {
+      console.error('Failed to add donor', err)
+    }
   }
 
   return (
@@ -48,29 +82,70 @@ function AdminDonation() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-xs">
+            <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50/60">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Donor Name
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Blood Type
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Contact
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Last Donation
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white">
-                <tr>
-                  <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={4}>
-                    No donors added yet.
-                  </td>
-                </tr>
+                {isLoading && (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={4}>
+                      Loading donors...
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && error && (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={4}>
+                      {error}
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && !error && donors.length === 0 && (
+                  <tr>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                      No donors added yet.
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading &&
+                  !error &&
+                  donors.map((donor) => (
+                    <tr key={donor.id} className="hover:bg-slate-50/60">
+                      <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                        {donor.donor_name || donor.donorName}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                        <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
+                          {donor.blood_type || donor.bloodType}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                        {donor.contact_phone || donor.contactPhone || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                        {donor.last_donation_date
+                          ? new Date(donor.last_donation_date).toLocaleDateString()
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

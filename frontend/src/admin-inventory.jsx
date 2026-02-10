@@ -1,11 +1,32 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
+import { apiRequest } from './api.js'
 
 function AdminInventory() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [bloodType, setBloodType] = useState('')
   const [units, setUnits] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
+  const [inventory, setInventory] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadInventory = async () => {
+    try {
+      setIsLoading(true)
+      setError('')
+      const data = await apiRequest('/api/admin/inventory')
+      setInventory(data)
+    } catch (err) {
+      setError(err.message || 'Failed to load inventory')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadInventory()
+  }, [])
 
   const handleOpenModal = () => {
     setIsModalOpen(true)
@@ -18,11 +39,24 @@ function AdminInventory() {
     setExpirationDate('')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Placeholder for future submit logic
-    console.log({ bloodType, units, expirationDate })
-    handleCloseModal()
+    try {
+      await apiRequest('/api/admin/inventory', {
+        method: 'POST',
+        body: JSON.stringify({
+          bloodType,
+          units: Number(units),
+          expirationDate,
+        }),
+      })
+      // Refresh table so new stock appears immediately
+      await loadInventory()
+      handleCloseModal()
+    } catch (err) {
+      // You could surface this in the UI; for now just log
+      console.error('Failed to add stock', err)
+    }
   }
 
   return (
@@ -49,29 +83,72 @@ function AdminInventory() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-100 text-xs">
+            <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50/60">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Blood Type
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Available Units
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Expiration Date
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Status
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white">
-                <tr>
-                  <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={4}>
-                    No inventory data available yet.
-                  </td>
-                </tr>
+                {isLoading && (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={4}>
+                      Loading inventory...
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && error && (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={4}>
+                      {error}
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && !error && inventory.length === 0 && (
+                  <tr>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                      No inventory data available yet.
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading &&
+                  !error &&
+                  inventory.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/60">
+                      <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                        {item.blood_type || item.bloodType}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                        <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
+                          {item.available_units ?? item.availableUnits ?? item.units}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                        {item.expiration_date
+                          ? new Date(item.expiration_date).toLocaleDateString()
+                          : item.expirationDate
+                          ? new Date(item.expirationDate).toLocaleDateString()
+                          : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm capitalize">
+                        {item.status || 'available'}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
