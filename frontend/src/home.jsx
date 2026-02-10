@@ -1,4 +1,51 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { apiRequest } from './api.js'
+
 function Home() {
+  const [activeRole, setActiveRole] = useState('donor') // 'donor' | 'hospital' | 'admin'
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const navigate = useNavigate()
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError('')
+
+    try {
+      const roleForApi =
+        activeRole === 'admin' ? 'admin' : activeRole === 'hospital' ? 'hospital' : 'donor'
+
+      const data = await apiRequest('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          identifier,
+          password,
+          role: roleForApi,
+        }),
+      })
+
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('role', data.user.role)
+
+      if (data.user.role === 'admin') {
+        navigate('/admin/dashboard')
+      } else if (data.user.role === 'hospital') {
+        navigate('/hospital/dashboard')
+      } else {
+        navigate('/dashboard')
+      }
+    } catch (err) {
+      setError(err.message || 'Login failed')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-red-150 via-white to-red-300">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-4 py-12 sm:px-6 lg:flex-row lg:gap-12 lg:px-8">
@@ -34,19 +81,34 @@ function Home() {
             <div className="mb-6 flex rounded-full bg-slate-100 p-1 text-xs font-medium text-slate-600">
               <button
                 type="button"
-                className="flex-1 rounded-full bg-white px-3 py-2 text-red-600 shadow-sm ring-1 ring-red-200"
+                onClick={() => setActiveRole('donor')}
+                className={`flex-1 rounded-full px-3 py-2 transition ${
+                  activeRole === 'donor'
+                    ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                    : 'hover:text-red-600'
+                }`}
               >
                 Donor/Recipient
               </button>
               <button
                 type="button"
-                className="flex-1 rounded-full px-3 py-2 transition hover:text-red-600"
+                onClick={() => setActiveRole('hospital')}
+                className={`flex-1 rounded-full px-3 py-2 transition ${
+                  activeRole === 'hospital'
+                    ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                    : 'hover:text-red-600'
+                }`}
               >
                 Hospital
               </button>
               <button
                 type="button"
-                className="flex-1 rounded-full px-3 py-2 transition hover:text-red-600"
+                onClick={() => setActiveRole('admin')}
+                className={`flex-1 rounded-full px-3 py-2 transition ${
+                  activeRole === 'admin'
+                    ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                    : 'hover:text-red-600'
+                }`}
               >
                 Admin
               </button>
@@ -56,7 +118,10 @@ function Home() {
               <h2 className="text-lg font-semibold text-slate-900">Login to BloodConnect</h2>
             </div>
 
-            <form className="space-y-4">
+            <form
+              className="space-y-4"
+              onSubmit={handleLogin}
+            >
               <div className="space-y-1">
                 <label
                   htmlFor="email"
@@ -67,6 +132,8 @@ function Home() {
                 <input
                   id="email"
                   type="email"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
                 />
               </div>
@@ -89,15 +156,24 @@ function Home() {
                 <input
                   id="password"
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
                 />
               </div>
 
+              {error && (
+                <p className="text-xs font-medium text-red-600">
+                  {error}
+                </p>
+              )}
+
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
               >
-                Login
+                {isSubmitting ? 'Logging in...' : 'Login'}
               </button>
 
               <p className="text-center text-xs text-slate-500">
