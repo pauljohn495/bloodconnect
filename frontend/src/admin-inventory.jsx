@@ -16,7 +16,11 @@ function AdminInventory() {
       setIsLoading(true)
       setError('')
       const data = await apiRequest('/api/admin/inventory')
-      setInventory(data)
+      // Filter out items with 0 available units to keep the table clean
+      const filteredData = data.filter(
+        (item) => (item.available_units || item.availableUnits || 0) > 0,
+      )
+      setInventory(filteredData)
     } catch (err) {
       setError(err.message || 'Failed to load inventory')
     } finally {
