@@ -19,6 +19,15 @@ function AdminPartner() {
   const [availableInventory, setAvailableInventory] = useState([])
   const [isLoadingInventory, setIsLoadingInventory] = useState(false)
   const [selectedStocks, setSelectedStocks] = useState({}) // { inventoryId: quantity }
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [notification, setNotification] = useState(null)
+  const [transferHospitalId, setTransferHospitalId] = useState(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingHospital, setEditingHospital] = useState(null)
+  const [editHospitalName, setEditHospitalName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editUsername, setEditUsername] = useState('')
+  const [editPassword, setEditPassword] = useState('')
 
   const loadHospitals = async () => {
     try {
@@ -77,8 +86,59 @@ function AdminPartner() {
       // Refresh table so new hospital appears immediately
       await loadHospitals()
       handleCloseModal()
+      showNotification('Hospital added successfully!', 'primary')
     } catch (err) {
       console.error('Failed to add hospital', err)
+      showNotification(err.message || 'Failed to add hospital', 'destructive')
+    }
+  }
+
+  const handleOpenEditModal = (hospital) => {
+    setEditingHospital(hospital)
+    setEditHospitalName(hospital.hospital_name || hospital.hospitalName || '')
+    setEditEmail(hospital.email || '')
+    setEditUsername(hospital.username || '')
+    setEditPassword('') // Don't pre-fill password for security
+    setIsEditModalOpen(true)
+    setOpenMenuHospitalId(null)
+  }
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false)
+    setEditingHospital(null)
+    setEditHospitalName('')
+    setEditEmail('')
+    setEditUsername('')
+    setEditPassword('')
+  }
+
+  const handleUpdateHospital = async (e) => {
+    e.preventDefault()
+    if (!editingHospital) return
+
+    try {
+      const updateData = {
+        hospitalName: editHospitalName,
+        email: editEmail,
+        username: editUsername,
+      }
+      
+      // Only include password if it's been changed
+      if (editPassword && editPassword.trim() !== '') {
+        updateData.password = editPassword
+      }
+
+      await apiRequest(`/api/admin/hospitals/${editingHospital.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      })
+      
+      await loadHospitals()
+      handleCloseEditModal()
+      showNotification('Hospital updated successfully!', 'primary')
+    } catch (err) {
+      console.error('Failed to update hospital', err)
+      showNotification(err.message || 'Failed to update hospital', 'destructive')
     }
   }
 
@@ -91,9 +151,10 @@ function AdminPartner() {
       await apiRequest(`/api/admin/hospitals/${hospital.id}`, { method: 'DELETE' })
       setOpenMenuHospitalId(null)
       await loadHospitals()
+      showNotification('Hospital deleted successfully!', 'primary')
     } catch (err) {
       console.error('Failed to delete hospital', err)
-      alert(err.message || 'Failed to delete hospital')
+      showNotification(err.message || 'Failed to delete hospital', 'destructive')
     }
   }
 
@@ -106,17 +167,18 @@ function AdminPartner() {
     try {
       // Fetch available inventory (where hospital_id is NULL)
       const data = await apiRequest('/api/admin/inventory')
-      // Filter for available stocks (status='available', available_units > 0, hospital_id is null)
+      // Filter for available stocks (status='available' or 'near_expiry', available_units > 0, hospital_id is null, not expired)
       const available = data.filter(
         (item) =>
-          item.status === 'available' &&
+          (item.status === 'available' || item.status === 'near_expiry') &&
           (item.available_units || item.availableUnits || 0) > 0 &&
-          (!item.hospital_id || item.hospital_id === null || item.hospitalId === null),
+          (!item.hospital_id || item.hospital_id === null || item.hospitalId === null) &&
+          item.status !== 'expired',
       )
       setAvailableInventory(available)
     } catch (err) {
       console.error('Failed to load inventory', err)
-      alert(err.message || 'Failed to load available inventory')
+      showNotification(err.message || 'Failed to load available inventory', 'destructive')
     } finally {
       setIsLoadingInventory(false)
     }
@@ -127,6 +189,8 @@ function AdminPartner() {
     setSelectedHospital(null)
     setSelectedStocks({})
     setAvailableInventory([])
+    setTransferHospitalId(null)
+    setShowConfirmDialog(false)
   }
 
   const handleStockToggle = (inventoryId, availableUnits) => {
@@ -149,12 +213,33 @@ function AdminPartner() {
     }))
   }
 
-  const handleConfirmTransfer = async () => {
+  const showNotification = (message, type = 'primary') => {
+    setNotification({ message, type })
+    setTimeout(() => {
+      setNotification(null)
+    }, 5000)
+  }
+
+  const handleConfirmTransferClick = () => {
     if (!selectedHospital || Object.keys(selectedStocks).length === 0) {
-      alert('Please select at least one blood stock to transfer')
+      showNotification('Please select at least one blood stock to transfer', 'destructive')
       return
     }
+    // Store hospital ID before showing dialog to prevent it from being lost
+    setTransferHospitalId(selectedHospital.id)
+    setShowConfirmDialog(true)
+  }
 
+  const handleConfirmTransfer = async () => {
+    setShowConfirmDialog(false)
+    
+    // Use stored hospital ID or fallback to selectedHospital
+    const hospitalId = transferHospitalId || selectedHospital?.id
+    if (!hospitalId) {
+      showNotification('Hospital information is missing. Please try again.', 'destructive')
+      return
+    }
+    
     const transfers = Object.entries(selectedStocks).map(([inventoryId, units]) => ({
       inventoryId: parseInt(inventoryId),
       units: parseInt(units),
@@ -164,7 +249,7 @@ function AdminPartner() {
       await apiRequest('/api/admin/transfer', {
         method: 'POST',
         body: JSON.stringify({
-          hospitalId: selectedHospital.id,
+          hospitalId: hospitalId,
           transfers,
         }),
       })
@@ -174,12 +259,13 @@ function AdminPartner() {
       let updatedAvailableInventory = []
       try {
         const data = await apiRequest('/api/admin/inventory')
-        // Filter for available stocks (status='available', available_units > 0, hospital_id is null)
+        // Filter for available stocks (status='available' or 'near_expiry', available_units > 0, hospital_id is null, not expired)
         updatedAvailableInventory = data.filter(
           (item) =>
-            item.status === 'available' &&
+            (item.status === 'available' || item.status === 'near_expiry') &&
             (item.available_units || item.availableUnits || 0) > 0 &&
-            (!item.hospital_id || item.hospital_id === null || item.hospitalId === null),
+            (!item.hospital_id || item.hospital_id === null || item.hospitalId === null) &&
+            item.status !== 'expired',
         )
         setAvailableInventory(updatedAvailableInventory)
       } catch (err) {
@@ -191,18 +277,16 @@ function AdminPartner() {
       // Clear selections
       setSelectedStocks({})
       
-      alert('Blood stocks transferred successfully!')
+      showNotification('Blood stocks transferred successfully!', 'primary')
       
       // Refresh hospital list to update totals (this will show the transferred blood in the hospital table)
       await loadHospitals()
       
-      // Close modal if no more available inventory, otherwise keep it open for more transfers
-      if (updatedAvailableInventory.length === 0) {
-        handleCloseTransferModal()
-      }
+      // Close the transfer modal after successful transfer
+      handleCloseTransferModal()
     } catch (err) {
       console.error('Transfer failed', err)
-      alert(err.message || 'Failed to transfer blood stocks')
+      showNotification(err.message || 'Failed to transfer blood stocks', 'destructive')
     }
   }
 
@@ -373,8 +457,10 @@ function AdminPartner() {
                 className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 role="menuitem"
                 onClick={() => {
-                  setOpenMenuHospitalId(null)
-                  alert('Edit: coming soon')
+                  const hospital = hospitals.find((h) => h.id === openMenuHospitalId)
+                  if (hospital) {
+                    handleOpenEditModal(hospital)
+                  }
                 }}
               >
                 Edit
@@ -391,17 +477,6 @@ function AdminPartner() {
                 }}
               >
                 Delete
-              </button>
-              <button
-                type="button"
-                className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                role="menuitem"
-                onClick={() => {
-                  setOpenMenuHospitalId(null)
-                  alert('More: coming soon')
-                }}
-              >
-                More
               </button>
             </div>
           </div>
@@ -494,6 +569,105 @@ function AdminPartner() {
         </div>
       )}
 
+      {/* Edit Hospital Modal */}
+      {isEditModalOpen && editingHospital && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Edit Hospital</h3>
+              <button
+                type="button"
+                onClick={handleCloseEditModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateHospital} className="mt-4 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Hospital Name
+                </label>
+                <input
+                  type="text"
+                  value={editHospitalName}
+                  onChange={(e) => setEditHospitalName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter hospital name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter hospital email"
+                  required
+                />
+              </div>
+
+              <div className="pt-1">
+                <p className="text-[11px] font-semibold text-slate-700">
+                  Login Credentials
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter username"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Password <span className="text-slate-400">(leave blank to keep current)</span>
+                </label>
+                <input
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter new password (optional)"
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseEditModal}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                >
+                  Update Hospital
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Transfer Modal */}
       {isTransferModalOpen && selectedHospital && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
@@ -563,6 +737,9 @@ function AdminPartner() {
                           Expiration Date
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
                           Units to Transfer
                         </th>
                       </tr>
@@ -600,6 +777,23 @@ function AdminPartner() {
                                 : item.expirationDate
                                 ? new Date(item.expirationDate).toLocaleDateString()
                                 : '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${
+                                  item.status === 'available'
+                                    ? 'bg-green-50 text-green-700 ring-green-100'
+                                    : item.status === 'near_expiry' || item.status === 'Near Expiry'
+                                    ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                                    : item.status === 'expired'
+                                    ? 'bg-red-50 text-red-700 ring-red-100'
+                                    : item.status === 'reserved'
+                                    ? 'bg-yellow-50 text-yellow-700 ring-yellow-100'
+                                    : 'bg-slate-50 text-slate-700 ring-slate-100'
+                                }`}
+                              >
+                                {item.status === 'near_expiry' ? 'Near Expiry' : item.status || 'available'}
+                              </span>
                             </td>
                             <td className="px-4 py-3">
                               {isSelected ? (
@@ -644,7 +838,7 @@ function AdminPartner() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleConfirmTransfer}
+                  onClick={handleConfirmTransferClick}
                   disabled={Object.keys(selectedStocks).length === 0}
                   className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -652,6 +846,100 @@ function AdminPartner() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <button
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 transition"
+              type="button"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <div className="border-b border-slate-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">Confirm Transfer</h2>
+            </div>
+            
+            <div className="px-6 py-4">
+              <p className="text-sm text-slate-700">
+                Are you sure you want to transfer{' '}
+                <strong>{Object.keys(selectedStocks).length}</strong> blood stock(s) to{' '}
+                <strong>{selectedHospital?.hospital_name || selectedHospital?.hospitalName}</strong>?
+              </p>
+              <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                {Object.entries(selectedStocks).map(([inventoryId, units]) => {
+                  const item = availableInventory.find((i) => i.id === parseInt(inventoryId))
+                  if (!item) return null
+                  return (
+                    <div key={inventoryId} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                      <span className="font-semibold text-slate-900">
+                        {item.blood_type || item.bloodType}
+                      </span>
+                      <span className="text-slate-600">{units} unit(s)</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            
+            <div className="border-t border-slate-200 px-6 py-4">
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmDialog(false)}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmTransfer}
+                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition"
+                >
+                  Confirm Transfer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Container */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[200] transition-all duration-300 ease-in-out">
+          <div
+            className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg min-w-[300px] max-w-md ${
+              notification.type === 'destructive'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : 'border-red-200 bg-red-50 text-red-800'
+            }`}
+          >
+            {notification.type === 'destructive' ? (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            <p className="text-sm font-medium flex-1">{notification.message}</p>
+            <button
+              onClick={() => setNotification(null)}
+              className="shrink-0 rounded p-1 transition hover:opacity-70 text-red-600 hover:bg-red-100"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}

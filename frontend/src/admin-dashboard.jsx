@@ -176,8 +176,22 @@ function AdminDashboard() {
                                 {stock.available_units ?? stock.availableUnits ?? stock.units ?? 0}
                               </span>
                             </td>
-                            <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700 capitalize">
-                              {stock.status || 'available'}
+                            <td className="whitespace-nowrap px-4 py-2 text-xs">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold capitalize ring-1 ${
+                                  stock.status === 'available'
+                                    ? 'bg-green-50 text-green-700 ring-green-100'
+                                    : stock.status === 'near_expiry' || stock.status === 'Near Expiry'
+                                    ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                                    : stock.status === 'expired'
+                                    ? 'bg-red-50 text-red-700 ring-red-100'
+                                    : stock.status === 'reserved'
+                                    ? 'bg-yellow-50 text-yellow-700 ring-yellow-100'
+                                    : 'bg-slate-50 text-slate-700 ring-slate-100'
+                                }`}
+                              >
+                                {stock.status === 'near_expiry' ? 'Near Expiry' : stock.status || 'available'}
+                              </span>
                             </td>
                             <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
                               {stock.expiration_date || stock.expirationDate
@@ -363,6 +377,8 @@ function AdminDashboard() {
                             className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${
                               stock.status === 'available'
                                 ? 'bg-green-50 text-green-700 ring-green-100'
+                                : stock.status === 'near_expiry' || stock.status === 'Near Expiry'
+                                ? 'bg-orange-50 text-orange-700 ring-orange-100'
                                 : stock.status === 'expired'
                                 ? 'bg-red-50 text-red-700 ring-red-100'
                                 : stock.status === 'reserved'
@@ -370,7 +386,7 @@ function AdminDashboard() {
                                 : 'bg-slate-50 text-slate-700 ring-slate-100'
                             }`}
                           >
-                            {stock.status || 'available'}
+                            {stock.status === 'near_expiry' ? 'Near Expiry' : stock.status || 'available'}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">

@@ -32,7 +32,48 @@ router.get('/inventory', async (req, res) => {
       [hospitalId],
     )
 
-    res.json(rows)
+    // Update status based on expiration date
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const sevenDaysFromNow = new Date(today)
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
+    
+    const updatedRows = await Promise.all(
+      rows.map(async (row) => {
+        const expirationDate = new Date(row.expiration_date)
+        expirationDate.setHours(0, 0, 0, 0)
+        
+        let newStatus = row.status
+        
+        // Check if expired
+        if (expirationDate < today) {
+          newStatus = 'expired'
+        }
+        // Check if near expiry (within 7 days) and not already expired
+        else if (expirationDate <= sevenDaysFromNow && row.status !== 'expired') {
+          newStatus = 'near_expiry'
+        }
+        // If status was near_expiry but no longer within 7 days, set back to available
+        else if (row.status === 'near_expiry' && expirationDate > sevenDaysFromNow) {
+          newStatus = 'available'
+        }
+        
+        // Update status in database if it changed
+        if (newStatus !== row.status) {
+          await pool.query('UPDATE blood_inventory SET status = ? WHERE id = ?', [
+            newStatus,
+            row.id,
+          ])
+        }
+        
+        return {
+          ...row,
+          status: newStatus,
+        }
+      })
+    )
+
+    res.json(updatedRows)
   } catch (error) {
     console.error('Hospital inventory error:', error)
     res.status(500).json({ message: 'Failed to fetch hospital inventory' })

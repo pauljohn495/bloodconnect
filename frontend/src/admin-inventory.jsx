@@ -148,8 +148,22 @@ function AdminInventory() {
                           ? new Date(item.expirationDate).toLocaleDateString()
                           : '—'}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-sm capitalize">
-                        {item.status || 'available'}
+                      <td className="whitespace-nowrap px-4 py-2 text-sm">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${
+                            item.status === 'available'
+                              ? 'bg-green-50 text-green-700 ring-green-100'
+                              : item.status === 'near_expiry' || item.status === 'Near Expiry'
+                              ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                              : item.status === 'expired'
+                              ? 'bg-red-50 text-red-700 ring-red-100'
+                              : item.status === 'reserved'
+                              ? 'bg-yellow-50 text-yellow-700 ring-yellow-100'
+                              : 'bg-slate-50 text-slate-700 ring-slate-100'
+                          }`}
+                        >
+                          {item.status === 'near_expiry' ? 'Near Expiry' : item.status || 'available'}
+                        </span>
                       </td>
                     </tr>
                   ))}
