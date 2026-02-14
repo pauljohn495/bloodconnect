@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 const sidebarItems = [
   { name: 'Dashboard', path: '/admin/dashboard' },
@@ -11,6 +11,15 @@ const sidebarItems = [
 
 function AdminLayout({ children, pageTitle, pageDescription }) {
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    // Clear authentication tokens and user data
+    localStorage.removeItem('token')
+    localStorage.removeItem('role')
+    // Navigate to home page
+    navigate('/')
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -83,6 +92,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
             <div className="flex items-center gap-3">
               <button
                 type="button"
+                onClick={handleLogout}
                 className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 Logout

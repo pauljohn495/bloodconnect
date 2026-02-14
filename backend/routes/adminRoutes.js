@@ -20,7 +20,8 @@ router.get('/dashboard-summary', async (req, res) => {
           (SELECT COUNT(*) FROM hospitals WHERE is_active = TRUE) AS partnerHospitals,
           (SELECT COUNT(*) FROM donors) AS totalDonors,
           (SELECT COUNT(*) FROM blood_requests WHERE status = 'pending') AS pendingRequests,
-          (SELECT COUNT(*) FROM donations WHERE status = 'completed') AS completedDonations
+          (SELECT COUNT(*) FROM donations WHERE status = 'completed') + 
+          COALESCE((SELECT SUM(units_transferred) FROM blood_transfers), 0) AS completedDonations
       `),
     ])
 
@@ -222,13 +223,22 @@ router.post('/donors', async (req, res) => {
 // GET /api/admin/inventory
 router.get('/inventory', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `
-      SELECT *
-      FROM blood_inventory
-      ORDER BY created_at DESC
-    `,
-    )
+    const { hospitalId } = req.query
+    
+    let query = 'SELECT * FROM blood_inventory'
+    let params = []
+    
+    if (hospitalId) {
+      query += ' WHERE hospital_id = ?'
+      params.push(hospitalId)
+    } else {
+      // For central inventory, show items where hospital_id is NULL
+      query += ' WHERE hospital_id IS NULL'
+    }
+    
+    query += ' ORDER BY created_at DESC'
+    
+    const [rows] = await pool.query(query, params)
     res.json(rows)
   } catch (error) {
     console.error('Fetch inventory error:', error)
@@ -255,8 +265,8 @@ router.post('/inventory', async (req, res) => {
     const [result] = await pool.query(
       `
       INSERT INTO blood_inventory
-        (blood_type, units, available_units, reserved_units, expiration_date, status, added_by, hospital_id)
-      VALUES (?, ?, ?, 0, ?, 'available', ?, ?)
+        (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
+      VALUES (?, ?, ?, ?, 'available', ?, ?)
     `,
       [bloodType, intUnits, intUnits, expirationDate, req.user.id, hospitalId || null],
     )
@@ -272,6 +282,147 @@ router.post('/inventory', async (req, res) => {
   } catch (error) {
     console.error('Create inventory error:', error)
     res.status(500).json({ message: 'Failed to add inventory' })
+  }
+})
+
+// POST /api/admin/transfer
+router.post('/transfer', async (req, res) => {
+  const { hospitalId, transfers } = req.body
+
+  if (!hospitalId || !Array.isArray(transfers) || transfers.length === 0) {
+    return res.status(400).json({ message: 'hospitalId and transfers array are required' })
+  }
+
+  try {
+    // Verify hospital exists
+    const [hospitalRows] = await pool.query('SELECT id FROM hospitals WHERE id = ?', [hospitalId])
+    if (hospitalRows.length === 0) {
+      return res.status(404).json({ message: 'Hospital not found' })
+    }
+
+    // Start transaction
+    await pool.query('START TRANSACTION')
+
+    try {
+      const transferResults = []
+
+      for (const transfer of transfers) {
+        const { inventoryId, units } = transfer
+
+        if (!inventoryId || !units || units <= 0) {
+          throw new Error('Invalid transfer data: inventoryId and positive units required')
+        }
+
+        // Get current inventory item
+        const [inventoryRows] = await pool.query(
+          'SELECT id, available_units, blood_type, expiration_date FROM blood_inventory WHERE id = ? AND status = ? AND (hospital_id IS NULL OR hospital_id = 0)',
+          [inventoryId, 'available'],
+        )
+
+        if (inventoryRows.length === 0) {
+          throw new Error(`Inventory item ${inventoryId} not found or not available`)
+        }
+
+        const inventory = inventoryRows[0]
+        if (inventory.available_units < units) {
+          throw new Error(
+            `Insufficient units: requested ${units}, available ${inventory.available_units}`,
+          )
+        }
+
+        // Update source inventory (reduce available units)
+        await pool.query(
+          'UPDATE blood_inventory SET available_units = available_units - ? WHERE id = ?',
+          [units, inventoryId],
+        )
+
+        // Create or update destination inventory
+        const [existingDest] = await pool.query(
+          'SELECT id, available_units FROM blood_inventory WHERE hospital_id = ? AND blood_type = ? AND expiration_date = ? AND status = ?',
+          [hospitalId, inventory.blood_type, inventory.expiration_date, 'available'],
+        )
+
+        if (existingDest.length > 0) {
+          // Update existing inventory
+          await pool.query(
+            'UPDATE blood_inventory SET available_units = available_units + ?, units = units + ? WHERE id = ?',
+            [units, units, existingDest[0].id],
+          )
+        } else {
+          // Create new inventory entry for hospital
+          await pool.query(
+            `INSERT INTO blood_inventory 
+             (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
+             VALUES (?, ?, ?, ?, 'available', ?, ?)`,
+            [
+              inventory.blood_type,
+              units,
+              units,
+              inventory.expiration_date,
+              req.user.id,
+              hospitalId,
+            ],
+          )
+        }
+
+        // Record transfer in blood_transfers table
+        await pool.query(
+          `INSERT INTO blood_transfers 
+           (source_inventory_id, hospital_id, blood_type, units_transferred, transferred_by, transfer_date)
+           VALUES (?, ?, ?, ?, ?, NOW())`,
+          [inventoryId, hospitalId, inventory.blood_type, units, req.user.id],
+        )
+
+        transferResults.push({
+          inventoryId,
+          bloodType: inventory.blood_type,
+          units,
+        })
+      }
+
+      // Commit transaction
+      await pool.query('COMMIT')
+
+      res.json({
+        message: 'Transfer completed successfully',
+        transfers: transferResults,
+      })
+    } catch (error) {
+      // Rollback on error
+      await pool.query('ROLLBACK')
+      throw error
+    }
+  } catch (error) {
+    console.error('Transfer error:', error)
+    res.status(500).json({ message: error.message || 'Failed to transfer blood stocks' })
+  }
+})
+
+// GET /api/admin/transfers
+router.get('/transfers', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        bt.id,
+        bt.blood_type,
+        bt.units_transferred,
+        bt.transfer_date,
+        h.hospital_name,
+        u.full_name AS transferred_by_name
+      FROM blood_transfers bt
+      JOIN hospitals h ON bt.hospital_id = h.id
+      LEFT JOIN users u ON bt.transferred_by = u.id
+      ORDER BY bt.transfer_date DESC
+      LIMIT ?
+    `,
+      [limit],
+    )
+    res.json(rows)
+  } catch (error) {
+    console.error('Fetch transfers error:', error)
+    res.status(500).json({ message: 'Failed to fetch transfers' })
   }
 })
 

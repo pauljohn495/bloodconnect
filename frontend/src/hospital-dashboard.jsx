@@ -12,10 +12,10 @@ function HospitalDashboard() {
 
       </section>
 
-      {/* Main table + side panel */}
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      {/* Main table */}
+      <section className="mt-6">
         {/* Blood requests table */}
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 w-400">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <div>
               <h2 className="text-sm font-semibold text-slate-900">Recent blood donated</h2>

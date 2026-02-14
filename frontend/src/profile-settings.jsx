@@ -50,8 +50,10 @@ function ProfileSettings() {
   }
 
   const handleLogout = () => {
-    // Add logout logic here (clear tokens, session, etc.)
-    // For now, just navigate to home page
+    // Clear authentication tokens and user data
+    localStorage.removeItem('token')
+    localStorage.removeItem('role')
+    // Navigate to home page
     navigate('/')
   }
 

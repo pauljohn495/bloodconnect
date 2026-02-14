@@ -127,7 +127,7 @@ function Home() {
                   htmlFor="email"
                   className="block text-xs font-medium text-slate-700"
                 >
-                  Email or Username
+                  Email
                 </label>
                 <input
                   id="email"
