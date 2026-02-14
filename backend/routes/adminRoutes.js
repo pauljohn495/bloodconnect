@@ -138,6 +138,70 @@ router.post('/hospitals', async (req, res) => {
   }
 })
 
+// PUT /api/admin/hospitals/:id
+router.put('/hospitals/:id', async (req, res) => {
+  const { id } = req.params
+  const hospitalId = parseInt(id, 10)
+  const { hospitalName, email, username, password } = req.body
+
+  if (Number.isNaN(hospitalId)) {
+    return res.status(400).json({ message: 'Invalid hospital id' })
+  }
+
+  if (!hospitalName || !email || !username) {
+    return res.status(400).json({ message: 'hospitalName, email, and username are required' })
+  }
+
+  try {
+    const [rows] = await pool.query('SELECT user_id FROM hospitals WHERE id = ? LIMIT 1', [
+      hospitalId,
+    ])
+
+    const hospital = rows[0]
+    if (!hospital) {
+      return res.status(404).json({ message: 'Hospital not found' })
+    }
+
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+
+      // Update user information
+      if (password && password.trim() !== '') {
+        const bcrypt = require('bcryptjs')
+        const passwordHash = await bcrypt.hash(password, 10)
+        await conn.query(
+          'UPDATE users SET username = ?, email = ?, password_hash = ?, full_name = ? WHERE id = ?',
+          [username, email, passwordHash, hospitalName, hospital.user_id],
+        )
+      } else {
+        await conn.query(
+          'UPDATE users SET username = ?, email = ?, full_name = ? WHERE id = ?',
+          [username, email, hospitalName, hospital.user_id],
+        )
+      }
+
+      // Update hospital name
+      await conn.query('UPDATE hospitals SET hospital_name = ? WHERE id = ?', [
+        hospitalName,
+        hospitalId,
+      ])
+
+      await conn.commit()
+
+      res.json({ message: 'Hospital updated successfully' })
+    } catch (error) {
+      await conn.rollback()
+      throw error
+    } finally {
+      conn.release()
+    }
+  } catch (error) {
+    console.error('Update hospital error:', error)
+    res.status(500).json({ message: 'Failed to update hospital' })
+  }
+})
+
 // DELETE /api/admin/hospitals/:id
 router.delete('/hospitals/:id', async (req, res) => {
   const { id } = req.params
@@ -239,7 +303,49 @@ router.get('/inventory', async (req, res) => {
     query += ' ORDER BY created_at DESC'
     
     const [rows] = await pool.query(query, params)
-    res.json(rows)
+    
+    // Update status based on expiration date
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const sevenDaysFromNow = new Date(today)
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
+    
+    const updatedRows = await Promise.all(
+      rows.map(async (row) => {
+        const expirationDate = new Date(row.expiration_date)
+        expirationDate.setHours(0, 0, 0, 0)
+        
+        let newStatus = row.status
+        
+        // Check if expired
+        if (expirationDate < today) {
+          newStatus = 'expired'
+        }
+        // Check if near expiry (within 7 days) and not already expired
+        else if (expirationDate <= sevenDaysFromNow && row.status !== 'expired') {
+          newStatus = 'near_expiry'
+        }
+        // If status was near_expiry but no longer within 7 days, set back to available
+        else if (row.status === 'near_expiry' && expirationDate > sevenDaysFromNow) {
+          newStatus = 'available'
+        }
+        
+        // Update status in database if it changed
+        if (newStatus !== row.status) {
+          await pool.query('UPDATE blood_inventory SET status = ? WHERE id = ?', [
+            newStatus,
+            row.id,
+          ])
+        }
+        
+        return {
+          ...row,
+          status: newStatus,
+        }
+      }),
+    )
+    
+    res.json(updatedRows)
   } catch (error) {
     console.error('Fetch inventory error:', error)
     res.status(500).json({ message: 'Failed to fetch inventory' })
