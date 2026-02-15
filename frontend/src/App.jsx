@@ -10,6 +10,7 @@ import UserDashboard from './user-dashboard.jsx'
 import ProfileSettings from './profile-settings.jsx'
 import HospitalDashboard from './hospital-dashboard.jsx'
 import HospitalInventory from './hospital-inventory.jsx'
+import HospitalRequests from './hospital-requests.jsx'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
         <Route path="/hospital/inventory" element={<HospitalInventory />} />
+        <Route path="/hospital/requests" element={<HospitalRequests />} />
         <Route path="/hospital" element={<Navigate to="/hospital/dashboard" replace />} />
       </Routes>
     </BrowserRouter>

@@ -10,6 +10,7 @@ function AdminInventory() {
   const [inventory, setInventory] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const loadInventory = async () => {
     try {
@@ -63,6 +64,15 @@ function AdminInventory() {
     }
   }
 
+  // Filter inventory based on status
+  const filteredInventory = inventory.filter((item) => {
+    if (statusFilter === 'all') return true
+    if (statusFilter === 'available') return item.status === 'available'
+    if (statusFilter === 'near_expiry') return item.status === 'near_expiry' || item.status === 'Near Expiry'
+    if (statusFilter === 'expired') return item.status === 'expired'
+    return true
+  })
+
   return (
     <AdminLayout
       pageTitle="Inventory"
@@ -77,13 +87,25 @@ function AdminInventory() {
                 Complete inventory of all blood types and units
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleOpenModal}
-              className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
-            >
-              Add Stock
-            </button>
+            <div className="flex items-center gap-3">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              >
+                <option value="all">All</option>
+                <option value="available">Available</option>
+                <option value="near_expiry">Near Expiry</option>
+                <option value="expired">Expired</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleOpenModal}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+              >
+                Add Stock
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -129,15 +151,23 @@ function AdminInventory() {
                   </tr>
                 )}
 
+                {!isLoading && !error && inventory.length > 0 && filteredInventory.length === 0 && (
+                  <tr>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                      No items found with status "{statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}".
+                    </td>
+                  </tr>
+                )}
+
                 {!isLoading &&
                   !error &&
-                  inventory.map((item) => (
+                  filteredInventory.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         {item.blood_type || item.bloodType}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                        <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
+                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
                           {item.available_units ?? item.availableUnits ?? item.units}
                         </span>
                       </td>
