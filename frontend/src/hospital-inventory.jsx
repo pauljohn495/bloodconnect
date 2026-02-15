@@ -6,6 +6,12 @@ function HospitalInventory() {
   const [inventory, setInventory] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [bloodTypeStats, setBloodTypeStats] = useState({})
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
+  const [bloodType, setBloodType] = useState('')
+  const [unitsRequested, setUnitsRequested] = useState('')
+  const [notes, setNotes] = useState('')
+  const [notification, setNotification] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const loadInventory = async () => {
     try {
@@ -42,6 +48,66 @@ function HospitalInventory() {
 
   const bloodTypes = ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-']
 
+  const handleOpenRequestModal = () => {
+    setIsRequestModalOpen(true)
+    setBloodType('')
+    setUnitsRequested('')
+    setNotes('')
+  }
+
+  const handleCloseRequestModal = () => {
+    setIsRequestModalOpen(false)
+    setBloodType('')
+    setUnitsRequested('')
+    setNotes('')
+  }
+
+  const showNotification = (message, type = 'primary') => {
+    setNotification({ message, type })
+    setTimeout(() => {
+      setNotification(null)
+    }, 5000)
+  }
+
+  const handleSubmitRequest = async (e) => {
+    e.preventDefault()
+    if (!bloodType || !unitsRequested) {
+      showNotification('Blood type and units requested are required', 'destructive')
+      return
+    }
+
+    const units = parseInt(unitsRequested, 10)
+    if (Number.isNaN(units) || units <= 0) {
+      showNotification('Units requested must be a positive number', 'destructive')
+      return
+    }
+
+    try {
+      await apiRequest('/api/hospital/requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          bloodType,
+          unitsRequested: units,
+          notes: notes || null,
+        }),
+      })
+      handleCloseRequestModal()
+      showNotification('Blood request submitted successfully!', 'primary')
+    } catch (err) {
+      console.error('Failed to submit request', err)
+      showNotification(err.message || 'Failed to submit blood request', 'destructive')
+    }
+  }
+
+  // Filter inventory based on status
+  const filteredInventory = inventory.filter((item) => {
+    if (statusFilter === 'all') return true
+    if (statusFilter === 'available') return item.status === 'available'
+    if (statusFilter === 'near_expiry') return item.status === 'near_expiry' || item.status === 'Near Expiry'
+    if (statusFilter === 'expired') return item.status === 'expired'
+    return true
+  })
+
   return (
     <HospitalLayout
       pageTitle="Blood Inventory Management"
@@ -72,12 +138,16 @@ function HospitalInventory() {
                 Complete inventory of all blood types and units
               </p>
             </div>
-            <button
-              type="button"
-              className="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 sm:inline-flex"
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
             >
-              Add Stock
-            </button>
+              <option value="all">All</option>
+              <option value="available">Available</option>
+              <option value="near_expiry">Near Expiry</option>
+              <option value="expired">Expired</option>
+            </select>
           </div>
 
           <div className="overflow-x-auto">
@@ -113,8 +183,15 @@ function HospitalInventory() {
                     </td>
                   </tr>
                 )}
+                {!isLoading && inventory.length > 0 && filteredInventory.filter((item) => (item.available_units || item.availableUnits || 0) > 0).length === 0 && (
+                  <tr>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={4}>
+                      No items found with status "{statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}".
+                    </td>
+                  </tr>
+                )}
                 {!isLoading &&
-                  inventory
+                  filteredInventory
                     .filter((item) => (item.available_units || item.availableUnits || 0) > 0)
                     .map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/60">
@@ -158,12 +235,128 @@ function HospitalInventory() {
         <div className="flex justify-end">
           <button
             type="button"
+            onClick={handleOpenRequestModal}
             className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
           >
             Request Blood
           </button>
         </div>
       </section>
+
+      {/* Request Blood Modal */}
+      {isRequestModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Request Blood</h3>
+              <button
+                type="button"
+                onClick={handleCloseRequestModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRequest} className="mt-4 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Blood Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={bloodType}
+                  onChange={(e) => setBloodType(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                >
+                  <option value="">Select blood type</option>
+                  {bloodTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Units Requested <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={unitsRequested}
+                  onChange={(e) => setUnitsRequested(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter number of units"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Notes (Optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Add any additional notes or requirements"
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseRequestModal}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                >
+                  Submit Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Container */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[200] transition-all duration-300 ease-in-out">
+          <div
+            className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg min-w-[300px] max-w-md ${
+              notification.type === 'destructive'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : 'border-red-200 bg-red-50 text-red-800'
+            }`}
+          >
+            {notification.type === 'destructive' ? (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            <p className="text-sm font-medium flex-1">{notification.message}</p>
+            <button
+              onClick={() => setNotification(null)}
+              className="shrink-0 rounded p-1 transition hover:opacity-70 text-red-600 hover:bg-red-100"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </HospitalLayout>
   )
 }

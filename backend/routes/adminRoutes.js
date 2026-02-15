@@ -63,22 +63,24 @@ router.get('/hospitals', async (req, res) => {
         ) AS total_available_units,
         COALESCE(
           (
-            SELECT SUM(d.units_donated)
-            FROM donations d
-            WHERE d.hospital_id = h.id
-              AND d.status = 'completed'
+            SELECT SUM(bt.units_transferred)
+            FROM blood_transfers bt
+            WHERE bt.hospital_id = h.id
           ),
           0
         ) AS total_donated_units
       FROM hospitals h
-      JOIN users u ON h.user_id = u.id
+      LEFT JOIN users u ON h.user_id = u.id
       ORDER BY h.created_at DESC
     `,
     )
-    res.json(rows)
+    res.json(rows || [])
   } catch (error) {
     console.error('Fetch hospitals error:', error)
-    res.status(500).json({ message: 'Failed to fetch hospitals' })
+    res.status(500).json({ 
+      message: 'Failed to fetch hospitals',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
 })
 
@@ -95,11 +97,56 @@ router.post('/hospitals', async (req, res) => {
   const bcrypt = require('bcryptjs')
 
   try {
+    // Check if username or email already exists
+    const [existingUsers] = await pool.query(
+      `
+      SELECT id, username, email FROM users 
+      WHERE username = ? OR email = ?
+    `,
+      [username, email],
+    )
+
+    if (existingUsers.length > 0) {
+      const existing = existingUsers[0]
+      if (existing.username === username) {
+        return res.status(400).json({ message: 'Username already exists' })
+      }
+      if (existing.email === email) {
+        return res.status(400).json({ message: 'Email already exists' })
+      }
+    }
+
+    // Check if user already has a hospital record
+    if (existingUsers.length > 0) {
+      const [existingHospital] = await pool.query(
+        `
+        SELECT id FROM hospitals WHERE user_id = ?
+      `,
+        [existingUsers[0].id],
+      )
+      if (existingHospital.length > 0) {
+        return res.status(400).json({ message: 'User already has a hospital account' })
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, 10)
 
     const conn = await pool.getConnection()
     try {
       await conn.beginTransaction()
+
+      // Check again within transaction
+      const [checkUsers] = await conn.query(
+        `
+        SELECT id FROM users WHERE username = ? OR email = ?
+      `,
+        [username, email],
+      )
+
+      if (checkUsers.length > 0) {
+        await conn.rollback()
+        return res.status(400).json({ message: 'Username or email already exists' })
+      }
 
       const [userResult] = await conn.query(
         `
@@ -110,6 +157,19 @@ router.post('/hospitals', async (req, res) => {
       )
 
       const userId = userResult.insertId
+
+      // Check if hospital already exists for this user_id
+      const [checkHospital] = await conn.query(
+        `
+        SELECT id FROM hospitals WHERE user_id = ?
+      `,
+        [userId],
+      )
+
+      if (checkHospital.length > 0) {
+        await conn.rollback()
+        return res.status(400).json({ message: 'Hospital record already exists for this user' })
+      }
 
       const [hospitalResult] = await conn.query(
         `
@@ -128,13 +188,32 @@ router.post('/hospitals', async (req, res) => {
       })
     } catch (error) {
       await conn.rollback()
+      console.error('Create hospital transaction error:', error)
+      
+      // Handle specific MySQL errors
+      if (error.code === 'ER_DUP_ENTRY') {
+        if (error.sqlMessage.includes('user_id')) {
+          return res.status(400).json({ message: 'User already has a hospital record. Please use a different username or email.' })
+        }
+        if (error.sqlMessage.includes('username')) {
+          return res.status(400).json({ message: 'Username already exists' })
+        }
+        if (error.sqlMessage.includes('email')) {
+          return res.status(400).json({ message: 'Email already exists' })
+        }
+        return res.status(400).json({ message: 'Duplicate entry. This record may already exist.' })
+      }
+      
       throw error
     } finally {
       conn.release()
     }
   } catch (error) {
     console.error('Create hospital error:', error)
-    res.status(500).json({ message: 'Failed to create hospital' })
+    res.status(500).json({ 
+      message: error.message || 'Failed to create hospital',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
 })
 
@@ -304,7 +383,7 @@ router.get('/inventory', async (req, res) => {
     
     const [rows] = await pool.query(query, params)
     
-    // Update status based on expiration date
+    // Calculate status based on expiration date (don't store near_expiry in DB)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const sevenDaysFromNow = new Date(today)
@@ -315,32 +394,41 @@ router.get('/inventory', async (req, res) => {
         const expirationDate = new Date(row.expiration_date)
         expirationDate.setHours(0, 0, 0, 0)
         
-        let newStatus = row.status
+        let displayStatus = row.status
+        let dbStatus = row.status
         
-        // Check if expired
+        // Check if expired - only update DB for expired status
         if (expirationDate < today) {
-          newStatus = 'expired'
+          displayStatus = 'expired'
+          dbStatus = 'expired'
         }
-        // Check if near expiry (within 7 days) and not already expired
+        // Check if near expiry (within 7 days) - calculate for display only, keep DB as 'available'
         else if (expirationDate <= sevenDaysFromNow && row.status !== 'expired') {
-          newStatus = 'near_expiry'
+          displayStatus = 'near_expiry' // For display only
+          dbStatus = 'available' // Keep in database as available
         }
-        // If status was near_expiry but no longer within 7 days, set back to available
-        else if (row.status === 'near_expiry' && expirationDate > sevenDaysFromNow) {
-          newStatus = 'available'
+        // If expired in DB but no longer expired (shouldn't happen, but handle it)
+        else if (row.status === 'expired' && expirationDate >= today) {
+          displayStatus = expirationDate <= sevenDaysFromNow ? 'near_expiry' : 'available'
+          dbStatus = 'available'
+        }
+        // Otherwise keep as available
+        else {
+          displayStatus = 'available'
+          dbStatus = 'available'
         }
         
-        // Update status in database if it changed
-        if (newStatus !== row.status) {
+        // Only update database if status actually changed (for expired status)
+        if (dbStatus !== row.status && dbStatus === 'expired') {
           await pool.query('UPDATE blood_inventory SET status = ? WHERE id = ?', [
-            newStatus,
+            dbStatus,
             row.id,
           ])
         }
         
         return {
           ...row,
-          status: newStatus,
+          status: displayStatus, // Return calculated status for display
         }
       }),
     )
@@ -579,6 +667,469 @@ router.patch('/requests/:id/status', async (req, res) => {
   } catch (error) {
     console.error('Update request status error:', error)
     res.status(500).json({ message: 'Failed to update request status' })
+  }
+})
+
+// ===== Analytics & Wastage Reduction =====
+
+// GET /api/admin/analytics/wastage-predictions
+router.get('/analytics/wastage-predictions', async (req, res) => {
+  try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Get historical wastage data (last 90 days)
+    const [historicalWastage] = await pool.query(
+      `
+      SELECT 
+        blood_type,
+        COUNT(*) as wasted_count,
+        SUM(available_units) as wasted_units
+      FROM blood_inventory
+      WHERE status = 'expired'
+        AND expiration_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+      GROUP BY blood_type
+    `,
+    )
+
+    // Get current inventory at risk
+    const [atRiskInventory] = await pool.query(
+      `
+      SELECT 
+        id,
+        blood_type,
+        available_units,
+        expiration_date,
+        status,
+        hospital_id,
+        DATEDIFF(expiration_date, CURDATE()) as days_until_expiry
+      FROM blood_inventory
+      WHERE status = 'available'
+        AND expiration_date > CURDATE()
+        AND available_units > 0
+      ORDER BY expiration_date ASC
+    `,
+    )
+
+    // Get demand patterns (last 30 days)
+    const [demandData] = await pool.query(
+      `
+      SELECT 
+        blood_type,
+        SUM(units_requested) as total_demand,
+        COUNT(*) as request_count
+      FROM blood_requests
+      WHERE request_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        AND status IN ('pending', 'approved', 'fulfilled')
+      GROUP BY blood_type
+    `,
+    )
+
+    // Get total inventory by blood type
+    const [inventorySummary] = await pool.query(
+      `
+      SELECT 
+        blood_type,
+        SUM(available_units) as total_available,
+        SUM(CASE WHEN DATEDIFF(expiration_date, CURDATE()) <= 7 AND DATEDIFF(expiration_date, CURDATE()) > 0 THEN available_units ELSE 0 END) as near_expiry_units,
+        SUM(CASE WHEN DATEDIFF(expiration_date, CURDATE()) <= 7 THEN available_units ELSE 0 END) as expiring_7days
+      FROM blood_inventory
+      WHERE status = 'available'
+        AND expiration_date > CURDATE()
+        AND available_units > 0
+      GROUP BY blood_type
+    `,
+    )
+
+    // Calculate wastage rates by blood type
+    const wastageRates = {}
+    historicalWastage.forEach((item) => {
+      wastageRates[item.blood_type] = {
+        wastedUnits: item.wasted_units || 0,
+        wastedCount: item.wasted_count || 0,
+      }
+    })
+
+    // Calculate demand factors
+    const demandFactors = {}
+    const totalDemand = demandData.reduce((sum, item) => sum + (item.total_demand || 0), 0)
+    demandData.forEach((item) => {
+      demandFactors[item.blood_type] = totalDemand > 0 ? (item.total_demand || 0) / totalDemand : 0
+    })
+
+    // Calculate risk scores for each inventory item
+    const inventoryWithRisk = atRiskInventory.map((item) => {
+      const daysUntilExpiry = item.days_until_expiry || 0
+      const bloodType = item.blood_type
+
+      // Days until expiry factor (0-40 points): fewer days = higher risk
+      let expiryFactor = 0
+      if (daysUntilExpiry <= 3) expiryFactor = 40
+      else if (daysUntilExpiry <= 7) expiryFactor = 30
+      else if (daysUntilExpiry <= 14) expiryFactor = 20
+      else if (daysUntilExpiry <= 30) expiryFactor = 10
+      else expiryFactor = 5
+
+      // Historical wastage factor (0-30 points)
+      const wastageRate = wastageRates[bloodType]?.wastedUnits || 0
+      const wastageFactor = Math.min(30, (wastageRate / 10) * 5) // Scale based on historical wastage
+
+      // Demand factor (0-20 points): low demand = higher risk
+      const demandFactor = demandFactors[bloodType] || 0
+      const demandRiskFactor = demandFactor < 0.1 ? 20 : demandFactor < 0.2 ? 10 : 5
+
+      // Inventory level factor (0-10 points): high inventory = higher risk
+      const inventorySummaryItem = inventorySummary.find((inv) => inv.blood_type === bloodType)
+      const totalAvailable = inventorySummaryItem?.total_available || 0
+      const inventoryFactor = totalAvailable > 50 ? 10 : totalAvailable > 20 ? 5 : 0
+
+      const riskScore = Math.min(100, Math.round(expiryFactor + wastageFactor + demandRiskFactor + inventoryFactor))
+
+      return {
+        ...item,
+        riskScore,
+        expiryFactor,
+        wastageFactor: Math.round(wastageFactor),
+        demandRiskFactor,
+        inventoryFactor,
+      }
+    })
+
+    // Calculate predicted wastage for next 7, 14, 30 days
+    const predictWastage = (days) => {
+      const expiringSoon = inventoryWithRisk.filter(
+        (item) => item.days_until_expiry <= days && item.days_until_expiry > 0,
+      )
+      const avgWastageRate = 0.15 // 15% average wastage rate (can be calculated from historical data)
+      return expiringSoon.reduce((sum, item) => {
+        const wastageProbability = item.riskScore / 100
+        return sum + Math.round(item.available_units * wastageProbability * avgWastageRate)
+      }, 0)
+    }
+
+    const predictedWastage = {
+      next7Days: predictWastage(7),
+      next14Days: predictWastage(14),
+      next30Days: predictWastage(30),
+    }
+
+    // Group by blood type for summary
+    const wastageByBloodType = {}
+    inventoryWithRisk.forEach((item) => {
+      if (!wastageByBloodType[item.blood_type]) {
+        wastageByBloodType[item.blood_type] = {
+          bloodType: item.blood_type,
+          totalAtRisk: 0,
+          highRiskUnits: 0,
+          averageRiskScore: 0,
+          items: [],
+        }
+      }
+      wastageByBloodType[item.blood_type].totalAtRisk += item.available_units
+      wastageByBloodType[item.blood_type].items.push(item)
+      if (item.riskScore >= 70) {
+        wastageByBloodType[item.blood_type].highRiskUnits += item.available_units
+      }
+    })
+
+    // Calculate average risk scores
+    Object.keys(wastageByBloodType).forEach((bloodType) => {
+      const group = wastageByBloodType[bloodType]
+      const avgRisk =
+        group.items.length > 0
+          ? group.items.reduce((sum, item) => sum + item.riskScore, 0) / group.items.length
+          : 0
+      group.averageRiskScore = Math.round(avgRisk)
+    })
+
+    res.json({
+      inventoryWithRisk: inventoryWithRisk.sort((a, b) => b.riskScore - a.riskScore),
+      predictedWastage,
+      wastageByBloodType: Object.values(wastageByBloodType),
+      summary: {
+        totalAtRisk: inventoryWithRisk.reduce((sum, item) => sum + item.available_units, 0),
+        highRiskItems: inventoryWithRisk.filter((item) => item.riskScore >= 70).length,
+        averageRiskScore:
+          inventoryWithRisk.length > 0
+            ? Math.round(
+                inventoryWithRisk.reduce((sum, item) => sum + item.riskScore, 0) / inventoryWithRisk.length,
+              )
+            : 0,
+      },
+    })
+  } catch (error) {
+    console.error('Wastage predictions error:', error)
+    res.status(500).json({ message: 'Failed to fetch wastage predictions' })
+  }
+})
+
+// GET /api/admin/analytics/wastage-prescriptions
+router.get('/analytics/wastage-prescriptions', async (req, res) => {
+  try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Get high-risk inventory (expiring soon or high risk score)
+    const [highRiskInventory] = await pool.query(
+      `
+      SELECT 
+        bi.id,
+        bi.blood_type,
+        bi.available_units,
+        bi.expiration_date,
+        bi.status,
+        bi.hospital_id,
+        DATEDIFF(bi.expiration_date, CURDATE()) as days_until_expiry
+      FROM blood_inventory bi
+      WHERE bi.status = 'available'
+        AND bi.expiration_date > CURDATE()
+        AND bi.expiration_date <= DATE_ADD(CURDATE(), INTERVAL 14 DAY)
+        AND bi.available_units > 0
+        AND (bi.hospital_id IS NULL OR bi.hospital_id = 0)
+      ORDER BY bi.expiration_date ASC, bi.available_units DESC
+    `,
+    )
+
+    // Get pending requests from hospitals
+    const [pendingRequests] = await pool.query(
+      `
+      SELECT 
+        br.id,
+        br.hospital_id,
+        br.blood_type,
+        br.units_requested,
+        br.request_date,
+        h.hospital_name
+      FROM blood_requests br
+      JOIN hospitals h ON br.hospital_id = h.id
+      WHERE br.status = 'pending'
+      ORDER BY br.request_date ASC
+    `,
+    )
+
+    // Get hospital inventory levels
+    const [hospitalInventory] = await pool.query(
+      `
+      SELECT 
+        hospital_id,
+        blood_type,
+        SUM(available_units) as total_available
+      FROM blood_inventory
+      WHERE hospital_id IS NOT NULL
+        AND status = 'available'
+        AND expiration_date > CURDATE()
+      GROUP BY hospital_id, blood_type
+    `,
+    )
+
+    // Generate transfer recommendations
+    const transferRecommendations = []
+    const processedRequests = new Set()
+
+    highRiskInventory.forEach((inventory) => {
+      // Find matching pending requests
+      const matchingRequests = pendingRequests.filter(
+        (req) =>
+          req.blood_type === inventory.blood_type &&
+          req.units_requested > 0 &&
+          !processedRequests.has(req.id),
+      )
+
+      if (matchingRequests.length > 0) {
+        // Prioritize by request date (older requests first)
+        matchingRequests.sort((a, b) => new Date(a.request_date) - new Date(b.request_date))
+
+        matchingRequests.forEach((request) => {
+          const unitsToTransfer = Math.min(
+            inventory.available_units,
+            request.units_requested,
+            Math.ceil(request.units_requested * 0.8), // Transfer up to 80% of requested
+          )
+
+          if (unitsToTransfer > 0) {
+            transferRecommendations.push({
+              type: 'transfer',
+              priority: inventory.days_until_expiry <= 3 ? 'high' : inventory.days_until_expiry <= 7 ? 'medium' : 'low',
+              inventoryId: inventory.id,
+              bloodType: inventory.blood_type,
+              units: unitsToTransfer,
+              daysUntilExpiry: inventory.days_until_expiry,
+              targetHospitalId: request.hospital_id,
+              targetHospitalName: request.hospital_name,
+              requestId: request.id,
+              impact: `Prevent ${unitsToTransfer} units from expiring`,
+              reason: `Match expiring inventory with pending request from ${request.hospital_name}`,
+            })
+
+            processedRequests.add(request.id)
+            inventory.available_units -= unitsToTransfer
+          }
+        })
+      }
+    })
+
+    // Generate priority actions
+    const priorityActions = []
+
+    // Action 1: Items expiring in next 3 days
+    const expiring3Days = highRiskInventory.filter((item) => item.days_until_expiry <= 3 && item.available_units > 0)
+    if (expiring3Days.length > 0) {
+      const totalUnits = expiring3Days.reduce((sum, item) => sum + item.available_units, 0)
+      priorityActions.push({
+        type: 'urgent_alert',
+        priority: 'critical',
+        title: 'Critical: Blood Expiring in 3 Days',
+        description: `${totalUnits} units expiring within 3 days. Immediate action required.`,
+        bloodTypes: [...new Set(expiring3Days.map((item) => item.blood_type))],
+        affectedUnits: totalUnits,
+        action: 'Review and transfer to hospitals with high demand immediately',
+      })
+    }
+
+    // Action 2: High inventory with low demand
+    const [lowDemandBloodTypes] = await pool.query(
+      `
+      SELECT 
+        bi.blood_type,
+        SUM(bi.available_units) as total_inventory,
+        COALESCE(SUM(br.units_requested), 0) as total_demand
+      FROM blood_inventory bi
+      LEFT JOIN blood_requests br ON bi.blood_type = br.blood_type 
+        AND br.status = 'pending'
+        AND br.request_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      WHERE bi.status = 'available'
+        AND bi.expiration_date > CURDATE()
+        AND bi.available_units > 0
+        AND (bi.hospital_id IS NULL OR bi.hospital_id = 0)
+      GROUP BY bi.blood_type
+      HAVING total_inventory > 30 AND total_demand < 5
+    `,
+    )
+
+    lowDemandBloodTypes.forEach((item) => {
+      priorityActions.push({
+        type: 'inventory_adjustment',
+        priority: 'medium',
+        title: `Reduce Donations: ${item.blood_type}`,
+        description: `High inventory (${item.total_inventory} units) with low demand (${item.total_demand} units requested). Consider reducing donation targets.`,
+        bloodType: item.blood_type,
+        action: 'Adjust donation collection targets for this blood type',
+      })
+    })
+
+    // Action 3: Near-expiry items without matching requests
+    const unmatchedNearExpiry = highRiskInventory.filter(
+      (item) =>
+        item.days_until_expiry <= 7 &&
+        !transferRecommendations.some((rec) => rec.inventoryId === item.id) &&
+        item.available_units > 0,
+    )
+
+    if (unmatchedNearExpiry.length > 0) {
+      const totalUnmatched = unmatchedNearExpiry.reduce((sum, item) => sum + item.available_units, 0)
+      priorityActions.push({
+        type: 'alert',
+        priority: 'high',
+        title: 'Near-Expiry Items Need Attention',
+        description: `${totalUnmatched} units expiring within 7 days without matching requests.`,
+        bloodTypes: [...new Set(unmatchedNearExpiry.map((item) => item.blood_type))],
+        affectedUnits: totalUnmatched,
+        action: 'Contact hospitals to check if they need these blood types',
+      })
+    }
+
+    // Sort recommendations by priority
+    transferRecommendations.sort((a, b) => {
+      const priorityOrder = { high: 3, medium: 2, low: 1 }
+      return priorityOrder[b.priority] - priorityOrder[a.priority]
+    })
+
+    res.json({
+      transferRecommendations: transferRecommendations.slice(0, 20), // Top 20 recommendations
+      priorityActions,
+      summary: {
+        totalRecommendations: transferRecommendations.length,
+        criticalActions: priorityActions.filter((a) => a.priority === 'critical').length,
+        estimatedWastageReduction: transferRecommendations.reduce(
+          (sum, rec) => sum + (rec.units || 0),
+          0,
+        ),
+      },
+    })
+  } catch (error) {
+    console.error('Wastage prescriptions error:', error)
+    res.status(500).json({ message: 'Failed to fetch wastage prescriptions' })
+  }
+})
+
+// GET /api/admin/analytics/historical-wastage
+router.get('/analytics/historical-wastage', async (req, res) => {
+  try {
+    const { days = 90 } = req.query
+
+    // Get wastage by date
+    const [wastageByDate] = await pool.query(
+      `
+      SELECT 
+        DATE(expiration_date) as date,
+        blood_type,
+        SUM(available_units) as wasted_units,
+        COUNT(*) as wasted_count
+      FROM blood_inventory
+      WHERE status = 'expired'
+        AND expiration_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      GROUP BY DATE(expiration_date), blood_type
+      ORDER BY date DESC
+    `,
+      [parseInt(days, 10)],
+    )
+
+    // Get wastage by blood type
+    const [wastageByBloodType] = await pool.query(
+      `
+      SELECT 
+        blood_type,
+        SUM(available_units) as total_wasted,
+        COUNT(*) as count
+      FROM blood_inventory
+      WHERE status = 'expired'
+        AND expiration_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      GROUP BY blood_type
+      ORDER BY total_wasted DESC
+    `,
+      [parseInt(days, 10)],
+    )
+
+    // Get total wastage directly from database for accuracy
+    const [totalWastageResult] = await pool.query(
+      `
+      SELECT COALESCE(SUM(available_units), 0) as total_wastage
+      FROM blood_inventory
+      WHERE status = 'expired'
+        AND expiration_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+    `,
+      [parseInt(days, 10)],
+    )
+
+    // Calculate total wastage (ensure numbers are properly converted)
+    const totalWastage = Number(totalWastageResult[0]?.total_wastage || 0)
+    
+    // Also ensure wastageByBloodType has proper number types
+    const formattedWastageByBloodType = wastageByBloodType.map((item) => ({
+      ...item,
+      total_wasted: Number(item.total_wasted || 0),
+      count: Number(item.count || 0),
+    }))
+
+    res.json({
+      wastageByDate,
+      wastageByBloodType: formattedWastageByBloodType,
+      totalWastage,
+      period: parseInt(days, 10),
+    })
+  } catch (error) {
+    console.error('Historical wastage error:', error)
+    res.status(500).json({ message: 'Failed to fetch historical wastage' })
   }
 })
 
