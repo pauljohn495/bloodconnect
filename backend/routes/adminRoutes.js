@@ -13,12 +13,13 @@ router.get('/dashboard-summary', async (req, res) => {
   try {
     const [[bloodStockRows], [donorSummaryRows], [pendingRequestsRows], [countsRows]] = await Promise.all([
       pool.query('SELECT * FROM v_blood_stock_summary'),
+      // TODO: replace this view later to read from users.role = 'donor'
       pool.query('SELECT * FROM v_active_donors_summary'),
       pool.query('SELECT * FROM v_pending_requests_summary'),
       pool.query(`
         SELECT
           (SELECT COUNT(*) FROM hospitals WHERE is_active = TRUE) AS partnerHospitals,
-          (SELECT COUNT(*) FROM donors) AS totalDonors,
+          (SELECT COUNT(*) FROM users WHERE role = 'donor') AS totalDonors,
           (SELECT COUNT(*) FROM blood_requests WHERE status = 'pending') AS pendingRequests,
           (SELECT COUNT(*) FROM donations WHERE status = 'completed') + 
           COALESCE((SELECT SUM(units_transferred) FROM blood_transfers), 0) AS completedDonations
@@ -380,13 +381,14 @@ router.delete('/hospitals/:id', async (req, res) => {
 
 // ===== Donors =====
 
-// GET /api/admin/donors
+// GET /api/admin/donors - list donor users
 router.get('/donors', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT *
-      FROM donors
+      SELECT id, username, email, full_name, phone, blood_type, last_donation_date, created_at, status
+      FROM users
+      WHERE role = 'donor'
       ORDER BY created_at DESC
     `,
     )
@@ -397,23 +399,60 @@ router.get('/donors', async (req, res) => {
   }
 })
 
-// POST /api/admin/donors
+// POST /api/admin/donors - create donor user (admin side)
 router.post('/donors', async (req, res) => {
-  const { donorName, bloodType, contactPhone, contactEmail } = req.body
+  const { donorName, bloodType, contactPhone, contactEmail, username, password } = req.body
 
-  if (!donorName || !bloodType || !contactPhone) {
+  if (!donorName || !bloodType || !contactPhone || !username || !password) {
     return res
       .status(400)
-      .json({ message: 'donorName, bloodType and contactPhone are required' })
+      .json({ message: 'donorName, bloodType, contactPhone, username and password are required' })
   }
 
   try {
+    // Ensure username is unique
+    const [existingUserByUsername] = await pool.query(
+      'SELECT id FROM users WHERE username = ? LIMIT 1',
+      [username],
+    )
+    if (existingUserByUsername.length > 0) {
+      return res.status(400).json({ message: 'Username is already taken' })
+    }
+
+    // Ensure phone is unique
+    const [existingUserByPhone] = await pool.query(
+      'SELECT id FROM users WHERE phone = ? LIMIT 1',
+      [contactPhone],
+    )
+    if (existingUserByPhone.length > 0) {
+      return res.status(400).json({ message: 'Mobile number is already registered' })
+    }
+
+    // Ensure email uniqueness if provided
+    if (contactEmail) {
+      const [existingUserByEmail] = await pool.query(
+        'SELECT id FROM users WHERE email = ? LIMIT 1',
+        [contactEmail],
+      )
+      if (existingUserByEmail.length > 0) {
+        return res.status(400).json({ message: 'Email is already registered' })
+      }
+    }
+
+    const bcrypt = require('bcryptjs')
+    const passwordHash = await bcrypt.hash(password, 10)
+
+    const safeEmail =
+      contactEmail && contactEmail.trim() !== ''
+        ? contactEmail.trim()
+        : `${contactPhone}@noemail.bloodconnect`
+
     const [result] = await pool.query(
       `
-      INSERT INTO donors (donor_name, blood_type, contact_phone, contact_email)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO users (username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date)
+      VALUES (?, ?, ?, 'donor', ?, ?, ?, 'active', NULL)
     `,
-      [donorName, bloodType, contactPhone, contactEmail || null],
+      [username, safeEmail, passwordHash, donorName, contactPhone, bloodType],
     )
 
     res.status(201).json({
@@ -422,6 +461,7 @@ router.post('/donors', async (req, res) => {
       bloodType,
       contactPhone,
       contactEmail: contactEmail || null,
+      username,
     })
   } catch (error) {
     console.error('Create donor error:', error)
