@@ -28,6 +28,10 @@ function AdminPartner() {
   const [editEmail, setEditEmail] = useState('')
   const [editUsername, setEditUsername] = useState('')
   const [editPassword, setEditPassword] = useState('')
+  const [hospitalApprovedRequests, setHospitalApprovedRequests] = useState([])
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [fulfilledRequests, setFulfilledRequests] = useState([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
   const loadHospitals = async () => {
     try {
@@ -163,6 +167,7 @@ function AdminPartner() {
     setIsTransferModalOpen(true)
     setSelectedStocks({})
     setIsLoadingInventory(true)
+    setHospitalApprovedRequests([])
 
     try {
       // Fetch available inventory (where hospital_id is NULL)
@@ -176,6 +181,18 @@ function AdminPartner() {
           item.status !== 'expired',
       )
       setAvailableInventory(available)
+
+      // Fetch approved requests for this hospital (using hospitals endpoint which includes request details)
+      try {
+        const hospitalsData = await apiRequest('/api/admin/hospitals')
+        const hospitalData = hospitalsData.find((h) => h.id === hospital.id)
+        if (hospitalData && hospitalData.requestedBlood) {
+          setHospitalApprovedRequests(hospitalData.requestedBlood)
+        }
+      } catch (err) {
+        console.error('Failed to load approved requests', err)
+        // Don't show error notification for this, just log it
+      }
     } catch (err) {
       console.error('Failed to load inventory', err)
       showNotification(err.message || 'Failed to load available inventory', 'destructive')
@@ -191,6 +208,27 @@ function AdminPartner() {
     setAvailableInventory([])
     setTransferHospitalId(null)
     setShowConfirmDialog(false)
+    setHospitalApprovedRequests([])
+  }
+
+  const handleOpenHistoryModal = async () => {
+    setIsHistoryModalOpen(true)
+    setIsLoadingHistory(true)
+    try {
+      const requestsData = await apiRequest('/api/admin/requests')
+      const fulfilled = requestsData.filter((req) => req.status === 'fulfilled')
+      setFulfilledRequests(fulfilled)
+    } catch (err) {
+      console.error('Failed to load fulfilled requests', err)
+      showNotification(err.message || 'Failed to load fulfilled requests', 'destructive')
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  const handleCloseHistoryModal = () => {
+    setIsHistoryModalOpen(false)
+    setFulfilledRequests([])
   }
 
   const handleStockToggle = (inventoryId, availableUnits) => {
@@ -304,13 +342,22 @@ function AdminPartner() {
                 List of all partnered hospitals
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleOpenModal}
-              className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
-            >
-              Add Hospital
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenHistoryModal}
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                History
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenModal}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+              >
+                Add Hospital
+              </button>
+            </div>
           </div>
 
           <div className="mt-2 overflow-x-auto">
@@ -326,6 +373,9 @@ function AdminPartner() {
                   <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Total Blood Stock Donated
                   </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                    Requested Blood
+                  </th>
                   <th className="whitespace-nowrap px-4 py-2 text-right text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Actions
                   </th>
@@ -334,7 +384,7 @@ function AdminPartner() {
               <tbody className="bg-white">
                 {isLoading && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={4}>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
                       Loading hospitals...
                     </td>
                   </tr>
@@ -342,7 +392,7 @@ function AdminPartner() {
 
                 {!isLoading && error && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={4}>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={5}>
                       {error}
                     </td>
                   </tr>
@@ -350,7 +400,7 @@ function AdminPartner() {
 
                 {!isLoading && !error && hospitals.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={5}>
                       No partner hospitals added yet.
                     </td>
                   </tr>
@@ -372,6 +422,45 @@ function AdminPartner() {
                         <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-sky-50 px-2 py-1 text-[13px] font-semibold text-sky-700 ring-1 ring-sky-100">
                           {hospital.total_donated_units ?? 0}
                         </span>
+                      </td>
+                      <td className="px-4 py-2 text-sm">
+                        {hospital.requestedBlood && hospital.requestedBlood.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {hospital.requestedBlood
+                              .filter((req) => req.status !== 'fulfilled')
+                              .map((req) => (
+                                <div key={req.requestId} className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+                                      {req.bloodType}: {req.unitsRequested} units
+                                    </span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                      req.status === 'partially_fulfilled'
+                                        ? 'bg-yellow-100 text-yellow-700'
+                                        : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {req.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
+                                    </span>
+                                  </div>
+                                  {req.unitsFulfilled > 0 && (
+                                    <span className="text-[10px] text-slate-600">
+                                      Fulfilled: {req.unitsFulfilled} / {req.unitsRequested}
+                                      {req.remainingBalance > 0 && (
+                                        <span className="ml-1 text-slate-500">
+                                          ({req.remainingBalance} remaining)
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            {hospital.requestedBlood.filter((req) => req.status !== 'fulfilled').length === 0 && (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-right">
                         <div className="relative inline-block text-left">
@@ -672,14 +761,38 @@ function AdminPartner() {
       {isTransferModalOpen && selectedHospital && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
           <div className="w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white shadow-xl flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+              <div className="flex-1">
                 <h3 className="text-lg font-semibold text-slate-900">
                   Transfer Blood Stock
                 </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Transfer to: {selectedHospital.hospital_name || selectedHospital.hospitalName}
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  Transfer to: <span className="text-blue-600">{selectedHospital.hospital_name || selectedHospital.hospitalName}</span>
                 </p>
+                {hospitalApprovedRequests.filter((req) => req.status !== 'fulfilled').length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-semibold text-slate-700">Approved Requests Summary:</p>
+                    {hospitalApprovedRequests
+                      .filter((req) => req.status !== 'fulfilled')
+                      .map((request, index) => (
+                        <div key={request.requestId || index} className="flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                            {request.bloodType}: {request.unitsRequested} units
+                            {request.remainingBalance > 0 && request.remainingBalance < request.unitsRequested && (
+                              <span className="ml-2 text-[10px]">({request.remainingBalance} remaining)</span>
+                            )}
+                          </span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                            request.status === 'partially_fulfilled'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {request.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
               <button
                 type="button"
@@ -905,6 +1018,114 @@ function AdminPartner() {
                   className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition"
                 >
                   Confirm Transfer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white shadow-xl flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Fulfilled Requests History</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  View all completed blood requests
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseHistoryModal}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {isLoadingHistory ? (
+                <div className="py-10 text-center text-sm text-slate-500">
+                  Loading fulfilled requests...
+                </div>
+              ) : fulfilledRequests.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-500">
+                  No fulfilled requests found.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Hospital
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Blood Type
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Units Requested
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Units Approved
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Request Date
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-200">
+                      {fulfilledRequests.map((request) => (
+                        <tr key={request.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-semibold text-slate-900">
+                            {request.hospital_name}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900">
+                            {request.blood_type}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100">
+                              {request.units_requested}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-green-100">
+                              {request.units_approved || request.units_requested}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {request.request_date
+                              ? new Date(request.request_date).toLocaleDateString()
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-green-100">
+                              Fulfilled
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 px-6 py-4">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseHistoryModal}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Close
                 </button>
               </div>
             </div>
