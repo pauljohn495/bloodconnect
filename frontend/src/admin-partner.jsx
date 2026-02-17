@@ -32,6 +32,8 @@ function AdminPartner() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [fulfilledRequests, setFulfilledRequests] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [selectedRequestIds, setSelectedRequestIds] = useState(new Set())
+  const [plannedRequestStatuses, setPlannedRequestStatuses] = useState({})
 
   const loadHospitals = async () => {
     try {
@@ -168,6 +170,8 @@ function AdminPartner() {
     setSelectedStocks({})
     setIsLoadingInventory(true)
     setHospitalApprovedRequests([])
+    setSelectedRequestIds(new Set())
+    setPlannedRequestStatuses({})
 
     try {
       // Fetch available inventory (where hospital_id is NULL)
@@ -258,6 +262,25 @@ function AdminPartner() {
     }, 5000)
   }
 
+  const toggleRequestSelection = (requestId) => {
+    setSelectedRequestIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(requestId)) {
+        next.delete(requestId)
+      } else {
+        next.add(requestId)
+      }
+      return next
+    })
+  }
+
+  const handlePlannedStatusChange = (requestId, newStatus) => {
+    setPlannedRequestStatuses((prev) => ({
+      ...prev,
+      [requestId]: newStatus,
+    }))
+  }
+
   const handleConfirmTransferClick = () => {
     if (!selectedHospital || Object.keys(selectedStocks).length === 0) {
       showNotification('Please select at least one blood stock to transfer', 'destructive')
@@ -291,6 +314,27 @@ function AdminPartner() {
           transfers,
         }),
       })
+
+      // After successful transfer, apply any planned status changes for requests
+      const pendingStatusUpdates = hospitalApprovedRequests
+        .filter((req) => plannedRequestStatuses[req.requestId] && plannedRequestStatuses[req.requestId] !== req.status)
+        .map((req) => ({
+          requestId: req.requestId,
+          status: plannedRequestStatuses[req.requestId],
+        }))
+
+      for (const update of pendingStatusUpdates) {
+        try {
+          await apiRequest(`/api/admin/requests/${update.requestId}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              status: update.status,
+            }),
+          })
+        } catch (err) {
+          console.error('Failed to apply planned request status', err)
+        }
+      }
       
       // Refresh available inventory to remove items with 0 available units
       setIsLoadingInventory(true)
@@ -312,8 +356,10 @@ function AdminPartner() {
         setIsLoadingInventory(false)
       }
       
-      // Clear selections
+      // Clear selections and planned statuses
       setSelectedStocks({})
+      setSelectedRequestIds(new Set())
+      setPlannedRequestStatuses({})
       
       showNotification('Blood stocks transferred successfully!', 'primary')
       
@@ -771,24 +817,55 @@ function AdminPartner() {
                 </p>
                 {hospitalApprovedRequests.filter((req) => req.status !== 'fulfilled').length > 0 && (
                   <div className="mt-3 space-y-2">
-                    <p className="text-xs font-semibold text-slate-700">Approved Requests Summary:</p>
+                    <p className="text-xs font-semibold text-slate-700">
+                      Approved Requests Summary (select which request to prioritize):
+                    </p>
                     {hospitalApprovedRequests
                       .filter((req) => req.status !== 'fulfilled')
                       .map((request, index) => (
-                        <div key={request.requestId || index} className="flex items-center gap-2">
-                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                            {request.bloodType}: {request.unitsRequested} units
-                            {request.remainingBalance > 0 && request.remainingBalance < request.unitsRequested && (
-                              <span className="ml-2 text-[10px]">({request.remainingBalance} remaining)</span>
-                            )}
-                          </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                            request.status === 'partially_fulfilled'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}>
-                            {request.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
-                          </span>
+                        <div
+                          key={request.requestId || index}
+                          className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                            checked={selectedRequestIds.has(request.requestId)}
+                            onChange={() => toggleRequestSelection(request.requestId)}
+                          />
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                                {request.bloodType}: {request.unitsRequested} units
+                                {request.remainingBalance > 0 &&
+                                  request.remainingBalance < request.unitsRequested && (
+                                    <span className="ml-2 text-[10px]">
+                                      ({request.remainingBalance} remaining)
+                                    </span>
+                                  )}
+                              </span>
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                  request.status === 'partially_fulfilled'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}
+                              >
+                                {request.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
+                              </span>
+                              <select
+                                value={plannedRequestStatuses[request.requestId] || request.status}
+                                onChange={(e) =>
+                                  handlePlannedStatusChange(request.requestId, e.target.value)
+                                }
+                                className="ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-red-500"
+                              >
+                                <option value="approved">Approved</option>
+                                <option value="partially_fulfilled">Partially Fulfilled</option>
+                                <option value="fulfilled">Fulfilled</option>
+                              </select>
+                            </div>
+                          </div>
                         </div>
                       ))}
                   </div>

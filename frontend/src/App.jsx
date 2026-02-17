@@ -11,12 +11,14 @@ import ProfileSettings from './profile-settings.jsx'
 import HospitalDashboard from './hospital-dashboard.jsx'
 import HospitalInventory from './hospital-inventory.jsx'
 import HospitalRequests from './hospital-requests.jsx'
+import DonorRegistration from './donor-registration.jsx'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/register" element={<DonorRegistration />} />
         <Route path="/dashboard" element={<UserDashboard />} />
         <Route path="/profile" element={<ProfileSettings />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />

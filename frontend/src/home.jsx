@@ -65,9 +65,10 @@ function Home() {
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-start">
             <button
               type="button"
+              onClick={() => navigate('/register')}
               className="inline-flex w-full items-center justify-center rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:w-auto"
             >
-              Donate Blood
+              Donate Blood – Sign Up
             </button>
           </div>
 
@@ -124,17 +125,18 @@ function Home() {
             >
               <div className="space-y-1">
                 <label
-                  htmlFor="email"
+                  htmlFor="identifier"
                   className="block text-xs font-medium text-slate-700"
                 >
-                  Email
+                  Username or Email
                 </label>
                 <input
-                  id="email"
-                  type="email"
+                  id="identifier"
+                  type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                  placeholder="Enter your username or email"
                 />
               </div>
 
@@ -180,6 +182,7 @@ function Home() {
                 New to BloodConnect?{' '}
                 <button
                   type="button"
+                  onClick={() => navigate('/register')}
                   className="font-semibold text-red-600 hover:text-red-700"
                 >
                   Create an account

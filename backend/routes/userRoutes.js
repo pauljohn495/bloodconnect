@@ -70,26 +70,14 @@ router.put('/me', async (req, res) => {
 // GET /api/user/donations - donation history for donor user
 router.get('/donations', async (req, res) => {
   try {
-    // Find donor record for this user (if exists)
-    const [donorRows] = await pool.query(
-      'SELECT id FROM donors WHERE user_id = ?',
-      [req.user.id],
-    )
-
-    if (!donorRows[0]) {
-      return res.json([])
-    }
-
-    const donorId = donorRows[0].id
-
     const [rows] = await pool.query(
       `
       SELECT id, blood_type, donation_date, location, hospital_id, status, units_donated
       FROM donations
-      WHERE donor_id = ?
+      WHERE user_id = ?
       ORDER BY donation_date DESC
     `,
-      [donorId],
+      [req.user.id],
     )
 
     res.json(rows)
