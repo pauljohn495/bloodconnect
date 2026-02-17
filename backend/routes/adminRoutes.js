@@ -74,7 +74,75 @@ router.get('/hospitals', async (req, res) => {
       ORDER BY h.created_at DESC
     `,
     )
-    res.json(rows || [])
+
+    // Get individual approved requests for each hospital (not grouped)
+    const [approvedRequests] = await pool.query(
+      `
+      SELECT 
+        br.id,
+        br.hospital_id,
+        br.blood_type,
+        br.units_requested,
+        br.units_approved,
+        br.status,
+        br.request_date,
+        COALESCE(
+          (
+            SELECT SUM(bt.units_transferred)
+            FROM blood_transfers bt
+            WHERE bt.hospital_id = br.hospital_id
+              AND bt.blood_type COLLATE utf8mb4_unicode_ci = br.blood_type COLLATE utf8mb4_unicode_ci
+              AND bt.transfer_date >= br.request_date
+          ),
+          0
+        ) as units_fulfilled
+      FROM blood_requests br
+      WHERE br.status IN ('approved', 'partially_fulfilled')
+      ORDER BY br.hospital_id, br.request_date ASC
+    `,
+    )
+
+    // Calculate remaining balance and fulfillment status for each request
+    const requestsWithFulfillment = approvedRequests.map((req) => {
+      const unitsFulfilled = req.units_fulfilled || 0
+      const unitsRequested = req.units_requested || 0
+      const remainingBalance = Math.max(0, unitsRequested - unitsFulfilled)
+      const isFullyFulfilled = remainingBalance === 0
+      const isPartiallyFulfilled = unitsFulfilled > 0 && remainingBalance > 0
+
+      return {
+        ...req,
+        unitsFulfilled,
+        remainingBalance,
+        isFullyFulfilled,
+        isPartiallyFulfilled,
+      }
+    })
+
+    // Group requests by hospital_id
+    const requestedBloodMap = {}
+    requestsWithFulfillment.forEach((req) => {
+      if (!requestedBloodMap[req.hospital_id]) {
+        requestedBloodMap[req.hospital_id] = []
+      }
+      requestedBloodMap[req.hospital_id].push({
+        requestId: req.id,
+        bloodType: req.blood_type,
+        unitsRequested: req.units_requested,
+        unitsFulfilled: req.unitsFulfilled,
+        remainingBalance: req.remainingBalance,
+        status: req.isFullyFulfilled ? 'fulfilled' : req.isPartiallyFulfilled ? 'partially_fulfilled' : 'approved',
+        requestDate: req.request_date,
+      })
+    })
+
+    // Add requested blood information to each hospital
+    const hospitalsWithRequests = rows.map((hospital) => ({
+      ...hospital,
+      requestedBlood: requestedBloodMap[hospital.id] || null,
+    }))
+
+    res.json(hospitalsWithRequests || [])
   } catch (error) {
     console.error('Fetch hospitals error:', error)
     res.status(500).json({ 
@@ -389,6 +457,28 @@ router.get('/inventory', async (req, res) => {
     const sevenDaysFromNow = new Date(today)
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
     
+    // Get approved requests grouped by blood type (only non-fulfilled)
+    const [approvedRequests] = await pool.query(
+      `
+      SELECT 
+        blood_type,
+        SUM(units_requested) as total_units_requested,
+        COUNT(*) as request_count
+      FROM blood_requests
+      WHERE status = 'approved'
+      GROUP BY blood_type
+    `,
+    )
+    
+    // Create a map of blood type to requested units
+    const requestedBloodMap = {}
+    approvedRequests.forEach((req) => {
+      requestedBloodMap[req.blood_type] = {
+        units: req.total_units_requested,
+        count: req.request_count,
+      }
+    })
+    
     const updatedRows = await Promise.all(
       rows.map(async (row) => {
         const expirationDate = new Date(row.expiration_date)
@@ -426,9 +516,19 @@ router.get('/inventory', async (req, res) => {
           ])
         }
         
+        // Add requested blood information if there are approved requests for this blood type
+        const requestedBlood = requestedBloodMap[row.blood_type] || null
+        
         return {
           ...row,
           status: displayStatus, // Return calculated status for display
+          requestedBlood: requestedBlood
+            ? {
+                bloodType: row.blood_type,
+                units: requestedBlood.units,
+                requestCount: requestedBlood.count,
+              }
+            : null,
         }
       }),
     )
@@ -481,7 +581,7 @@ router.post('/inventory', async (req, res) => {
 
 // POST /api/admin/transfer
 router.post('/transfer', async (req, res) => {
-  const { hospitalId, transfers } = req.body
+  const { hospitalId, transfers, requestFulfillments } = req.body
 
   if (!hospitalId || !Array.isArray(transfers) || transfers.length === 0) {
     return res.status(400).json({ message: 'hospitalId and transfers array are required' })
@@ -574,6 +674,54 @@ router.post('/transfer', async (req, res) => {
         })
       }
 
+      // Handle request fulfillment if provided
+      if (requestFulfillments && Array.isArray(requestFulfillments)) {
+        for (const fulfillment of requestFulfillments) {
+          const { requestId, unitsTransferred } = fulfillment
+          
+          if (!requestId || !unitsTransferred || unitsTransferred <= 0) continue
+
+          // Get current request status and units
+          const [requestRows] = await pool.query(
+            'SELECT id, units_requested, status FROM blood_requests WHERE id = ?',
+            [requestId],
+          )
+
+          if (requestRows.length === 0) continue
+
+          const request = requestRows[0]
+          
+          // Calculate total fulfilled units (existing + new)
+          const [transferRows] = await pool.query(
+            `SELECT COALESCE(SUM(units_transferred), 0) as total_fulfilled
+             FROM blood_transfers bt
+             INNER JOIN blood_requests br ON bt.blood_type COLLATE utf8mb4_unicode_ci = br.blood_type COLLATE utf8mb4_unicode_ci
+             WHERE bt.hospital_id = ? 
+               AND br.id = ?
+               AND bt.transfer_date >= br.request_date`,
+            [hospitalId, requestId],
+          )
+
+          const totalFulfilled = transferRows[0]?.total_fulfilled || 0
+          const remainingBalance = request.units_requested - totalFulfilled
+
+          // Update request status based on fulfillment
+          let newStatus = request.status
+          if (remainingBalance <= 0) {
+            newStatus = 'fulfilled'
+          } else if (totalFulfilled > 0) {
+            newStatus = 'partially_fulfilled'
+          }
+
+          await pool.query(
+            `UPDATE blood_requests 
+             SET status = ?, units_approved = COALESCE(units_approved, ?)
+             WHERE id = ?`,
+            [newStatus, totalFulfilled, requestId],
+          )
+        }
+      }
+
       // Commit transaction
       await pool.query('COMMIT')
 
@@ -645,7 +793,7 @@ router.patch('/requests/:id/status', async (req, res) => {
   const { id } = req.params
   const { status, unitsApproved, notes } = req.body
 
-  if (!['approved', 'rejected', 'cancelled', 'fulfilled'].includes(status)) {
+  if (!['approved', 'rejected', 'cancelled', 'fulfilled', 'partially_fulfilled'].includes(status)) {
     return res.status(400).json({ message: 'Invalid status value' })
   }
 
@@ -943,7 +1091,6 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
           const unitsToTransfer = Math.min(
             inventory.available_units,
             request.units_requested,
-            Math.ceil(request.units_requested * 0.8), // Transfer up to 80% of requested
           )
 
           if (unitsToTransfer > 0) {
