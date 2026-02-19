@@ -129,15 +129,15 @@ function AdminDonation() {
                   donors.map((donor) => (
                     <tr key={donor.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                        {donor.donor_name || donor.donorName}
+                        {donor.full_name || donor.fullName || donor.donor_name || donor.donorName || donor.username || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
-                          {donor.blood_type || donor.bloodType}
+                          {donor.blood_type || donor.bloodType || '—'}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                        {donor.contact_phone || donor.contactPhone || '—'}
+                        {donor.phone || donor.contact_phone || donor.contactPhone || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
                         {donor.last_donation_date

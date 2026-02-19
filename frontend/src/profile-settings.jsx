@@ -1,21 +1,59 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiRequest } from './api.js'
 
 function ProfileSettings() {
   const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Sample data - replace with actual data from API/state
   const [profileData, setProfileData] = useState({
-    name: 'Test',
-    phone: '+1 (555) 123-4567',
-    email: 'test@example.com',
-    bloodType: 'O+',
+    name: '',
+    username: '',
+    phone: '',
+    email: '',
+    bloodType: '',
+    lastDonationDate: null,
     avatar: null,
   })
 
-  const [editedData, setEditedData] = useState({ ...profileData })
+  const [editedData, setEditedData] = useState(profileData)
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      setIsLoading(true)
+      setError('')
+      try {
+        const data = await apiRequest('/api/user/me')
+        setProfileData({
+          name: data.full_name || '',
+          username: data.username || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          bloodType: data.blood_type || '',
+          lastDonationDate: data.last_donation_date || null,
+          avatar: null,
+        })
+        setEditedData({
+          name: data.full_name || '',
+          username: data.username || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          bloodType: data.blood_type || '',
+          lastDonationDate: data.last_donation_date || null,
+          avatar: null,
+        })
+      } catch (err) {
+        setError(err.message || 'Failed to load profile')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [])
 
   const handleEdit = () => {
     setIsEditing(true)
@@ -27,10 +65,23 @@ function ProfileSettings() {
     setEditedData({ ...profileData })
   }
 
-  const handleSave = () => {
-    setProfileData({ ...editedData })
-    setIsEditing(false)
-    // Here you would typically make an API call to save the data
+  const handleSave = async () => {
+    try {
+      setError('')
+      // Update profile in backend (only editable fields)
+      await apiRequest('/api/user/me', {
+        method: 'PUT',
+        body: JSON.stringify({
+          fullName: editedData.name,
+          phone: editedData.phone,
+          bloodType: editedData.bloodType,
+        }),
+      })
+      setProfileData({ ...editedData })
+      setIsEditing(false)
+    } catch (err) {
+      setError(err.message || 'Failed to save profile')
+    }
   }
 
   const handleInputChange = (field, value) => {
@@ -189,168 +240,195 @@ function ProfileSettings() {
           </div>
 
           <div className="p-6">
-            {/* Two-column layout */}
-            <div className="grid gap-6 lg:grid-cols-[200px_1fr]">
-              {/* Left: Avatar Section */}
-              <div className="flex flex-col items-center lg:items-start">
-                <div className="relative">
-                  <div className="flex h-32 w-32 items-center justify-center rounded-full bg-red-600 text-3xl font-semibold text-white ring-4 ring-white shadow-lg">
-                    {editedData.avatar ? (
-                      <img
-                        src={editedData.avatar}
-                        alt={profileData.name}
-                        className="h-full w-full rounded-full object-cover"
-                      />
-                    ) : (
-                      editedData.name.charAt(0).toUpperCase()
+            {isLoading ? (
+              <p className="text-sm text-slate-500">Loading profile...</p>
+            ) : error ? (
+              <p className="text-sm text-red-600">{error}</p>
+            ) : (
+              <>
+                <div className="grid gap-6 lg:grid-cols-[200px_1fr]">
+                  {/* Left: Avatar Section */}
+                  <div className="flex flex-col items-center lg:items-start">
+                    <div className="relative">
+                      <div className="flex h-32 w-32 items-center justify-center rounded-full bg-red-600 text-3xl font-semibold text-white ring-4 ring-white shadow-lg">
+                        {editedData.avatar ? (
+                          <img
+                            src={editedData.avatar}
+                            alt={profileData.name}
+                            className="h-full w-full rounded-full object-cover"
+                          />
+                        ) : (
+                          editedData.name.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      {isEditing && (
+                        <label className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-red-600 text-white shadow-md transition hover:bg-red-700">
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                          </svg>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                    {isEditing && (
+                      <p className="mt-3 text-center text-xs text-slate-500 lg:text-left">
+                        Click icon to change
+                      </p>
                     )}
                   </div>
-                  {isEditing && (
-                    <label className="absolute bottom-0 right-0 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-red-600 text-white shadow-md transition hover:bg-red-700">
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+
+                  {/* Right: Form Fields */}
+                  <div className="space-y-5">
+                    {/* Username (read-only) */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">
+                        Username
+                      </label>
+                      <p className="mt-1 text-sm font-medium text-slate-900">
+                        {profileData.username || '—'}
+                      </p>
+                    </div>
+                    {/* Full Name */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">
+                        Full Name
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedData.name}
+                          onChange={(e) => handleInputChange('name', e.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                          placeholder="Enter your full name"
                         />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                      ) : (
+                        <p className="mt-1 text-sm font-medium text-slate-900">
+                          {profileData.name}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Phone Number */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">
+                        Phone Number
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="tel"
+                          value={editedData.phone}
+                          onChange={(e) => handleInputChange('phone', e.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                          placeholder="Enter your phone number"
                         />
-                      </svg>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-                {isEditing && (
-                  <p className="mt-3 text-center text-xs text-slate-500 lg:text-left">
-                    Click icon to change
-                  </p>
-                )}
-              </div>
+                      ) : (
+                        <p className="mt-1 text-sm font-medium text-slate-900">
+                          {profileData.phone}
+                        </p>
+                      )}
+                    </div>
 
-              {/* Right: Form Fields */}
-              <div className="space-y-5">
-                {/* Full Name */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">
-                    Full Name
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={editedData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                      placeholder="Enter your full name"
-                    />
-                  ) : (
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {profileData.name}
-                    </p>
-                  )}
-                </div>
+                    {/* Email Address */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">
+                        Email Address
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="email"
+                          value={editedData.email}
+                          onChange={(e) => handleInputChange('email', e.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                          placeholder="Enter your email address"
+                        />
+                      ) : (
+                        <p className="mt-1 text-sm font-medium text-slate-900">
+                          {profileData.email}
+                        </p>
+                      )}
+                    </div>
 
-                {/* Phone Number */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">
-                    Phone Number
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      value={editedData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                      placeholder="Enter your phone number"
-                    />
-                  ) : (
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {profileData.phone}
-                    </p>
-                  )}
-                </div>
+                    {/* Blood Type */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">
+                        Blood Type
+                      </label>
+                      {isEditing ? (
+                        <select
+                          value={editedData.bloodType}
+                          onChange={(e) => handleInputChange('bloodType', e.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                        >
+                          <option value="O+">O+</option>
+                          <option value="O-">O-</option>
+                          <option value="A+">A+</option>
+                          <option value="A-">A-</option>
+                          <option value="B+">B+</option>
+                          <option value="B-">B-</option>
+                          <option value="AB+">AB+</option>
+                          <option value="AB-">AB-</option>
+                        </select>
+                      ) : (
+                        <p className="mt-1 text-sm font-medium text-slate-900">
+                          {profileData.bloodType}
+                        </p>
+                      )}
+                    </div>
 
-                {/* Email Address */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">
-                    Email Address
-                  </label>
-                  {isEditing ? (
-                    <input
-                      type="email"
-                      value={editedData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                      placeholder="Enter your email address"
-                    />
-                  ) : (
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {profileData.email}
-                    </p>
-                  )}
+                    {/* Last Donation Date (read-only, if available) */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700">
+                        Last Donation Date
+                      </label>
+                      <p className="mt-1 text-sm font-medium text-slate-900">
+                        {profileData.lastDonationDate
+                          ? new Date(profileData.lastDonationDate).toLocaleDateString()
+                          : 'No donations recorded yet'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Blood Type */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">
-                    Blood Type
-                  </label>
-                  {isEditing ? (
-                    <select
-                      value={editedData.bloodType}
-                      onChange={(e) => handleInputChange('bloodType', e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                {isEditing && !isLoading && !error && (
+                  <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-6">
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                     >
-                      <option value="O+">O+</option>
-                      <option value="O-">O-</option>
-                      <option value="A+">A+</option>
-                      <option value="A-">A-</option>
-                      <option value="B+">B+</option>
-                      <option value="B-">B-</option>
-                      <option value="AB+">AB+</option>
-                      <option value="AB-">AB-</option>
-                    </select>
-                  ) : (
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {profileData.bloodType}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            {isEditing && (
-              <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-6">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                >
-                  Save Changes
-                </button>
-              </div>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

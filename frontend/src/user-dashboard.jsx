@@ -1,22 +1,59 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiRequest } from './api.js'
 
 function UserDashboard() {
   const navigate = useNavigate()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Sample data - replace with actual data from API/state
-  const userData = {
-    name: 'Test',
-    bloodType: 'O+',
+  const [userData, setUserData] = useState({
+    name: '',
+    bloodType: '',
     status: 'Available',
     bloodAvailable: '(Blood stocks)',
-    avatar: null, // You can add avatar URL here
-  }
+    avatar: null,
+  })
 
-  const donationHistory = [
+  const [donationHistory, setDonationHistory] = useState([])
 
-  ]
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true)
+      setError('')
+      try {
+        const [me, donations] = await Promise.all([
+          apiRequest('/api/user/me'),
+          apiRequest('/api/user/donations'),
+        ])
+
+        setUserData({
+          name: me.full_name || me.fullName || me.username || 'Donor',
+          bloodType: me.blood_type || me.bloodType || '—',
+          status: 'Available',
+          bloodAvailable: '(Blood stocks)',
+          avatar: null,
+        })
+
+        const formattedDonations = (donations || []).map((d) => ({
+          id: d.id,
+          date: d.donation_date || d.donationDate,
+          bloodType: d.blood_type || d.bloodType,
+          location: d.location || (d.hospital_id ? `Hospital #${d.hospital_id}` : '—'),
+          status: d.status || 'Completed',
+        }))
+
+        setDonationHistory(formattedDonations)
+      } catch (err) {
+        setError(err.message || 'Failed to load dashboard data')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
 
   const handleLogout = () => {
     // Clear authentication tokens and user data
@@ -147,12 +184,19 @@ function UserDashboard() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {error && (
+          <p className="mb-4 text-sm text-red-600">
+            {error}
+          </p>
+        )}
         {/* Hero Section - Three Statistic Cards */}
         <section className="mb-8 grid gap-4 sm:grid-cols-3">
           {/* Blood Type Card */}
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
             <p className="text-xs font-medium text-slate-500">Blood Type</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{userData.bloodType}</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {isLoading ? '—' : userData.bloodType || '—'}
+            </p>
             <p className="mt-1 text-xs text-slate-500">Your blood group</p>
           </div>
 
@@ -171,7 +215,9 @@ function UserDashboard() {
           {/* Blood Available Card */}
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
             <p className="text-xs font-medium text-slate-500">Blood Available</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{userData.bloodAvailable}</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {userData.bloodAvailable}
+            </p>
           </div>
         </section>
 
@@ -204,7 +250,16 @@ function UserDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {donationHistory.length > 0 ? (
+                  {isLoading ? (
+                    <tr>
+                      <td
+                        className="px-6 py-10 text-center text-sm text-slate-500"
+                        colSpan={4}
+                      >
+                        Loading donation history...
+                      </td>
+                    </tr>
+                  ) : donationHistory.length > 0 ? (
                     donationHistory.map((donation) => (
                       <tr
                         key={donation.id}

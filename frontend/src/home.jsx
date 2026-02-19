@@ -66,7 +66,7 @@ function Home() {
             <button
               type="button"
               onClick={() => navigate('/register')}
-              className="inline-flex w-full items-center justify-center rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:w-auto"
+              className="inline-flex w-full cursor-pointer items-center justify-center rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:w-auto"
             >
               Donate Blood – Sign Up
             </button>
@@ -148,10 +148,10 @@ function Home() {
                   >
                     Password
                   </label>
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-red-600 hover:text-red-700"
-                  >
+                <button
+                  type="button"
+                  className="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700"
+                >
                     Forgot password?
                   </button>
                 </div>
@@ -183,7 +183,7 @@ function Home() {
                 <button
                   type="button"
                   onClick={() => navigate('/register')}
-                  className="font-semibold text-red-600 hover:text-red-700"
+                  className="cursor-pointer font-semibold text-red-600 hover:text-red-700"
                 >
                   Create an account
                 </button>
