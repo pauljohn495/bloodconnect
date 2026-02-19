@@ -11,20 +11,29 @@ router.use(auth(['admin']))
 // GET /api/admin/dashboard-summary
 router.get('/dashboard-summary', async (req, res) => {
   try {
-    const [[bloodStockRows], [donorSummaryRows], [pendingRequestsRows], [countsRows]] = await Promise.all([
-      pool.query('SELECT * FROM v_blood_stock_summary'),
-      // TODO: replace this view later to read from users.role = 'donor'
-      pool.query('SELECT * FROM v_active_donors_summary'),
-      pool.query('SELECT * FROM v_pending_requests_summary'),
-      pool.query(`
-        SELECT
-          (SELECT COUNT(*) FROM hospitals WHERE is_active = TRUE) AS partnerHospitals,
-          (SELECT COUNT(*) FROM users WHERE role = 'donor') AS totalDonors,
-          (SELECT COUNT(*) FROM blood_requests WHERE status = 'pending') AS pendingRequests,
-          (SELECT COUNT(*) FROM donations WHERE status = 'completed') + 
-          COALESCE((SELECT SUM(units_transferred) FROM blood_transfers), 0) AS completedDonations
-      `),
-    ])
+    const [[bloodStockRows], [donorSummaryRows], [pendingRequestsRows], [countsRows]] =
+      await Promise.all([
+        pool.query('SELECT * FROM v_blood_stock_summary'),
+        // Donor summary derived directly from users/donations instead of a DB view
+        pool.query(`
+          SELECT 
+            u.blood_type,
+            COUNT(*) AS donor_count,
+            MAX(u.last_donation_date) AS last_donation_date
+          FROM users u
+          WHERE u.role = 'donor'
+          GROUP BY u.blood_type
+        `),
+        pool.query('SELECT * FROM v_pending_requests_summary'),
+        pool.query(`
+          SELECT
+            (SELECT COUNT(*) FROM hospitals WHERE is_active = TRUE) AS partnerHospitals,
+            (SELECT COUNT(*) FROM users WHERE role = 'donor') AS totalDonors,
+            (SELECT COUNT(*) FROM blood_requests WHERE status = 'pending') AS pendingRequests,
+            (SELECT COUNT(*) FROM donations WHERE status = 'completed') + 
+            COALESCE((SELECT SUM(units_transferred) FROM blood_transfers), 0) AS completedDonations
+        `),
+      ])
 
     res.json({
       bloodStock: bloodStockRows,
