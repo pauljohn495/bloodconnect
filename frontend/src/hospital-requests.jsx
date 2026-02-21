@@ -66,6 +66,9 @@ function HospitalRequests() {
                     Blood Type
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                    Component Type
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
                     Units Requested
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
@@ -85,21 +88,21 @@ function HospitalRequests() {
               <tbody className="bg-white">
                 {isLoading && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={6}>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={7}>
                       Loading requests...
                     </td>
                   </tr>
                 )}
                 {!isLoading && error && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-red-500" colSpan={6}>
+                    <td className="px-4 py-10 text-center text-xs text-red-500" colSpan={7}>
                       {error}
                     </td>
                   </tr>
                 )}
                 {!isLoading && !error && requests.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={6}>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={7}>
                       No blood requests found. Submit a request from the Inventory page.
                     </td>
                   </tr>
@@ -110,6 +113,9 @@ function HospitalRequests() {
                     <tr key={request.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-xs font-semibold text-slate-900">
                         {request.blood_type}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
+                        {request.component_type === 'whole_blood' ? 'Whole Blood' : request.component_type === 'platelets' ? 'Platelets' : request.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-xs">
                         <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">

@@ -91,7 +91,7 @@ router.get('/inventory', async (req, res) => {
 
 // POST /api/hospital/requests
 router.post('/requests', async (req, res) => {
-  const { bloodType, unitsRequested, notes } = req.body
+  const { bloodType, componentType, unitsRequested, notes } = req.body
 
   if (!bloodType || !unitsRequested) {
     return res
@@ -112,18 +112,40 @@ router.post('/requests', async (req, res) => {
         .json({ message: 'unitsRequested must be a positive integer' })
     }
 
-    const [result] = await pool.query(
-      `
-      INSERT INTO blood_requests (hospital_id, blood_type, units_requested, notes)
-      VALUES (?, ?, ?, ?)
-    `,
-      [hospitalId, bloodType, intUnits, notes || null],
-    )
+    const component = componentType || 'whole_blood'
+
+    // Try to insert with component_type if column exists
+    let result
+    try {
+      const [result1] = await pool.query(
+        `
+        INSERT INTO blood_requests (hospital_id, blood_type, component_type, units_requested, notes)
+        VALUES (?, ?, ?, ?, ?)
+      `,
+        [hospitalId, bloodType, component, intUnits, notes || null],
+      )
+      result = result1
+    } catch (error) {
+      // If component_type column doesn't exist, insert without it
+      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('component_type')) {
+        const [result2] = await pool.query(
+          `
+          INSERT INTO blood_requests (hospital_id, blood_type, units_requested, notes)
+          VALUES (?, ?, ?, ?)
+        `,
+          [hospitalId, bloodType, intUnits, notes || null],
+        )
+        result = result2
+      } else {
+        throw error
+      }
+    }
 
     res.status(201).json({
       id: result.insertId,
       hospitalId,
       bloodType,
+      componentType: component,
       unitsRequested: intUnits,
       status: 'pending',
       notes: notes || null,

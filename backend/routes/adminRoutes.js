@@ -500,6 +500,12 @@ router.get('/inventory', async (req, res) => {
     
     const [rows] = await pool.query(query, params)
     
+    // Add default component_type if column doesn't exist
+    const rowsWithComponent = rows.map((row) => ({
+      ...row,
+      component_type: row.component_type || 'whole_blood', // Default to whole_blood if not specified
+    }))
+    
     // Calculate status based on expiration date (don't store near_expiry in DB)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -529,7 +535,7 @@ router.get('/inventory', async (req, res) => {
     })
     
     const updatedRows = await Promise.all(
-      rows.map(async (row) => {
+      rowsWithComponent.map(async (row) => {
         const expirationDate = new Date(row.expiration_date)
         expirationDate.setHours(0, 0, 0, 0)
         
@@ -591,7 +597,7 @@ router.get('/inventory', async (req, res) => {
 
 // POST /api/admin/inventory
 router.post('/inventory', async (req, res) => {
-  const { bloodType, units, expirationDate, hospitalId } = req.body
+  const { bloodType, units, expirationDate, hospitalId, componentType } = req.body
 
   if (!bloodType || !units || !expirationDate) {
     return res
@@ -605,14 +611,37 @@ router.post('/inventory', async (req, res) => {
       return res.status(400).json({ message: 'units must be a positive integer' })
     }
 
-    const [result] = await pool.query(
-      `
-      INSERT INTO blood_inventory
-        (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
-      VALUES (?, ?, ?, ?, 'available', ?, ?)
-    `,
-      [bloodType, intUnits, intUnits, expirationDate, req.user.id, hospitalId || null],
-    )
+    // Check if component_type column exists, if not default to 'whole_blood'
+    const component = componentType || 'whole_blood'
+
+    // Try to insert with component_type if column exists
+    let result
+    try {
+      const [result1] = await pool.query(
+        `
+        INSERT INTO blood_inventory
+          (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
+        VALUES (?, ?, ?, ?, 'available', ?, ?, ?)
+      `,
+        [bloodType, intUnits, intUnits, expirationDate, req.user.id, hospitalId || null, component],
+      )
+      result = result1
+    } catch (error) {
+      // If component_type column doesn't exist, insert without it
+      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('component_type')) {
+        const [result2] = await pool.query(
+          `
+          INSERT INTO blood_inventory
+            (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
+          VALUES (?, ?, ?, ?, 'available', ?, ?)
+        `,
+          [bloodType, intUnits, intUnits, expirationDate, req.user.id, hospitalId || null],
+        )
+        result = result2
+      } else {
+        throw error
+      }
+    }
 
     res.status(201).json({
       id: result.insertId,
@@ -621,6 +650,7 @@ router.post('/inventory', async (req, res) => {
       availableUnits: intUnits,
       expirationDate,
       hospitalId: hospitalId || null,
+      componentType: component,
     })
   } catch (error) {
     console.error('Create inventory error:', error)
@@ -830,7 +860,12 @@ router.get('/requests', async (req, res) => {
       ORDER BY br.request_date DESC
     `,
     )
-    res.json(rows)
+    // Add default component_type if column doesn't exist
+    const rowsWithComponent = rows.map((row) => ({
+      ...row,
+      component_type: row.component_type || 'whole_blood',
+    }))
+    res.json(rowsWithComponent)
   } catch (error) {
     console.error('Fetch requests error:', error)
     res.status(500).json({ message: 'Failed to fetch requests' })
@@ -875,17 +910,18 @@ router.get('/analytics/wastage-predictions', async (req, res) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Get historical wastage data (last 90 days)
+    // Get historical wastage data (last 90 days) - grouped by blood_type and component_type
     const [historicalWastage] = await pool.query(
       `
       SELECT 
         blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
         COUNT(*) as wasted_count,
         SUM(available_units) as wasted_units
       FROM blood_inventory
       WHERE status = 'expired'
         AND expiration_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
-      GROUP BY blood_type
+      GROUP BY blood_type, component_type
     `,
     )
 
@@ -895,6 +931,7 @@ router.get('/analytics/wastage-predictions', async (req, res) => {
       SELECT 
         id,
         blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
         available_units,
         expiration_date,
         status,
@@ -908,25 +945,27 @@ router.get('/analytics/wastage-predictions', async (req, res) => {
     `,
     )
 
-    // Get demand patterns (last 30 days)
+    // Get demand patterns (last 30 days) - grouped by blood_type and component_type
     const [demandData] = await pool.query(
       `
       SELECT 
         blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
         SUM(units_requested) as total_demand,
         COUNT(*) as request_count
       FROM blood_requests
       WHERE request_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
         AND status IN ('pending', 'approved', 'fulfilled')
-      GROUP BY blood_type
+      GROUP BY blood_type, component_type
     `,
     )
 
-    // Get total inventory by blood type
+    // Get total inventory by blood type and component type
     const [inventorySummary] = await pool.query(
       `
       SELECT 
         blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
         SUM(available_units) as total_available,
         SUM(CASE WHEN DATEDIFF(expiration_date, CURDATE()) <= 7 AND DATEDIFF(expiration_date, CURDATE()) > 0 THEN available_units ELSE 0 END) as near_expiry_units,
         SUM(CASE WHEN DATEDIFF(expiration_date, CURDATE()) <= 7 THEN available_units ELSE 0 END) as expiring_7days
@@ -934,30 +973,34 @@ router.get('/analytics/wastage-predictions', async (req, res) => {
       WHERE status = 'available'
         AND expiration_date > CURDATE()
         AND available_units > 0
-      GROUP BY blood_type
+      GROUP BY blood_type, component_type
     `,
     )
 
-    // Calculate wastage rates by blood type
+    // Calculate wastage rates by blood type and component type
     const wastageRates = {}
     historicalWastage.forEach((item) => {
-      wastageRates[item.blood_type] = {
+      const key = `${item.blood_type}_${item.component_type || 'whole_blood'}`
+      wastageRates[key] = {
         wastedUnits: item.wasted_units || 0,
         wastedCount: item.wasted_count || 0,
       }
     })
 
-    // Calculate demand factors
+    // Calculate demand factors by blood type and component type
     const demandFactors = {}
     const totalDemand = demandData.reduce((sum, item) => sum + (item.total_demand || 0), 0)
     demandData.forEach((item) => {
-      demandFactors[item.blood_type] = totalDemand > 0 ? (item.total_demand || 0) / totalDemand : 0
+      const key = `${item.blood_type}_${item.component_type || 'whole_blood'}`
+      demandFactors[key] = totalDemand > 0 ? (item.total_demand || 0) / totalDemand : 0
     })
 
     // Calculate risk scores for each inventory item
     const inventoryWithRisk = atRiskInventory.map((item) => {
       const daysUntilExpiry = item.days_until_expiry || 0
       const bloodType = item.blood_type
+      const componentType = item.component_type || 'whole_blood'
+      const key = `${bloodType}_${componentType}`
 
       // Days until expiry factor (0-40 points): fewer days = higher risk
       let expiryFactor = 0
@@ -968,15 +1011,17 @@ router.get('/analytics/wastage-predictions', async (req, res) => {
       else expiryFactor = 5
 
       // Historical wastage factor (0-30 points)
-      const wastageRate = wastageRates[bloodType]?.wastedUnits || 0
+      const wastageRate = wastageRates[key]?.wastedUnits || 0
       const wastageFactor = Math.min(30, (wastageRate / 10) * 5) // Scale based on historical wastage
 
       // Demand factor (0-20 points): low demand = higher risk
-      const demandFactor = demandFactors[bloodType] || 0
+      const demandFactor = demandFactors[key] || 0
       const demandRiskFactor = demandFactor < 0.1 ? 20 : demandFactor < 0.2 ? 10 : 5
 
       // Inventory level factor (0-10 points): high inventory = higher risk
-      const inventorySummaryItem = inventorySummary.find((inv) => inv.blood_type === bloodType)
+      const inventorySummaryItem = inventorySummary.find(
+        (inv) => inv.blood_type === bloodType && (inv.component_type || 'whole_blood') === componentType,
+      )
       const totalAvailable = inventorySummaryItem?.total_available || 0
       const inventoryFactor = totalAvailable > 50 ? 10 : totalAvailable > 20 ? 5 : 0
 
@@ -1010,28 +1055,31 @@ router.get('/analytics/wastage-predictions', async (req, res) => {
       next30Days: predictWastage(30),
     }
 
-    // Group by blood type for summary
+    // Group by blood type and component type for summary
     const wastageByBloodType = {}
     inventoryWithRisk.forEach((item) => {
-      if (!wastageByBloodType[item.blood_type]) {
-        wastageByBloodType[item.blood_type] = {
+      const componentType = item.component_type || 'whole_blood'
+      const key = `${item.blood_type}_${componentType}`
+      if (!wastageByBloodType[key]) {
+        wastageByBloodType[key] = {
           bloodType: item.blood_type,
+          componentType: componentType,
           totalAtRisk: 0,
           highRiskUnits: 0,
           averageRiskScore: 0,
           items: [],
         }
       }
-      wastageByBloodType[item.blood_type].totalAtRisk += item.available_units
-      wastageByBloodType[item.blood_type].items.push(item)
+      wastageByBloodType[key].totalAtRisk += item.available_units
+      wastageByBloodType[key].items.push(item)
       if (item.riskScore >= 70) {
-        wastageByBloodType[item.blood_type].highRiskUnits += item.available_units
+        wastageByBloodType[key].highRiskUnits += item.available_units
       }
     })
 
     // Calculate average risk scores
-    Object.keys(wastageByBloodType).forEach((bloodType) => {
-      const group = wastageByBloodType[bloodType]
+    Object.keys(wastageByBloodType).forEach((key) => {
+      const group = wastageByBloodType[key]
       const avgRisk =
         group.items.length > 0
           ? group.items.reduce((sum, item) => sum + item.riskScore, 0) / group.items.length
@@ -1072,6 +1120,7 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
       SELECT 
         bi.id,
         bi.blood_type,
+        COALESCE(bi.component_type, 'whole_blood') as component_type,
         bi.available_units,
         bi.expiration_date,
         bi.status,
@@ -1094,6 +1143,7 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
         br.id,
         br.hospital_id,
         br.blood_type,
+        COALESCE(br.component_type, 'whole_blood') as component_type,
         br.units_requested,
         br.request_date,
         h.hospital_name
@@ -1124,10 +1174,11 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
     const processedRequests = new Set()
 
     highRiskInventory.forEach((inventory) => {
-      // Find matching pending requests
+      // Find matching pending requests (match by blood_type AND component_type)
       const matchingRequests = pendingRequests.filter(
         (req) =>
           req.blood_type === inventory.blood_type &&
+          (req.component_type || 'whole_blood') === (inventory.component_type || 'whole_blood') &&
           req.units_requested > 0 &&
           !processedRequests.has(req.id),
       )
@@ -1148,6 +1199,7 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
               priority: inventory.days_until_expiry <= 3 ? 'high' : inventory.days_until_expiry <= 7 ? 'medium' : 'low',
               inventoryId: inventory.id,
               bloodType: inventory.blood_type,
+              componentType: inventory.component_type || 'whole_blood',
               units: unitsToTransfer,
               daysUntilExpiry: inventory.days_until_expiry,
               targetHospitalId: request.hospital_id,
@@ -1182,34 +1234,38 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
       })
     }
 
-    // Action 2: High inventory with low demand
+    // Action 2: High inventory with low demand (by blood_type and component_type)
     const [lowDemandBloodTypes] = await pool.query(
       `
       SELECT 
         bi.blood_type,
+        COALESCE(bi.component_type, 'whole_blood') as component_type,
         SUM(bi.available_units) as total_inventory,
         COALESCE(SUM(br.units_requested), 0) as total_demand
       FROM blood_inventory bi
       LEFT JOIN blood_requests br ON bi.blood_type = br.blood_type 
+        AND COALESCE(bi.component_type, 'whole_blood') = COALESCE(br.component_type, 'whole_blood')
         AND br.status = 'pending'
         AND br.request_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
       WHERE bi.status = 'available'
         AND bi.expiration_date > CURDATE()
         AND bi.available_units > 0
         AND (bi.hospital_id IS NULL OR bi.hospital_id = 0)
-      GROUP BY bi.blood_type
+      GROUP BY bi.blood_type, bi.component_type
       HAVING total_inventory > 30 AND total_demand < 5
     `,
     )
 
     lowDemandBloodTypes.forEach((item) => {
+      const componentLabel = item.component_type === 'whole_blood' ? 'Whole Blood' : item.component_type === 'platelets' ? 'Platelets' : 'Plasma'
       priorityActions.push({
         type: 'inventory_adjustment',
         priority: 'medium',
-        title: `Reduce Donations: ${item.blood_type}`,
+        title: `Reduce Donations: ${item.blood_type} ${componentLabel}`,
         description: `High inventory (${item.total_inventory} units) with low demand (${item.total_demand} units requested). Consider reducing donation targets.`,
         bloodType: item.blood_type,
-        action: 'Adjust donation collection targets for this blood type',
+        componentType: item.component_type,
+        action: `Adjust donation collection targets for ${item.blood_type} ${componentLabel}`,
       })
     })
 
@@ -1263,34 +1319,36 @@ router.get('/analytics/historical-wastage', async (req, res) => {
   try {
     const { days = 90 } = req.query
 
-    // Get wastage by date
+    // Get wastage by date (grouped by blood_type and component_type)
     const [wastageByDate] = await pool.query(
       `
       SELECT 
         DATE(expiration_date) as date,
         blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
         SUM(available_units) as wasted_units,
         COUNT(*) as wasted_count
       FROM blood_inventory
       WHERE status = 'expired'
         AND expiration_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-      GROUP BY DATE(expiration_date), blood_type
+      GROUP BY DATE(expiration_date), blood_type, component_type
       ORDER BY date DESC
     `,
       [parseInt(days, 10)],
     )
 
-    // Get wastage by blood type
+    // Get wastage by blood type and component type
     const [wastageByBloodType] = await pool.query(
       `
       SELECT 
         blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
         SUM(available_units) as total_wasted,
         COUNT(*) as count
       FROM blood_inventory
       WHERE status = 'expired'
         AND expiration_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-      GROUP BY blood_type
+      GROUP BY blood_type, component_type
       ORDER BY total_wasted DESC
     `,
       [parseInt(days, 10)],
@@ -1326,6 +1384,200 @@ router.get('/analytics/historical-wastage', async (req, res) => {
   } catch (error) {
     console.error('Historical wastage error:', error)
     res.status(500).json({ message: 'Failed to fetch historical wastage' })
+  }
+})
+
+// ===== Schedule Requests =====
+
+// GET /api/admin/schedule-requests - get all schedule requests
+router.get('/schedule-requests', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        sr.id,
+        sr.user_id,
+        sr.preferred_date,
+        sr.preferred_time,
+        sr.component_type,
+        sr.status,
+        sr.created_at,
+        u.full_name AS donor_name,
+        u.email,
+        u.phone
+      FROM schedule_requests sr
+      JOIN users u ON sr.user_id = u.id
+      ORDER BY sr.created_at DESC
+    `,
+    )
+    // Add default component_type if column doesn't exist
+    const rowsWithComponent = rows.map((row) => ({
+      ...row,
+      component_type: row.component_type || 'whole_blood',
+    }))
+    res.json(rowsWithComponent)
+  } catch (error) {
+    console.error('Fetch schedule requests error:', error)
+    res.status(500).json({ message: 'Failed to fetch schedule requests' })
+  }
+})
+
+// GET /api/admin/schedule-requests/:id - get schedule request details
+router.get('/schedule-requests/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        sr.*,
+        u.full_name AS donor_name,
+        u.email,
+        u.phone,
+        u.blood_type,
+        reviewer.full_name AS reviewer_name
+      FROM schedule_requests sr
+      JOIN users u ON sr.user_id = u.id
+      LEFT JOIN users reviewer ON sr.reviewed_by = reviewer.id
+      WHERE sr.id = ?
+    `,
+      [id],
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Schedule request not found' })
+    }
+
+    const request = rows[0]
+    // Parse JSON fields
+    if (request.health_screening_answers) {
+      try {
+        request.health_screening_answers = JSON.parse(request.health_screening_answers)
+      } catch {
+        request.health_screening_answers = {}
+      }
+    }
+
+    res.json(request)
+  } catch (error) {
+    console.error('Fetch schedule request details error:', error)
+    res.status(500).json({ message: 'Failed to fetch schedule request details' })
+  }
+})
+
+// PATCH /api/admin/schedule-requests/:id/approve - approve schedule request
+router.patch('/schedule-requests/:id/approve', async (req, res) => {
+  const { id } = req.params
+  const { adminNotes } = req.body
+
+  try {
+    // Get the request first to get user_id and preferred date/time
+    const [requestRows] = await pool.query(
+      'SELECT user_id, preferred_date, preferred_time FROM schedule_requests WHERE id = ?',
+      [id],
+    )
+
+    if (requestRows.length === 0) {
+      return res.status(404).json({ message: 'Schedule request not found' })
+    }
+
+    const userId = requestRows[0].user_id
+    const preferredDate = new Date(requestRows[0].preferred_date).toLocaleDateString()
+    const preferredTime = requestRows[0].preferred_time
+
+    // Update request status
+    const [result] = await pool.query(
+      `
+      UPDATE schedule_requests
+      SET status = 'approved',
+          admin_notes = ?,
+          reviewed_by = ?,
+          reviewed_at = NOW()
+      WHERE id = ?
+    `,
+      [adminNotes || null, req.user.id, id],
+    )
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Schedule request not found' })
+    }
+
+    // Create notification for donor
+    await pool.query(
+      `
+      INSERT INTO notifications (user_id, title, message, type)
+      VALUES (?, ?, ?, 'info')
+    `,
+      [
+        userId,
+        'Schedule Request Approved',
+        `Your schedule request has been approved. Preferred date: ${preferredDate} at ${preferredTime}. ${adminNotes ? `Admin notes: ${adminNotes}` : ''}`,
+      ],
+    )
+
+    res.json({ message: 'Schedule request approved successfully' })
+  } catch (error) {
+    console.error('Approve schedule request error:', error)
+    res.status(500).json({ message: 'Failed to approve schedule request' })
+  }
+})
+
+// PATCH /api/admin/schedule-requests/:id/reject - reject schedule request
+router.patch('/schedule-requests/:id/reject', async (req, res) => {
+  const { id } = req.params
+  const { rejectionReason } = req.body
+
+  if (!rejectionReason || rejectionReason.trim() === '') {
+    return res.status(400).json({ message: 'rejectionReason is required' })
+  }
+
+  try {
+    // Get the request first to get user_id
+    const [requestRows] = await pool.query(
+      'SELECT user_id FROM schedule_requests WHERE id = ?',
+      [id],
+    )
+
+    if (requestRows.length === 0) {
+      return res.status(404).json({ message: 'Schedule request not found' })
+    }
+
+    const userId = requestRows[0].user_id
+
+    // Update request status
+    const [result] = await pool.query(
+      `
+      UPDATE schedule_requests
+      SET status = 'rejected',
+          rejection_reason = ?,
+          reviewed_by = ?,
+          reviewed_at = NOW()
+      WHERE id = ?
+    `,
+      [rejectionReason, req.user.id, id],
+    )
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Schedule request not found' })
+    }
+
+    // Create notification for donor
+    await pool.query(
+      `
+      INSERT INTO notifications (user_id, title, message, type)
+      VALUES (?, ?, ?, 'warning')
+    `,
+      [
+        userId,
+        'Schedule Request Rejected',
+        `Your schedule request was rejected. Reason: ${rejectionReason}`,
+      ],
+    )
+
+    res.json({ message: 'Schedule request rejected successfully' })
+  } catch (error) {
+    console.error('Reject schedule request error:', error)
+    res.status(500).json({ message: 'Failed to reject schedule request' })
   }
 })
 

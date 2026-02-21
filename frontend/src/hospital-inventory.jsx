@@ -8,6 +8,7 @@ function HospitalInventory() {
   const [bloodTypeStats, setBloodTypeStats] = useState({})
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
   const [bloodType, setBloodType] = useState('')
+  const [componentType, setComponentType] = useState('whole_blood')
   const [unitsRequested, setUnitsRequested] = useState('')
   const [notes, setNotes] = useState('')
   const [notification, setNotification] = useState(null)
@@ -51,6 +52,7 @@ function HospitalInventory() {
   const handleOpenRequestModal = () => {
     setIsRequestModalOpen(true)
     setBloodType('')
+    setComponentType('whole_blood')
     setUnitsRequested('')
     setNotes('')
   }
@@ -58,6 +60,7 @@ function HospitalInventory() {
   const handleCloseRequestModal = () => {
     setIsRequestModalOpen(false)
     setBloodType('')
+    setComponentType('whole_blood')
     setUnitsRequested('')
     setNotes('')
   }
@@ -87,6 +90,7 @@ function HospitalInventory() {
         method: 'POST',
         body: JSON.stringify({
           bloodType,
+          componentType,
           unitsRequested: units,
           notes: notes || null,
         }),
@@ -261,6 +265,22 @@ function HospitalInventory() {
             </div>
 
             <form onSubmit={handleSubmitRequest} className="mt-4 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Component Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={componentType}
+                  onChange={(e) => setComponentType(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                >
+                  <option value="whole_blood">Whole Blood</option>
+                  <option value="platelets">Platelets</option>
+                  <option value="plasma">Plasma</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-slate-700">
                   Blood Type <span className="text-red-500">*</span>
