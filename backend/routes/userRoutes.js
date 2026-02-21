@@ -121,6 +121,130 @@ router.get('/blood-availability', async (req, res) => {
   }
 })
 
+// ===== Schedule Requests =====
+
+// GET /api/user/schedule-requests - get donor's schedule requests
+router.get('/schedule-requests', async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        id,
+        preferred_date,
+        preferred_time,
+        component_type,
+        last_donation_date,
+        weight,
+        health_screening_answers,
+        notes,
+        status,
+        admin_notes,
+        rejection_reason,
+        reviewed_at,
+        created_at
+      FROM schedule_requests
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+    `,
+      [req.user.id],
+    )
+
+    res.json(rows)
+  } catch (error) {
+    console.error('Fetch schedule requests error:', error)
+    res.status(500).json({ message: 'Failed to fetch schedule requests' })
+  }
+})
+
+// POST /api/user/schedule-requests - create schedule request
+router.post('/schedule-requests', async (req, res) => {
+  const {
+    preferredDate,
+    preferredTime,
+    componentType,
+    lastDonationDate,
+    weight,
+    healthScreeningAnswers,
+    notes,
+  } = req.body
+
+  if (!preferredDate || !preferredTime || !weight || !healthScreeningAnswers) {
+    return res
+      .status(400)
+      .json({ message: 'preferredDate, preferredTime, weight, and healthScreeningAnswers are required' })
+  }
+
+  try {
+    // Check if there's already a pending request
+    const [pendingRequests] = await pool.query(
+      'SELECT id FROM schedule_requests WHERE user_id = ? AND status = ?',
+      [req.user.id, 'pending'],
+    )
+
+    if (pendingRequests.length > 0) {
+      return res.status(400).json({
+        message: 'You already have a pending schedule request. Please wait for it to be reviewed.',
+      })
+    }
+
+    const component = componentType || 'whole_blood'
+
+    // Try to insert with component_type if column exists
+    let result
+    try {
+      const [result1] = await pool.query(
+        `
+        INSERT INTO schedule_requests 
+          (user_id, preferred_date, preferred_time, component_type, last_donation_date, weight, health_screening_answers, notes, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      `,
+        [
+          req.user.id,
+          preferredDate,
+          preferredTime,
+          component,
+          lastDonationDate || null,
+          weight,
+          JSON.stringify(healthScreeningAnswers),
+          notes || null,
+        ],
+      )
+      result = result1
+    } catch (error) {
+      // If component_type column doesn't exist, insert without it
+      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('component_type')) {
+        const [result2] = await pool.query(
+          `
+          INSERT INTO schedule_requests 
+            (user_id, preferred_date, preferred_time, last_donation_date, weight, health_screening_answers, notes, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        `,
+          [
+            req.user.id,
+            preferredDate,
+            preferredTime,
+            lastDonationDate || null,
+            weight,
+            JSON.stringify(healthScreeningAnswers),
+            notes || null,
+          ],
+        )
+        result = result2
+      } else {
+        throw error
+      }
+    }
+
+    res.status(201).json({
+      id: result.insertId,
+      message: 'Schedule request submitted successfully',
+    })
+  } catch (error) {
+    console.error('Create schedule request error:', error)
+    res.status(500).json({ message: 'Failed to create schedule request' })
+  }
+})
+
 module.exports = router
 
 

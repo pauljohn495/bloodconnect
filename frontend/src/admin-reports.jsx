@@ -26,6 +26,7 @@ function AdminReports() {
   const [historicalWastage, setHistoricalWastage] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [componentFilter, setComponentFilter] = useState('all') // 'all', 'whole_blood', 'platelets', 'plasma'
 
   const loadAnalytics = async () => {
     try {
@@ -100,25 +101,59 @@ function AdminReports() {
     return 'text-blue-600 bg-blue-50 ring-blue-100'
   }
 
-  // Prepare chart data
+  // Prepare chart data - filter predicted wastage by component type if filter is set
   const wastageForecastData = predictions
-    ? [
-        { period: 'Next 7 Days', predicted: predictions.predictedWastage.next7Days },
-        { period: 'Next 14 Days', predicted: predictions.predictedWastage.next14Days },
-        { period: 'Next 30 Days', predicted: predictions.predictedWastage.next30Days },
-      ]
+    ? (() => {
+        // If component filter is set, calculate wastage only for that component type
+        if (componentFilter !== 'all' && predictions.inventoryWithRisk) {
+          const filteredInventory = predictions.inventoryWithRisk.filter(
+            (item) => (item.component_type || 'whole_blood') === componentFilter,
+          )
+          const predictWastage = (days) => {
+            const expiringSoon = filteredInventory.filter(
+              (item) => item.days_until_expiry <= days && item.days_until_expiry > 0,
+            )
+            const avgWastageRate = 0.15
+            return expiringSoon.reduce((sum, item) => {
+              const wastageProbability = item.riskScore / 100
+              return sum + Math.round(item.available_units * wastageProbability * avgWastageRate)
+            }, 0)
+          }
+          return [
+            { period: 'Next 7 Days', predicted: predictWastage(7) },
+            { period: 'Next 14 Days', predicted: predictWastage(14) },
+            { period: 'Next 30 Days', predicted: predictWastage(30) },
+          ]
+        }
+        // Otherwise use original predictions
+        return [
+          { period: 'Next 7 Days', predicted: predictions.predictedWastage.next7Days },
+          { period: 'Next 14 Days', predicted: predictions.predictedWastage.next14Days },
+          { period: 'Next 30 Days', predicted: predictions.predictedWastage.next30Days },
+        ]
+      })()
     : []
 
-  const wastageByBloodTypeData = predictions?.wastageByBloodType || []
+  // Filter wastage by component type if filter is set
+  const wastageByBloodTypeData = (predictions?.wastageByBloodType || []).filter((item) => {
+    if (componentFilter === 'all') return true
+    return (item.componentType || 'whole_blood') === componentFilter
+  })
 
+  // Group historical wastage by date and component type, filter by componentFilter
   const historicalChartData = historicalWastage?.wastageByDate
     ? historicalWastage.wastageByDate
+        .filter((item) => {
+          if (componentFilter === 'all') return true
+          return (item.component_type || 'whole_blood') === componentFilter
+        })
         .reduce((acc, item) => {
-          const existing = acc.find((a) => a.date === item.date)
+          const date = item.date
+          const existing = acc.find((a) => a.date === date)
           if (existing) {
             existing.total += item.wasted_units || 0
           } else {
-            acc.push({ date: item.date, total: item.wasted_units || 0 })
+            acc.push({ date, total: item.wasted_units || 0 })
           }
           return acc
         }, [])
@@ -126,32 +161,84 @@ function AdminReports() {
         .slice(-30) // Last 30 days
     : []
 
+  // Use historicalChartData directly (already aggregated by date)
+  const aggregatedChartData = historicalChartData
+
   return (
     <AdminLayout pageTitle="Reports & Analytics" pageDescription="View detailed reports and system analytics.">
-      {/* Tabs */}
-      <div className="mb-4 flex gap-2 border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setActiveTab('analytics')}
-          className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
-            activeTab === 'analytics'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Analytics
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('reports')}
-          className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
-            activeTab === 'reports'
-              ? 'border-red-600 text-red-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Reports
-        </button>
+      {/* Tabs and Component Filter */}
+      <div className="mb-4 flex items-center justify-between border-b border-slate-200">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('analytics')}
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
+              activeTab === 'analytics'
+                ? 'border-red-600 text-red-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Analytics
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('reports')}
+            className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
+              activeTab === 'reports'
+                ? 'border-red-600 text-red-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Reports
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-600">Filter:</span>
+          <button
+            type="button"
+            onClick={() => setComponentFilter('all')}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+              componentFilter === 'all'
+                ? 'bg-red-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setComponentFilter('whole_blood')}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+              componentFilter === 'whole_blood'
+                ? 'bg-red-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Whole Blood
+          </button>
+          <button
+            type="button"
+            onClick={() => setComponentFilter('platelets')}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+              componentFilter === 'platelets'
+                ? 'bg-red-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Platelets
+          </button>
+          <button
+            type="button"
+            onClick={() => setComponentFilter('plasma')}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+              componentFilter === 'plasma'
+                ? 'bg-red-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Plasma
+          </button>
+        </div>
       </div>
 
       {/* Analytics content */}
@@ -172,28 +259,48 @@ function AdminReports() {
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <p className="text-[11px] font-medium text-slate-500">Total At Risk</p>
                   <p className="mt-1 text-2xl font-semibold text-slate-900">
-                    {predictions?.summary?.totalAtRisk || 0}
+                    {componentFilter === 'all'
+                      ? predictions?.summary?.totalAtRisk || 0
+                      : predictions?.inventoryWithRisk
+                          ?.filter((item) => (item.component_type || 'whole_blood') === componentFilter)
+                          .reduce((sum, item) => sum + item.available_units, 0) || 0}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-400">units</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <p className="text-[11px] font-medium text-slate-500">High Risk Items</p>
                   <p className="mt-1 text-2xl font-semibold text-red-600">
-                    {predictions?.summary?.highRiskItems || 0}
+                    {componentFilter === 'all'
+                      ? predictions?.summary?.highRiskItems || 0
+                      : predictions?.inventoryWithRisk?.filter(
+                          (item) => item.riskScore >= 70 && (item.component_type || 'whole_blood') === componentFilter,
+                        ).length || 0}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-400">items</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <p className="text-[11px] font-medium text-slate-500">Avg Risk Score</p>
                   <p className="mt-1 text-2xl font-semibold text-slate-900">
-                    {predictions?.summary?.averageRiskScore || 0}
+                    {(() => {
+                      if (componentFilter === 'all') return predictions?.summary?.averageRiskScore || 0
+                      const filtered = predictions?.inventoryWithRisk?.filter(
+                        (item) => (item.component_type || 'whole_blood') === componentFilter,
+                      ) || []
+                      return filtered.length > 0
+                        ? Math.round(filtered.reduce((sum, item) => sum + item.riskScore, 0) / filtered.length)
+                        : 0
+                    })()}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-400">out of 100</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <p className="text-[11px] font-medium text-slate-500">Recommendations</p>
                   <p className="mt-1 text-2xl font-semibold text-blue-600">
-                    {prescriptions?.summary?.totalRecommendations || 0}
+                    {componentFilter === 'all'
+                      ? prescriptions?.summary?.totalRecommendations || 0
+                      : prescriptions?.transferRecommendations?.filter(
+                          (rec) => (rec.componentType || 'whole_blood') === componentFilter,
+                        ).length || 0}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-400">actions available</p>
                 </div>
@@ -267,10 +374,17 @@ function AdminReports() {
                     </ResponsiveContainer>
                   </div>
 
-                  {/* Risk by Blood Type */}
+                  {/* Risk by Blood Type & Component Type */}
                   {wastageByBloodTypeData.length > 0 && (
                     <div className="mb-10">
-                      <h3 className="mb-4 text-sm font-semibold text-slate-900">Risk by Blood Type</h3>
+                      <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                        Risk by Blood Type & Component
+                        {componentFilter !== 'all' && (
+                          <span className="ml-2 text-xs font-normal text-slate-500">
+                            ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
+                          </span>
+                        )}
+                      </h3>
                       <ResponsiveContainer width="100%" height={320}>
                         <PieChart>
                           <Pie
@@ -281,9 +395,10 @@ function AdminReports() {
                             cy="50%"
                             outerRadius={100}
                             innerRadius={40}
-                            label={({ bloodType, totalAtRisk, percent }) =>
-                              `${bloodType}\n${totalAtRisk} units\n(${(percent * 100).toFixed(1)}%)`
-                            }
+                            label={({ bloodType, componentType, totalAtRisk, percent }) => {
+                              const componentLabel = componentType === 'whole_blood' ? 'WB' : componentType === 'platelets' ? 'PLT' : 'PLA'
+                              return `${bloodType} ${componentLabel}\n${totalAtRisk} units\n(${(percent * 100).toFixed(1)}%)`
+                            }}
                             labelLine={{ stroke: '#475569', strokeWidth: 1 }}
                             style={{ fontSize: 12, fontWeight: 500 }}
                           >
@@ -306,17 +421,24 @@ function AdminReports() {
                               padding: '10px',
                               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                             }}
-                            formatter={(value, name, props) => [
-                              `${value} units (${((value / wastageByBloodTypeData.reduce((sum, item) => sum + item.totalAtRisk, 0)) * 100).toFixed(1)}%)`,
-                              props.payload.bloodType,
-                            ]}
+                            formatter={(value, name, props) => {
+                              const componentLabel = props.payload.componentType === 'whole_blood' ? 'Whole Blood' : props.payload.componentType === 'platelets' ? 'Platelets' : 'Plasma'
+                              const total = wastageByBloodTypeData.reduce((sum, item) => sum + item.totalAtRisk, 0)
+                              return [
+                                `${value} units (${total > 0 ? ((value / total) * 100).toFixed(1) : 0}%)`,
+                                `${props.payload.bloodType} ${componentLabel}`,
+                              ]
+                            }}
                             labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
                           />
                           <Legend
                             verticalAlign="bottom"
                             height={36}
                             wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '15px' }}
-                            formatter={(value, entry) => `${value}: ${entry.payload.totalAtRisk} units`}
+                            formatter={(value, entry) => {
+                              const componentLabel = entry.payload.componentType === 'whole_blood' ? 'Whole Blood' : entry.payload.componentType === 'platelets' ? 'Platelets' : 'Plasma'
+                              return `${entry.payload.bloodType} ${componentLabel}: ${entry.payload.totalAtRisk} units`
+                            }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -325,13 +447,23 @@ function AdminReports() {
 
                   {/* High Risk Inventory Table */}
                   <div>
-                    <h3 className="mb-3 text-xs font-semibold text-slate-700">High Risk Inventory Items</h3>
+                    <h3 className="mb-3 text-xs font-semibold text-slate-700">
+                      High Risk Inventory Items
+                      {componentFilter !== 'all' && (
+                        <span className="ml-2 text-xs font-normal text-slate-500">
+                          ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
+                        </span>
+                      )}
+                    </h3>
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-slate-100 text-xs">
                         <thead className="bg-slate-50/60">
                           <tr>
                             <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
                               Blood Type
+                            </th>
+                            <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                              Component Type
                             </th>
                             <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
                               Units
@@ -346,12 +478,19 @@ function AdminReports() {
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
                           {predictions?.inventoryWithRisk
-                            ?.filter((item) => item.riskScore >= 50)
+                            ?.filter((item) => {
+                              if (item.riskScore < 50) return false
+                              if (componentFilter === 'all') return true
+                              return (item.component_type || 'whole_blood') === componentFilter
+                            })
                             .slice(0, 10)
                             .map((item) => (
                               <tr key={item.id} className="hover:bg-slate-50/60">
                                 <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">
                                   {item.blood_type}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                                  {item.component_type === 'whole_blood' ? 'Whole Blood' : item.component_type === 'platelets' ? 'Platelets' : item.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-2 text-slate-700">
                                   {item.available_units}
@@ -371,8 +510,9 @@ function AdminReports() {
                               </tr>
                             )) || (
                             <tr>
-                              <td className="px-3 py-4 text-center text-slate-500" colSpan={4}>
+                              <td className="px-3 py-4 text-center text-slate-500" colSpan={5}>
                                 No high-risk items found
+                                {componentFilter !== 'all' && ` for ${componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'}`}
                               </td>
                             </tr>
                           )}
@@ -393,11 +533,24 @@ function AdminReports() {
                 </div>
                 <div className="p-6">
                   {/* Priority Actions */}
-                  {prescriptions?.priorityActions && prescriptions.priorityActions.length > 0 && (
-                    <div className="mb-8">
-                      <h3 className="mb-4 text-sm font-semibold text-slate-700">Priority Actions</h3>
-                      <div className="space-y-4">
-                        {prescriptions.priorityActions.map((action, index) => (
+                  {(() => {
+                    const filteredActions = (prescriptions?.priorityActions || []).filter((action) => {
+                      if (componentFilter === 'all') return true
+                      // Show action if it matches component type or doesn't have component type specified
+                      return !action.componentType || action.componentType === componentFilter
+                    })
+                    return filteredActions.length > 0 ? (
+                      <div className="mb-8">
+                        <h3 className="mb-4 text-sm font-semibold text-slate-700">
+                          Priority Actions
+                          {componentFilter !== 'all' && (
+                            <span className="ml-2 text-xs font-normal text-slate-500">
+                              ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
+                            </span>
+                          )}
+                        </h3>
+                        <div className="space-y-4">
+                          {filteredActions.map((action, index) => (
                           <div
                             key={index}
                             className={`rounded-lg border p-5 ring-1 ${getPriorityColor(action.priority)}`}
@@ -430,20 +583,39 @@ function AdminReports() {
                                     ))}
                                   </div>
                                 )}
+                                {action.componentType && (
+                                  <div className="mt-2">
+                                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                      Component: {action.componentType === 'whole_blood' ? 'Whole Blood' : action.componentType === 'platelets' ? 'Platelets' : 'Plasma'}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null
+                  })()}
 
                   {/* Transfer Recommendations */}
-                  {prescriptions?.transferRecommendations &&
-                    prescriptions.transferRecommendations.length > 0 && (
+                  {(() => {
+                    const filteredRecommendations = (prescriptions?.transferRecommendations || []).filter(
+                      (rec) => {
+                        if (componentFilter === 'all') return true
+                        return (rec.componentType || 'whole_blood') === componentFilter
+                      },
+                    )
+                    return filteredRecommendations.length > 0 ? (
                       <div>
                         <h3 className="mb-3 text-xs font-semibold text-slate-700">
                           Transfer Recommendations
+                          {componentFilter !== 'all' && (
+                            <span className="ml-2 text-xs font-normal text-slate-500">
+                              ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
+                            </span>
+                          )}
                         </h3>
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y divide-slate-100 text-xs">
@@ -454,6 +626,9 @@ function AdminReports() {
                                 </th>
                                 <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
                                   Blood Type
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                                  Component Type
                                 </th>
                                 <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
                                   Units
@@ -470,7 +645,7 @@ function AdminReports() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
-                              {prescriptions.transferRecommendations.map((rec, index) => (
+                              {filteredRecommendations.map((rec, index) => (
                                 <tr key={index} className="hover:bg-slate-50/60">
                                   <td className="whitespace-nowrap px-3 py-2">
                                     <span
@@ -483,6 +658,9 @@ function AdminReports() {
                                   </td>
                                   <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">
                                     {rec.bloodType}
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">
+                                    {rec.componentType === 'whole_blood' ? 'Whole Blood' : rec.componentType === 'platelets' ? 'Platelets' : rec.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'}
                                   </td>
                                   <td className="whitespace-nowrap px-3 py-2 text-slate-700">{rec.units}</td>
                                   <td className="whitespace-nowrap px-3 py-2 text-slate-700">
@@ -500,7 +678,8 @@ function AdminReports() {
                           </table>
                         </div>
                       </div>
-                    )}
+                    ) : null
+                  })()}
                 </div>
               </section>
             </>
@@ -526,28 +705,46 @@ function AdminReports() {
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <p className="text-[11px] font-medium text-slate-500">Total Wastage (90 days)</p>
                   <p className="mt-1 text-2xl font-semibold text-red-600">
-                    {historicalWastage?.totalWastage !== undefined
-                      ? Number(historicalWastage.totalWastage)
-                      : historicalWastage?.wastageByBloodType
-                        ? historicalWastage.wastageByBloodType.reduce(
-                            (sum, item) => sum + Number(item.total_wasted || 0),
-                            0,
-                          )
-                        : 0}
+                    {(() => {
+                      if (componentFilter === 'all') {
+                        return historicalWastage?.totalWastage !== undefined
+                          ? Number(historicalWastage.totalWastage)
+                          : historicalWastage?.wastageByBloodType
+                            ? historicalWastage.wastageByBloodType.reduce(
+                                (sum, item) => sum + Number(item.total_wasted || 0),
+                                0,
+                              )
+                            : 0
+                      }
+                      // Filter by component type
+                      return (historicalWastage?.wastageByBloodType || [])
+                        .filter((item) => (item.component_type || 'whole_blood') === componentFilter)
+                        .reduce((sum, item) => sum + Number(item.total_wasted || 0), 0)
+                    })()}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-400">units wasted</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <p className="text-[11px] font-medium text-slate-500">Wastage Reduction Potential</p>
                   <p className="mt-1 text-2xl font-semibold text-blue-600">
-                    {prescriptions?.summary?.estimatedWastageReduction || 0}
+                    {componentFilter === 'all'
+                      ? prescriptions?.summary?.estimatedWastageReduction || 0
+                      : (prescriptions?.transferRecommendations || [])
+                          .filter((rec) => (rec.componentType || 'whole_blood') === componentFilter)
+                          .reduce((sum, rec) => sum + (rec.units || 0), 0)}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-400">units if recommendations followed</p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                   <p className="text-[11px] font-medium text-slate-500">Critical Actions</p>
                   <p className="mt-1 text-2xl font-semibold text-orange-600">
-                    {prescriptions?.summary?.criticalActions || 0}
+                    {componentFilter === 'all'
+                      ? prescriptions?.summary?.criticalActions || 0
+                      : (prescriptions?.priorityActions || []).filter(
+                          (action) =>
+                            action.priority === 'critical' &&
+                            (!action.componentType || action.componentType === componentFilter),
+                        ).length}
                   </p>
                   <p className="mt-1 text-[10px] text-slate-400">urgent items</p>
                 </div>
@@ -557,9 +754,9 @@ function AdminReports() {
               <section className="mt-6">
                 <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
                   <h3 className="mb-5 text-base font-semibold text-slate-900">Historical Wastage Trend (Last 30 Days)</h3>
-                  {historicalChartData.length > 0 ? (
+                  {aggregatedChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={350}>
-                      <LineChart data={historicalChartData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
+                      <LineChart data={aggregatedChartData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
                         <XAxis
                           dataKey="date"
@@ -627,19 +824,24 @@ function AdminReports() {
               {/* Wastage by Blood Type */}
               <section className="mt-6 grid gap-6 lg:grid-cols-2">
                 <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-                  <h3 className="mb-5 text-base font-semibold text-slate-900">Wastage by Blood Type (90 days)</h3>
+                  <h3 className="mb-5 text-base font-semibold text-slate-900">Wastage by Blood Type & Component (90 days)</h3>
                   {historicalWastage?.wastageByBloodType &&
                   historicalWastage.wastageByBloodType.length > 0 ? (
                     <ResponsiveContainer width="100%" height={320}>
-                      <BarChart data={historicalWastage.wastageByBloodType} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
+                      <BarChart data={filteredData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
                         <XAxis
                           dataKey="blood_type"
-                          tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
+                          tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }}
                           stroke="#64748b"
                           tickLine={{ stroke: '#64748b' }}
+                          tickFormatter={(value, entry) => {
+                            const componentType = entry?.payload?.component_type || 'whole_blood'
+                            const componentLabel = componentType === 'whole_blood' ? 'WB' : componentType === 'platelets' ? 'PLT' : 'PLA'
+                            return `${value} ${componentLabel}`
+                          }}
                         >
-                          <Label value="Blood Type" offset={-5} position="insideBottom" style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }} />
+                          <Label value="Blood Type & Component" offset={-5} position="insideBottom" style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }} />
                         </XAxis>
                         <YAxis
                           tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
@@ -663,11 +865,18 @@ function AdminReports() {
                             padding: '10px',
                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                           }}
-                          formatter={(value) => [`${value} units`, 'Wasted']}
+                          formatter={(value, name, props) => {
+                            const componentLabel = props.payload.component_type === 'whole_blood' ? 'Whole Blood' : props.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
+                            return [`${value} units`, `${props.payload.blood_type} ${componentLabel}`]
+                          }}
                           labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
                         />
                         <Legend
                           wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '10px' }}
+                          formatter={(value, entry) => {
+                            const componentLabel = entry.payload.component_type === 'whole_blood' ? 'Whole Blood' : entry.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
+                            return `${entry.payload.blood_type} ${componentLabel}`
+                          }}
                         />
                         <Bar
                           dataKey="total_wasted"
@@ -688,31 +897,43 @@ function AdminReports() {
                     <div className="flex h-[320px] items-center justify-center">
                       <p className="text-sm text-slate-400">No wastage data by blood type</p>
                     </div>
-                  )}
+                  )
+                  })()}
                 </div>
 
                 <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-                  <h3 className="mb-5 text-base font-semibold text-slate-900">Wastage Distribution</h3>
-                  {historicalWastage?.wastageByBloodType &&
-                  Array.isArray(historicalWastage.wastageByBloodType) &&
-                  historicalWastage.wastageByBloodType.length > 0 ? (
+                  <h3 className="mb-5 text-base font-semibold text-slate-900">
+                    Wastage Distribution
+                    {componentFilter !== 'all' && (
+                      <span className="ml-2 text-sm font-normal text-slate-500">
+                        ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
+                      </span>
+                    )}
+                  </h3>
+                  {(() => {
+                    const filteredData = (historicalWastage?.wastageByBloodType || []).filter((item) => {
+                      if (componentFilter === 'all') return true
+                      return (item.component_type || 'whole_blood') === componentFilter
+                    })
+                    return Array.isArray(filteredData) && filteredData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={320}>
                       <PieChart>
                         <Pie
-                          data={historicalWastage.wastageByBloodType}
+                          data={filteredData}
                           dataKey="total_wasted"
                           nameKey="blood_type"
                           cx="50%"
                           cy="50%"
                           outerRadius={100}
                           innerRadius={40}
-                          label={({ blood_type, total_wasted, percent }) =>
-                            `${blood_type}\n${total_wasted} units\n(${(percent * 100).toFixed(1)}%)`
-                          }
+                          label={({ blood_type, component_type, total_wasted, percent }) => {
+                            const componentLabel = component_type === 'whole_blood' ? 'WB' : component_type === 'platelets' ? 'PLT' : 'PLA'
+                            return `${blood_type} ${componentLabel}\n${total_wasted} units\n(${(percent * 100).toFixed(1)}%)`
+                          }}
                           labelLine={{ stroke: '#475569', strokeWidth: 1 }}
                           style={{ fontSize: 12, fontWeight: 500 }}
                         >
-                          {historicalWastage.wastageByBloodType.map((entry, index) => (
+                          {filteredData.map((entry, index) => (
                             <Cell
                               key={`cell-${index}`}
                               fill={COLORS[index % COLORS.length]}
@@ -732,13 +953,14 @@ function AdminReports() {
                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                           }}
                           formatter={(value, name, props) => {
-                            const total = historicalWastage.wastageByBloodType.reduce(
+                            const total = filteredData.reduce(
                               (sum, item) => sum + (item.total_wasted || 0),
                               0,
                             )
+                            const componentLabel = props.payload.component_type === 'whole_blood' ? 'Whole Blood' : props.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
                             return [
                               `${value} units (${total > 0 ? ((value / total) * 100).toFixed(1) : 0}%)`,
-                              props.payload.blood_type,
+                              `${props.payload.blood_type} ${componentLabel}`,
                             ]
                           }}
                           labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
@@ -747,7 +969,10 @@ function AdminReports() {
                           verticalAlign="bottom"
                           height={36}
                           wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '15px' }}
-                          formatter={(value, entry) => `${value}: ${entry.payload.total_wasted || 0} units`}
+                          formatter={(value, entry) => {
+                            const componentLabel = entry.payload.component_type === 'whole_blood' ? 'Whole Blood' : entry.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
+                            return `${entry.payload.blood_type} ${componentLabel}: ${entry.payload.total_wasted || 0} units`
+                          }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -757,12 +982,13 @@ function AdminReports() {
                         <p className="text-sm font-medium text-slate-600">No wastage distribution data</p>
                         <p className="mt-1 text-xs text-slate-400">
                           {historicalWastage
-                            ? 'No expired blood units found in the last 90 days'
+                            ? `No expired ${componentFilter === 'all' ? 'blood units' : componentFilter === 'whole_blood' ? 'whole blood' : componentFilter === 'platelets' ? 'platelets' : 'plasma'} found in the last 90 days`
                             : 'Loading wastage data...'}
                         </p>
                       </div>
                     </div>
-                  )}
+                  )
+                  })()}
                 </div>
               </section>
             </>

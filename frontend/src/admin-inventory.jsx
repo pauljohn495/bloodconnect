@@ -7,10 +7,12 @@ function AdminInventory() {
   const [bloodType, setBloodType] = useState('')
   const [units, setUnits] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
+  const [componentType, setComponentType] = useState('whole_blood')
   const [inventory, setInventory] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [componentFilter, setComponentFilter] = useState('all') // 'all', 'whole_blood', 'platelets', 'plasma'
 
   const loadInventory = async () => {
     try {
@@ -42,6 +44,7 @@ function AdminInventory() {
     setBloodType('')
     setUnits('')
     setExpirationDate('')
+    setComponentType('whole_blood')
   }
 
   const handleSubmit = async (e) => {
@@ -53,6 +56,7 @@ function AdminInventory() {
           bloodType,
           units: Number(units),
           expirationDate,
+          componentType,
         }),
       })
       // Refresh table so new stock appears immediately
@@ -64,8 +68,17 @@ function AdminInventory() {
     }
   }
 
-  // Filter inventory based on status
+  // Filter inventory based on status and component type
   const filteredInventory = inventory.filter((item) => {
+    // Filter by component type
+    if (componentFilter !== 'all') {
+      const componentType = item.component_type || item.componentType || 'whole_blood' // Default to whole_blood if not specified
+      if (componentFilter === 'whole_blood' && componentType !== 'whole_blood') return false
+      if (componentFilter === 'platelets' && componentType !== 'platelets') return false
+      if (componentFilter === 'plasma' && componentType !== 'plasma') return false
+    }
+    
+    // Filter by status
     if (statusFilter === 'all') return true
     if (statusFilter === 'available') return item.status === 'available'
     if (statusFilter === 'near_expiry') return item.status === 'near_expiry' || item.status === 'Near Expiry'
@@ -81,11 +94,57 @@ function AdminInventory() {
       <section className="mt-2">
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">Blood Inventory</h2>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Complete inventory of all blood types and units
-              </p>
+            <div className="flex items-center gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Blood Inventory</h2>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Complete inventory of all blood types and units
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setComponentFilter('whole_blood')}
+                  className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    componentFilter === 'whole_blood'
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Whole Blood
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComponentFilter('platelets')}
+                  className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    componentFilter === 'platelets'
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Platelets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComponentFilter('plasma')}
+                  className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    componentFilter === 'plasma'
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Plasma
+                </button>
+                {componentFilter !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setComponentFilter('all')}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Show All
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <select
@@ -154,7 +213,9 @@ function AdminInventory() {
                 {!isLoading && !error && inventory.length > 0 && filteredInventory.length === 0 && (
                   <tr>
                     <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
-                      No items found with status "{statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}".
+                      {componentFilter !== 'all'
+                        ? `No ${componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'} items found${statusFilter !== 'all' ? ` with status "${statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}"` : ''}.`
+                        : `No items found with status "${statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}".`}
                     </td>
                   </tr>
                 )}
@@ -220,6 +281,22 @@ function AdminInventory() {
             </div>
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Component Type
+                </label>
+                <select
+                  value={componentType}
+                  onChange={(e) => setComponentType(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                >
+                  <option value="whole_blood">Whole Blood</option>
+                  <option value="platelets">Platelets</option>
+                  <option value="plasma">Plasma</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-slate-700">
                   Blood Type
