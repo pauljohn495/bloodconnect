@@ -1,9 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 const sidebarItems = [
-  { name: 'Dashboard', path: '/hospital/dashboard' },
   { name: 'Inventory', path: '/hospital/inventory' },
   { name: 'Requests', path: '/hospital/requests' },
+  { name: 'Reports and Analytics', path: '/hospital/reports' },
 ]
 
 function HospitalLayout({ children, pageTitle, pageDescription }) {

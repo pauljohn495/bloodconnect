@@ -836,7 +836,7 @@ function AdminPartner() {
                           <div className="flex flex-col gap-0.5">
                             <div className="flex items-center gap-2">
                               <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                                {request.bloodType}: {request.unitsRequested} units
+                                {request.bloodType} {request.componentType === 'platelets' ? '(Platelets)' : request.componentType === 'plasma' ? '(Plasma)' : ''}: {request.unitsRequested} units
                                 {request.remainingBalance > 0 &&
                                   request.remainingBalance < request.unitsRequested && (
                                     <span className="ml-2 text-[10px]">
@@ -921,6 +921,9 @@ function AdminPartner() {
                           Blood Type
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                          Component Type
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
                           Available Units
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
@@ -955,6 +958,9 @@ function AdminPartner() {
                             </td>
                             <td className="px-4 py-3 font-semibold text-slate-900">
                               {item.blood_type || item.bloodType}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">
+                              {item.component_type === 'platelets' ? 'Platelets' : item.component_type === 'plasma' ? 'Plasma' : item.componentType === 'platelets' ? 'Platelets' : item.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'}
                             </td>
                             <td className="px-4 py-3">
                               <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
@@ -1072,6 +1078,8 @@ function AdminPartner() {
                     <div key={inventoryId} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                       <span className="font-semibold text-slate-900">
                         {item.blood_type || item.bloodType}
+                        {(item.component_type || item.componentType) === 'platelets' && ' (Platelets)'}
+                        {(item.component_type || item.componentType) === 'plasma' && ' (Plasma)'}
                       </span>
                       <span className="text-slate-600">{units} unit(s)</span>
                     </div>

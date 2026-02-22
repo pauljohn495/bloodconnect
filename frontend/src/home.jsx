@@ -35,7 +35,7 @@ function Home() {
       if (data.user.role === 'admin') {
         navigate('/admin/dashboard')
       } else if (data.user.role === 'hospital') {
-        navigate('/hospital/dashboard')
+        navigate('/hospital/inventory')
       } else {
         navigate('/dashboard')
       }
