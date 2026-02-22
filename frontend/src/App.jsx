@@ -8,9 +8,9 @@ import AdminReports from './admin-reports.jsx'
 import AdminInventory from './admin-inventory.jsx'
 import UserDashboard from './user-dashboard.jsx'
 import ProfileSettings from './profile-settings.jsx'
-import HospitalDashboard from './hospital-dashboard.jsx'
 import HospitalInventory from './hospital-inventory.jsx'
 import HospitalRequests from './hospital-requests.jsx'
+import HospitalReports from './hospital-reports.jsx'
 import DonorRegistration from './donor-registration.jsx'
 
 function App() {
@@ -29,10 +29,11 @@ function App() {
         <Route path="/admin/partner" element={<Navigate to="/admin/partners" replace />} />
         <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
         <Route path="/hospital/inventory" element={<HospitalInventory />} />
         <Route path="/hospital/requests" element={<HospitalRequests />} />
-        <Route path="/hospital" element={<Navigate to="/hospital/dashboard" replace />} />
+        <Route path="/hospital/reports" element={<HospitalReports />} />
+        <Route path="/hospital/dashboard" element={<Navigate to="/hospital/inventory" replace />} />
+        <Route path="/hospital" element={<Navigate to="/hospital/inventory" replace />} />
       </Routes>
     </BrowserRouter>
   )

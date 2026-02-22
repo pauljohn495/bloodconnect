@@ -5,7 +5,6 @@ import { apiRequest } from './api.js'
 function HospitalInventory() {
   const [inventory, setInventory] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [bloodTypeStats, setBloodTypeStats] = useState({})
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
   const [bloodType, setBloodType] = useState('')
   const [componentType, setComponentType] = useState('whole_blood')
@@ -19,20 +18,6 @@ function HospitalInventory() {
       setIsLoading(true)
       const data = await apiRequest('/api/hospital/inventory')
       setInventory(data)
-      
-      // Calculate stats by blood type
-      const stats = {}
-      data.forEach((item) => {
-        const bloodType = item.blood_type || item.bloodType
-        if (!stats[bloodType]) {
-          stats[bloodType] = 0
-        }
-        const units = item.available_units || item.availableUnits || 0
-        if (item.status === 'available' && units > 0) {
-          stats[bloodType] += units
-        }
-      })
-      setBloodTypeStats(stats)
     } catch (err) {
       console.error('Failed to load inventory', err)
     } finally {
@@ -117,23 +102,8 @@ function HospitalInventory() {
       pageTitle="Blood Inventory Management"
       pageDescription="View and manage your blood stock levels and inventory."
     >
-      {/* Top stats */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {bloodTypes.slice(0, 4).map((type) => (
-          <div key={type} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <p className="text-xs font-medium text-slate-500">{type} Units</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {isLoading ? '—' : bloodTypeStats[type] || 0}
-            </p>
-            <p className="mt-1 text-[11px] text-slate-500">
-              {isLoading ? 'Loading...' : bloodTypeStats[type] ? 'Available' : 'No stock'}
-            </p>
-          </div>
-        ))}
-      </section>
-
       {/* Main inventory table */}
-      <section className="mt-6 space-y-4">
+      <section className="space-y-4">
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <div>
@@ -162,6 +132,9 @@ function HospitalInventory() {
                     Blood Type
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                    Component Type
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
                     Available Units
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
@@ -175,21 +148,21 @@ function HospitalInventory() {
               <tbody className="bg-white">
                 {isLoading && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={4}>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={5}>
                       Loading inventory...
                     </td>
                   </tr>
                 )}
                 {!isLoading && inventory.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={4}>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={5}>
                       No inventory data available yet.
                     </td>
                   </tr>
                 )}
                 {!isLoading && inventory.length > 0 && filteredInventory.filter((item) => (item.available_units || item.availableUnits || 0) > 0).length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={4}>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={5}>
                       No items found with status "{statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}".
                     </td>
                   </tr>
@@ -201,6 +174,9 @@ function HospitalInventory() {
                       <tr key={item.id} className="hover:bg-slate-50/60">
                         <td className="whitespace-nowrap px-4 py-2 text-xs font-semibold text-slate-900">
                           {item.blood_type || item.bloodType}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
+                          {(item.component_type || item.componentType) === 'platelets' ? 'Platelets' : (item.component_type || item.componentType) === 'plasma' ? 'Plasma' : 'Whole Blood'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-xs">
                           <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-[13px] font-semibold text-emerald-700 ring-1 ring-emerald-100">

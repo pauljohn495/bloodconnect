@@ -58,9 +58,6 @@ function AdminReports() {
       ])
       setPrescriptions(prescData)
       setHistoricalWastage(histData)
-      // Debug log to check data structure
-      console.log('Historical wastage data:', histData)
-      console.log('Wastage by blood type:', histData?.wastageByBloodType)
     } catch (err) {
       setError(err.message || 'Failed to load reports')
       console.error('Reports error:', err)
@@ -445,38 +442,45 @@ function AdminReports() {
                     </div>
                   )}
 
-                  {/* High Risk Inventory Table */}
-                  <div>
-                    <h3 className="mb-3 text-xs font-semibold text-slate-700">
-                      High Risk Inventory Items
-                      {componentFilter !== 'all' && (
-                        <span className="ml-2 text-xs font-normal text-slate-500">
-                          ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
-                        </span>
-                      )}
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-slate-100 text-xs">
-                        <thead className="bg-slate-50/60">
-                          <tr>
-                            <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                  {/* High Risk Inventory Table - prominent card with color */}
+                  <div className="rounded-xl border-2 border-red-200 bg-red-50/30 ring-1 ring-red-100">
+                    <div className="flex items-center gap-2 border-b border-red-200/60 px-4 py-3 bg-red-100/50">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white" aria-hidden>
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </span>
+                      <h3 className="text-sm font-bold text-red-900">
+                        High Risk Inventory Items
+                        {componentFilter !== 'all' && (
+                          <span className="ml-2 text-sm font-normal text-red-700">
+                            ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="overflow-x-auto p-4">
+                      <table className="min-w-full divide-y divide-red-200/60 text-sm">
+                        <thead>
+                          <tr className="bg-red-100/40">
+                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
                               Blood Type
                             </th>
-                            <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
                               Component Type
                             </th>
-                            <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
                               Units
                             </th>
-                            <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
                               Days Until Expiry
                             </th>
-                            <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
+                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
                               Risk Score
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
+                        <tbody className="divide-y divide-red-200/40 bg-white/80">
                           {predictions?.inventoryWithRisk
                             ?.filter((item) => {
                               if (item.riskScore < 50) return false
@@ -484,33 +488,38 @@ function AdminReports() {
                               return (item.component_type || 'whole_blood') === componentFilter
                             })
                             .slice(0, 10)
-                            .map((item) => (
-                              <tr key={item.id} className="hover:bg-slate-50/60">
-                                <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">
-                                  {item.blood_type}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                  {item.component_type === 'whole_blood' ? 'Whole Blood' : item.component_type === 'platelets' ? 'Platelets' : item.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                  {item.available_units}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                  {item.days_until_expiry} days
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2">
-                                  <span
-                                    className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ${getRiskColor(
-                                      item.riskScore,
-                                    )}`}
-                                  >
-                                    {item.riskScore}
-                                  </span>
-                                </td>
-                              </tr>
-                            )) || (
+                            .map((item) => {
+                              const isCritical = item.riskScore >= 70
+                              const isHigh = item.riskScore >= 50 && item.riskScore < 70
+                              const rowBg = isCritical ? 'bg-red-100/50' : isHigh ? 'bg-amber-50/60' : 'bg-white'
+                              return (
+                                <tr key={item.id} className={`${rowBg} hover:opacity-90 transition`}>
+                                  <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                    {item.blood_type}
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
+                                    {item.component_type === 'whole_blood' ? 'Whole Blood' : item.component_type === 'platelets' ? 'Platelets' : item.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
+                                    {item.available_units}
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
+                                    {item.days_until_expiry} days
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-3">
+                                    <span
+                                      className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-bold ring-2 ${getRiskColor(
+                                        item.riskScore,
+                                      )}`}
+                                    >
+                                      {item.riskScore}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )
+                            }) || (
                             <tr>
-                              <td className="px-3 py-4 text-center text-slate-500" colSpan={5}>
+                              <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
                                 No high-risk items found
                                 {componentFilter !== 'all' && ` for ${componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'}`}
                               </td>
@@ -523,28 +532,34 @@ function AdminReports() {
                 </div>
               </section>
 
-              {/* Prescriptive Analytics Section */}
-              <section className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="border-b border-slate-100 px-6 py-4">
-                  <p className="text-base font-semibold text-slate-900">Prescriptive Analytics</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Actionable recommendations to reduce wastage
-                  </p>
+              {/* Prescriptive Analytics Section - prominent card with color */}
+              <section className="mt-6 overflow-hidden rounded-xl border-2 border-blue-200 bg-blue-50/20 ring-1 ring-blue-100">
+                <div className="flex items-center gap-2 border-b border-blue-200/60 px-4 py-3 bg-blue-100/50">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white" aria-hidden>
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-blue-900">Prescriptive Analytics</p>
+                    <p className="text-xs text-blue-700">
+                      Actionable recommendations to reduce wastage
+                    </p>
+                  </div>
                 </div>
                 <div className="p-6">
                   {/* Priority Actions */}
                   {(() => {
                     const filteredActions = (prescriptions?.priorityActions || []).filter((action) => {
                       if (componentFilter === 'all') return true
-                      // Show action if it matches component type or doesn't have component type specified
                       return !action.componentType || action.componentType === componentFilter
                     })
                     return filteredActions.length > 0 ? (
                       <div className="mb-8">
-                        <h3 className="mb-4 text-sm font-semibold text-slate-700">
+                        <h3 className="mb-4 text-base font-bold text-blue-900">
                           Priority Actions
                           {componentFilter !== 'all' && (
-                            <span className="ml-2 text-xs font-normal text-slate-500">
+                            <span className="ml-2 text-sm font-normal text-blue-700">
                               ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
                             </span>
                           )}
@@ -553,30 +568,30 @@ function AdminReports() {
                           {filteredActions.map((action, index) => (
                           <div
                             key={index}
-                            className={`rounded-lg border p-5 ring-1 ${getPriorityColor(action.priority)}`}
+                            className={`rounded-xl border-2 p-5 ring-1 ${getPriorityColor(action.priority)}`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span
-                                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase ring-1 ${getPriorityColor(
+                                    className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-bold uppercase ring-2 ${getPriorityColor(
                                       action.priority,
                                     )}`}
                                   >
                                     {action.priority}
                                   </span>
-                                  <p className="text-sm font-semibold text-slate-900">{action.title}</p>
+                                  <p className="text-base font-semibold text-slate-900">{action.title}</p>
                                 </div>
-                                <p className="mt-2 text-xs text-slate-600">{action.description}</p>
-                                <p className="mt-3 text-xs font-medium text-slate-700">
+                                <p className="mt-3 text-sm text-slate-600">{action.description}</p>
+                                <p className="mt-3 text-sm font-semibold text-slate-700">
                                   💡 {action.action}
                                 </p>
                                 {action.bloodTypes && (
-                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                  <div className="mt-3 flex flex-wrap gap-2">
                                     {action.bloodTypes.map((bt) => (
                                       <span
                                         key={bt}
-                                        className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                                        className="inline-flex items-center rounded-lg bg-slate-200/80 px-3 py-1.5 text-sm font-medium text-slate-800"
                                       >
                                         {bt}
                                       </span>
@@ -585,7 +600,7 @@ function AdminReports() {
                                 )}
                                 {action.componentType && (
                                   <div className="mt-2">
-                                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                    <span className="inline-flex items-center rounded-lg bg-blue-200 px-3 py-1.5 text-sm font-medium text-blue-800">
                                       Component: {action.componentType === 'whole_blood' ? 'Whole Blood' : action.componentType === 'platelets' ? 'Platelets' : 'Plasma'}
                                     </span>
                                   </div>
@@ -608,72 +623,65 @@ function AdminReports() {
                       },
                     )
                     return filteredRecommendations.length > 0 ? (
-                      <div>
-                        <h3 className="mb-3 text-xs font-semibold text-slate-700">
-                          Transfer Recommendations
-                          {componentFilter !== 'all' && (
-                            <span className="ml-2 text-xs font-normal text-slate-500">
-                              ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
-                            </span>
-                          )}
-                        </h3>
+                      <div className="rounded-xl border-2 border-blue-200/60 bg-white/60 overflow-hidden">
+                        <div className="flex items-center gap-2 border-b border-blue-200/60 px-4 py-3 bg-blue-100/40">
+                          <h3 className="text-sm font-bold text-blue-900">
+                            Transfer Recommendations
+                            {componentFilter !== 'all' && (
+                              <span className="ml-2 text-sm font-normal text-blue-700">
+                                ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
+                              </span>
+                            )}
+                          </h3>
+                        </div>
                         <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-slate-100 text-xs">
-                            <thead className="bg-slate-50/60">
-                              <tr>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                                  Priority
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                                  Blood Type
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                                  Component Type
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                                  Units
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                                  Days Until Expiry
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                                  Transfer To
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">
-                                  Impact
-                                </th>
+                          <table className="min-w-full divide-y divide-blue-200/50 text-sm">
+                            <thead>
+                              <tr className="bg-blue-100/40">
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Priority</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Blood Type</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Component Type</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Units</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Days Until Expiry</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Transfer To</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Impact</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
-                              {filteredRecommendations.map((rec, index) => (
-                                <tr key={index} className="hover:bg-slate-50/60">
-                                  <td className="whitespace-nowrap px-3 py-2">
-                                    <span
-                                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1 ${getPriorityColor(
-                                        rec.priority,
-                                      )}`}
-                                    >
-                                      {rec.priority}
-                                    </span>
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-900">
-                                    {rec.bloodType}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                    {rec.componentType === 'whole_blood' ? 'Whole Blood' : rec.componentType === 'platelets' ? 'Platelets' : rec.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">{rec.units}</td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                    {rec.daysUntilExpiry} days
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                    {rec.targetHospitalName}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-[10px] text-slate-600">
-                                    {rec.impact}
-                                  </td>
-                                </tr>
-                              ))}
+                            <tbody className="divide-y divide-blue-200/40 bg-white/80">
+                              {filteredRecommendations.map((rec, index) => {
+                                const isCritical = rec.priority === 'critical' || rec.priority === 'high'
+                                const isMedium = rec.priority === 'medium'
+                                const rowBg = isCritical ? 'bg-red-50/50' : isMedium ? 'bg-amber-50/50' : 'bg-blue-50/30'
+                                return (
+                                  <tr key={index} className={`${rowBg} hover:opacity-90 transition`}>
+                                    <td className="whitespace-nowrap px-4 py-3">
+                                      <span
+                                        className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-bold uppercase ring-2 ${getPriorityColor(
+                                          rec.priority,
+                                        )}`}
+                                      >
+                                        {rec.priority}
+                                      </span>
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                      {rec.bloodType}
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
+                                      {rec.componentType === 'whole_blood' ? 'Whole Blood' : rec.componentType === 'platelets' ? 'Platelets' : rec.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'}
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">{rec.units}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
+                                      {rec.daysUntilExpiry} days
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
+                                      {rec.targetHospitalName}
+                                    </td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
+                                      {rec.impact}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -821,89 +829,11 @@ function AdminReports() {
                 </div>
               </section>
 
-              {/* Wastage by Blood Type */}
-              <section className="mt-6 grid gap-6 lg:grid-cols-2">
-                <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-                  <h3 className="mb-5 text-base font-semibold text-slate-900">Wastage by Blood Type & Component (90 days)</h3>
-                  {historicalWastage?.wastageByBloodType &&
-                  historicalWastage.wastageByBloodType.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={320}>
-                      <BarChart data={filteredData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
-                        <XAxis
-                          dataKey="blood_type"
-                          tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }}
-                          stroke="#64748b"
-                          tickLine={{ stroke: '#64748b' }}
-                          tickFormatter={(value, entry) => {
-                            const componentType = entry?.payload?.component_type || 'whole_blood'
-                            const componentLabel = componentType === 'whole_blood' ? 'WB' : componentType === 'platelets' ? 'PLT' : 'PLA'
-                            return `${value} ${componentLabel}`
-                          }}
-                        >
-                          <Label value="Blood Type & Component" offset={-5} position="insideBottom" style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }} />
-                        </XAxis>
-                        <YAxis
-                          tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
-                          stroke="#64748b"
-                          tickLine={{ stroke: '#64748b' }}
-                        >
-                          <Label
-                            value="Wasted Units"
-                            angle={-90}
-                            position="insideLeft"
-                            style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }}
-                          />
-                        </YAxis>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '2px solid #e2e8f0',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            padding: '10px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                          }}
-                          formatter={(value, name, props) => {
-                            const componentLabel = props.payload.component_type === 'whole_blood' ? 'Whole Blood' : props.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
-                            return [`${value} units`, `${props.payload.blood_type} ${componentLabel}`]
-                          }}
-                          labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
-                        />
-                        <Legend
-                          wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '10px' }}
-                          formatter={(value, entry) => {
-                            const componentLabel = entry.payload.component_type === 'whole_blood' ? 'Whole Blood' : entry.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
-                            return `${entry.payload.blood_type} ${componentLabel}`
-                          }}
-                        />
-                        <Bar
-                          dataKey="total_wasted"
-                          fill="#dc2626"
-                          radius={[6, 6, 0, 0]}
-                          name="Wasted Units"
-                        >
-                          <LabelList
-                            dataKey="total_wasted"
-                            position="top"
-                            style={{ fontSize: 12, fill: '#1e293b', fontWeight: 600 }}
-                            formatter={(value) => `${value}`}
-                          />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex h-[320px] items-center justify-center">
-                      <p className="text-sm text-slate-400">No wastage data by blood type</p>
-                    </div>
-                  )
-                  })()}
-                </div>
-
+              {/* Wastage Distribution - full width */}
+              <section className="mt-6">
                 <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
                   <h3 className="mb-5 text-base font-semibold text-slate-900">
-                    Wastage Distribution
+                    Wastage Distribution (90 days)
                     {componentFilter !== 'all' && (
                       <span className="ml-2 text-sm font-normal text-slate-500">
                         ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
@@ -916,7 +846,7 @@ function AdminReports() {
                       return (item.component_type || 'whole_blood') === componentFilter
                     })
                     return Array.isArray(filteredData) && filteredData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={320}>
+                    <ResponsiveContainer width="100%" height={420}>
                       <PieChart>
                         <Pie
                           data={filteredData}
@@ -924,8 +854,8 @@ function AdminReports() {
                           nameKey="blood_type"
                           cx="50%"
                           cy="50%"
-                          outerRadius={100}
-                          innerRadius={40}
+                          outerRadius={140}
+                          innerRadius={56}
                           label={({ blood_type, component_type, total_wasted, percent }) => {
                             const componentLabel = component_type === 'whole_blood' ? 'WB' : component_type === 'platelets' ? 'PLT' : 'PLA'
                             return `${blood_type} ${componentLabel}\n${total_wasted} units\n(${(percent * 100).toFixed(1)}%)`
@@ -977,7 +907,7 @@ function AdminReports() {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex h-[320px] items-center justify-center">
+                    <div className="flex h-[420px] items-center justify-center">
                       <div className="text-center">
                         <p className="text-sm font-medium text-slate-600">No wastage distribution data</p>
                         <p className="mt-1 text-xs text-slate-400">

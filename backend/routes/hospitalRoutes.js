@@ -78,6 +78,7 @@ router.get('/inventory', async (req, res) => {
         return {
           ...row,
           status: displayStatus, // Return calculated status for display
+          component_type: row.component_type || 'whole_blood',
         }
       })
     )

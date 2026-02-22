@@ -92,6 +92,7 @@ router.get('/hospitals', async (req, res) => {
         br.id,
         br.hospital_id,
         br.blood_type,
+        COALESCE(br.component_type, 'whole_blood') as component_type,
         br.units_requested,
         br.units_approved,
         br.status,
@@ -138,6 +139,7 @@ router.get('/hospitals', async (req, res) => {
       requestedBloodMap[req.hospital_id].push({
         requestId: req.id,
         bloodType: req.blood_type,
+        componentType: req.component_type || 'whole_blood',
         unitsRequested: req.units_requested,
         unitsFulfilled: req.unitsFulfilled,
         remainingBalance: req.remainingBalance,
