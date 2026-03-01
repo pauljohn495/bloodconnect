@@ -688,9 +688,20 @@ router.post('/transfer', async (req, res) => {
           throw new Error('Invalid transfer data: inventoryId and positive units required')
         }
 
-        // Get current inventory item
+        // Get current inventory item (include component_type when available)
         const [inventoryRows] = await pool.query(
-          'SELECT id, available_units, blood_type, expiration_date FROM blood_inventory WHERE id = ? AND status = ? AND (hospital_id IS NULL OR hospital_id = 0)',
+          `
+          SELECT 
+            id,
+            available_units,
+            blood_type,
+            expiration_date,
+            COALESCE(component_type, 'whole_blood') AS component_type
+          FROM blood_inventory
+          WHERE id = ?
+            AND status = ?
+            AND (hospital_id IS NULL OR hospital_id = 0)
+        `,
           [inventoryId, 'available'],
         )
 
@@ -712,9 +723,26 @@ router.post('/transfer', async (req, res) => {
         )
 
         // Create or update destination inventory
+        const component = inventory.component_type || 'whole_blood'
         const [existingDest] = await pool.query(
-          'SELECT id, available_units FROM blood_inventory WHERE hospital_id = ? AND blood_type = ? AND expiration_date = ? AND status = ?',
-          [hospitalId, inventory.blood_type, inventory.expiration_date, 'available'],
+          `
+          SELECT 
+            id,
+            available_units
+          FROM blood_inventory
+          WHERE hospital_id = ?
+            AND blood_type = ?
+            AND expiration_date = ?
+            AND COALESCE(component_type, 'whole_blood') = ?
+            AND status = ?
+        `,
+          [
+            hospitalId,
+            inventory.blood_type,
+            inventory.expiration_date,
+            component,
+            'available',
+          ],
         )
 
         if (existingDest.length > 0) {
@@ -724,20 +752,48 @@ router.post('/transfer', async (req, res) => {
             [units, units, existingDest[0].id],
           )
         } else {
-          // Create new inventory entry for hospital
-          await pool.query(
-            `INSERT INTO blood_inventory 
-             (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
-             VALUES (?, ?, ?, ?, 'available', ?, ?)`,
-            [
-              inventory.blood_type,
-              units,
-              units,
-              inventory.expiration_date,
-              req.user.id,
-              hospitalId,
-            ],
-          )
+          // Create new inventory entry for hospital, preserving component_type when the column exists
+          try {
+            await pool.query(
+              `
+              INSERT INTO blood_inventory 
+                (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
+              VALUES (?, ?, ?, ?, 'available', ?, ?, ?)
+            `,
+              [
+                inventory.blood_type,
+                units,
+                units,
+                inventory.expiration_date,
+                req.user.id,
+                hospitalId,
+                component,
+              ],
+            )
+          } catch (error) {
+            if (
+              error.code === 'ER_BAD_FIELD_ERROR' ||
+              (error.message && error.message.includes('component_type'))
+            ) {
+              await pool.query(
+                `
+                INSERT INTO blood_inventory 
+                  (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
+                VALUES (?, ?, ?, ?, 'available', ?, ?)
+              `,
+                [
+                  inventory.blood_type,
+                  units,
+                  units,
+                  inventory.expiration_date,
+                  req.user.id,
+                  hospitalId,
+                ],
+              )
+            } else {
+              throw error
+            }
+          }
         }
 
         // Record transfer in blood_transfers table
