@@ -5,6 +5,13 @@ const auth = require('../middleware/auth')
 
 const router = express.Router()
 
+// Cooldown periods in days by donation component type
+const DONATION_COOLDOWNS = {
+  whole_blood: 90,
+  platelets: 14,
+  plasma: 28,
+}
+
 // All user routes require any authenticated user
 router.use(auth(['admin', 'hospital', 'donor', 'recipient']))
 
@@ -123,6 +130,71 @@ router.get('/blood-availability', async (req, res) => {
 
 // ===== Schedule Requests =====
 
+// GET /api/user/donation-eligibility - per-component cooldown / eligibility
+router.get('/donation-eligibility', async (req, res) => {
+  try {
+    // Get latest completed schedule per component type
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        COALESCE(component_type, 'whole_blood') AS component_type,
+        MAX(reviewed_at) AS last_completed_at
+      FROM schedule_requests
+      WHERE user_id = ? AND status = 'completed'
+      GROUP BY COALESCE(component_type, 'whole_blood')
+    `,
+      [req.user.id],
+    )
+
+    const now = new Date()
+
+    const base = {
+      whole_blood: { componentType: 'whole_blood', cooldownDays: DONATION_COOLDOWNS.whole_blood, lastCompletedAt: null },
+      platelets: { componentType: 'platelets', cooldownDays: DONATION_COOLDOWNS.platelets, lastCompletedAt: null },
+      plasma: { componentType: 'plasma', cooldownDays: DONATION_COOLDOWNS.plasma, lastCompletedAt: null },
+    }
+
+    rows.forEach((row) => {
+      const key = row.component_type || 'whole_blood'
+      if (base[key]) {
+        base[key].lastCompletedAt = row.last_completed_at
+      }
+    })
+
+    const result = {}
+
+    Object.values(base).forEach((entry) => {
+      const { componentType, cooldownDays, lastCompletedAt } = entry
+      let isEligible = true
+      let nextEligibleAt = null
+
+      if (lastCompletedAt && cooldownDays && cooldownDays > 0) {
+        const last = new Date(lastCompletedAt)
+        const next = new Date(last)
+        next.setDate(next.getDate() + cooldownDays)
+
+        if (next > now) {
+          isEligible = false
+          nextEligibleAt = next.toISOString()
+        }
+      }
+
+      result[componentType] = {
+        componentType,
+        cooldownDays,
+        lastCompletedAt: lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null,
+        isEligible,
+        nextEligibleAt,
+      }
+    })
+
+    res.json(result)
+  } catch (error) {
+    console.error('Donation eligibility error:', error)
+    res.status(500).json({ message: 'Failed to fetch donation eligibility' })
+  }
+})
+
 // GET /api/user/schedule-requests - get donor's schedule requests
 router.get('/schedule-requests', async (req, res) => {
   try {
@@ -189,6 +261,47 @@ router.post('/schedule-requests', async (req, res) => {
 
     const component = componentType || 'whole_blood'
 
+    // Enforce cooldown based on last completed schedule for this component type
+    const cooldownDays = DONATION_COOLDOWNS[component] || 0
+    if (cooldownDays > 0) {
+      const [lastRows] = await pool.query(
+        `
+        SELECT reviewed_at
+        FROM schedule_requests
+        WHERE user_id = ? 
+          AND status = 'completed'
+          AND COALESCE(component_type, 'whole_blood') = ?
+        ORDER BY reviewed_at DESC
+        LIMIT 1
+      `,
+        [req.user.id, component],
+      )
+
+      if (lastRows.length > 0 && lastRows[0].reviewed_at) {
+        const last = new Date(lastRows[0].reviewed_at)
+        const nextEligible = new Date(last)
+        nextEligible.setDate(nextEligible.getDate() + cooldownDays)
+        const now = new Date()
+
+        if (nextEligible > now) {
+          const humanComponent =
+            component === 'whole_blood'
+              ? 'Whole Blood'
+              : component === 'platelets'
+                ? 'Platelets'
+                : component === 'plasma'
+                  ? 'Plasma'
+                  : component
+
+          return res.status(400).json({
+            message: `You are still in cooldown for ${humanComponent}. You can donate this type again on ${nextEligible.toLocaleDateString()}.`,
+            componentType: component,
+            nextEligibleDate: nextEligible.toISOString(),
+          })
+        }
+      }
+    }
+
     // Try to insert with component_type if column exists
     let result
     try {
@@ -212,7 +325,7 @@ router.post('/schedule-requests', async (req, res) => {
       result = result1
     } catch (error) {
       // If component_type column doesn't exist, insert without it
-      if (error.code === 'ER_BAD_FIELD_ERROR' || error.message.includes('component_type')) {
+      if (error.code === 'ER_BAD_FIELD_ERROR' || (error.message && error.message.includes('component_type'))) {
         const [result2] = await pool.query(
           `
           INSERT INTO schedule_requests 

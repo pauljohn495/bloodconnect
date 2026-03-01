@@ -157,7 +157,7 @@ router.get('/hospitals', async (req, res) => {
     res.json(hospitalsWithRequests || [])
   } catch (error) {
     console.error('Fetch hospitals error:', error)
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to fetch hospitals',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     })
@@ -269,7 +269,7 @@ router.post('/hospitals', async (req, res) => {
     } catch (error) {
       await conn.rollback()
       console.error('Create hospital transaction error:', error)
-      
+
       // Handle specific MySQL errors
       if (error.code === 'ER_DUP_ENTRY') {
         if (error.sqlMessage.includes('user_id')) {
@@ -283,14 +283,14 @@ router.post('/hospitals', async (req, res) => {
         }
         return res.status(400).json({ message: 'Duplicate entry. This record may already exist.' })
       }
-      
+
       throw error
     } finally {
       conn.release()
     }
   } catch (error) {
     console.error('Create hospital error:', error)
-    res.status(500).json({ 
+    res.status(500).json({
       message: error.message || 'Failed to create hospital',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     })
@@ -486,10 +486,10 @@ router.post('/donors', async (req, res) => {
 router.get('/inventory', async (req, res) => {
   try {
     const { hospitalId } = req.query
-    
+
     let query = 'SELECT * FROM blood_inventory'
     let params = []
-    
+
     if (hospitalId) {
       query += ' WHERE hospital_id = ?'
       params.push(hospitalId)
@@ -497,23 +497,23 @@ router.get('/inventory', async (req, res) => {
       // For central inventory, show items where hospital_id is NULL
       query += ' WHERE hospital_id IS NULL'
     }
-    
+
     query += ' ORDER BY created_at DESC'
-    
+
     const [rows] = await pool.query(query, params)
-    
+
     // Add default component_type if column doesn't exist
     const rowsWithComponent = rows.map((row) => ({
       ...row,
       component_type: row.component_type || 'whole_blood', // Default to whole_blood if not specified
     }))
-    
+
     // Calculate status based on expiration date (don't store near_expiry in DB)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const sevenDaysFromNow = new Date(today)
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
-    
+
     // Get approved requests grouped by blood type (only non-fulfilled)
     const [approvedRequests] = await pool.query(
       `
@@ -526,7 +526,7 @@ router.get('/inventory', async (req, res) => {
       GROUP BY blood_type
     `,
     )
-    
+
     // Create a map of blood type to requested units
     const requestedBloodMap = {}
     approvedRequests.forEach((req) => {
@@ -535,15 +535,15 @@ router.get('/inventory', async (req, res) => {
         count: req.request_count,
       }
     })
-    
+
     const updatedRows = await Promise.all(
       rowsWithComponent.map(async (row) => {
         const expirationDate = new Date(row.expiration_date)
         expirationDate.setHours(0, 0, 0, 0)
-        
+
         let displayStatus = row.status
         let dbStatus = row.status
-        
+
         // Check if expired - only update DB for expired status
         if (expirationDate < today) {
           displayStatus = 'expired'
@@ -564,7 +564,7 @@ router.get('/inventory', async (req, res) => {
           displayStatus = 'available'
           dbStatus = 'available'
         }
-        
+
         // Only update database if status actually changed (for expired status)
         if (dbStatus !== row.status && dbStatus === 'expired') {
           await pool.query('UPDATE blood_inventory SET status = ? WHERE id = ?', [
@@ -572,24 +572,24 @@ router.get('/inventory', async (req, res) => {
             row.id,
           ])
         }
-        
+
         // Add requested blood information if there are approved requests for this blood type
         const requestedBlood = requestedBloodMap[row.blood_type] || null
-        
+
         return {
           ...row,
           status: displayStatus, // Return calculated status for display
           requestedBlood: requestedBlood
             ? {
-                bloodType: row.blood_type,
-                units: requestedBlood.units,
-                requestCount: requestedBlood.count,
-              }
+              bloodType: row.blood_type,
+              units: requestedBlood.units,
+              requestCount: requestedBlood.count,
+            }
             : null,
         }
       }),
     )
-    
+
     res.json(updatedRows)
   } catch (error) {
     console.error('Fetch inventory error:', error)
@@ -759,7 +759,7 @@ router.post('/transfer', async (req, res) => {
       if (requestFulfillments && Array.isArray(requestFulfillments)) {
         for (const fulfillment of requestFulfillments) {
           const { requestId, unitsTransferred } = fulfillment
-          
+
           if (!requestId || !unitsTransferred || unitsTransferred <= 0) continue
 
           // Get current request status and units
@@ -771,7 +771,7 @@ router.post('/transfer', async (req, res) => {
           if (requestRows.length === 0) continue
 
           const request = requestRows[0]
-          
+
           // Calculate total fulfilled units (existing + new)
           const [transferRows] = await pool.query(
             `SELECT COALESCE(SUM(units_transferred), 0) as total_fulfilled
@@ -1099,8 +1099,8 @@ router.get('/analytics/wastage-predictions', async (req, res) => {
         averageRiskScore:
           inventoryWithRisk.length > 0
             ? Math.round(
-                inventoryWithRisk.reduce((sum, item) => sum + item.riskScore, 0) / inventoryWithRisk.length,
-              )
+              inventoryWithRisk.reduce((sum, item) => sum + item.riskScore, 0) / inventoryWithRisk.length,
+            )
             : 0,
       },
     })
@@ -1369,7 +1369,7 @@ router.get('/analytics/historical-wastage', async (req, res) => {
 
     // Calculate total wastage (ensure numbers are properly converted)
     const totalWastage = Number(totalWastageResult[0]?.total_wastage || 0)
-    
+
     // Also ensure wastageByBloodType has proper number types
     const formattedWastageByBloodType = wastageByBloodType.map((item) => ({
       ...item,
@@ -1452,7 +1452,7 @@ router.get('/schedule-requests/:id', async (req, res) => {
 
     const request = rows[0]
     // Parse JSON fields
-    if (request.health_screening_answers) {
+    if (request.health_screening_answers && typeof request.health_screening_answers === 'string') {
       try {
         request.health_screening_answers = JSON.parse(request.health_screening_answers)
       } catch {
@@ -1580,6 +1580,70 @@ router.patch('/schedule-requests/:id/reject', async (req, res) => {
   } catch (error) {
     console.error('Reject schedule request error:', error)
     res.status(500).json({ message: 'Failed to reject schedule request' })
+  }
+})
+
+// PATCH /api/admin/schedule-requests/:id/complete - complete schedule request
+router.patch('/schedule-requests/:id/complete', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    // Get the request first to get user_id
+    const [requestRows] = await pool.query(
+      'SELECT user_id FROM schedule_requests WHERE id = ?',
+      [id],
+    )
+
+    if (requestRows.length === 0) {
+      return res.status(404).json({ message: 'Schedule request not found' })
+    }
+
+    const userId = requestRows[0].user_id
+
+    // Update request status to 'completed'
+    // Depending on the DB you might also want to update last_donation_date for the donor user
+    const [result] = await pool.query(
+      `
+      UPDATE schedule_requests
+      SET status = 'completed',
+          reviewed_by = COALESCE(reviewed_by, ?),
+          reviewed_at = NOW()
+      WHERE id = ?
+    `,
+      [req.user.id, id],
+    )
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Schedule request not found' })
+    }
+
+    // Let's also update the user's last_donation_date since the donation is completed
+    await pool.query(
+      `
+      UPDATE users
+      SET last_donation_date = NOW()
+      WHERE id = ?
+      `,
+      [userId]
+    )
+
+    // Create notification for donor
+    await pool.query(
+      `
+      INSERT INTO notifications (user_id, title, message, type)
+      VALUES (?, ?, ?, 'success')
+    `,
+      [
+        userId,
+        'Donation Completed',
+        `Your scheduled donation has been successfully completed. Thank you for your donation!`,
+      ],
+    )
+
+    res.json({ message: 'Schedule request completed successfully' })
+  } catch (error) {
+    console.error('Complete schedule request error:', error)
+    res.status(500).json({ message: 'Failed to complete schedule request' })
   }
 })
 

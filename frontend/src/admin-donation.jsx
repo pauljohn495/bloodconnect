@@ -21,6 +21,7 @@ function AdminDonation() {
   const [scheduleHistory, setScheduleHistory] = useState([])
   const [isScheduleHistoryLoading, setIsScheduleHistoryLoading] = useState(false)
   const [previousModalOpen, setPreviousModalOpen] = useState(null) // Track which modal was open before details
+  const [feedbackModal, setFeedbackModal] = useState({ open: false, message: '' })
 
   const loadDonors = async () => {
     try {
@@ -73,8 +74,8 @@ function AdminDonation() {
     try {
       setIsScheduleRequestsLoading(true)
       const data = await apiRequest('/api/admin/schedule-requests')
-      // Filter to only show pending requests
-      const pendingRequests = data.filter((req) => req.status === 'pending')
+      // Filter to only show pending and approved requests
+      const pendingRequests = data.filter((req) => req.status === 'pending' || req.status === 'approved')
       setScheduleRequests(pendingRequests)
     } catch (err) {
       console.error('Failed to load schedule requests', err)
@@ -87,9 +88,9 @@ function AdminDonation() {
     try {
       setIsScheduleHistoryLoading(true)
       const data = await apiRequest('/api/admin/schedule-requests')
-      // Filter to only show approved/rejected requests
+      // Filter to only show completed/rejected requests
       const historyRequests = data.filter(
-        (req) => req.status === 'approved' || req.status === 'rejected',
+        (req) => req.status === 'completed' || req.status === 'rejected',
       )
       setScheduleHistory(historyRequests)
     } catch (err) {
@@ -158,10 +159,43 @@ function AdminDonation() {
       if (selectedRequest && selectedRequest.id === requestId) {
         setSelectedRequest(null)
       }
-      alert('Schedule request approved successfully')
+      setFeedbackModal({
+        open: true,
+        message: 'Schedule request approved successfully',
+      })
     } catch (err) {
       console.error('Failed to approve request', err)
-      alert(err.message || 'Failed to approve request')
+      setFeedbackModal({
+        open: true,
+        message: err.message || 'Failed to approve request',
+      })
+    }
+  }
+
+  const handleComplete = async (requestId) => {
+    try {
+      await apiRequest(`/api/admin/schedule-requests/${requestId}/complete`, {
+        method: 'PATCH',
+      })
+      // Reload both pending requests and history
+      await loadScheduleRequests()
+      if (isScheduleHistoryModalOpen) {
+        await loadScheduleHistory()
+      }
+      setIsDetailsModalOpen(false)
+      if (selectedRequest && selectedRequest.id === requestId) {
+        setSelectedRequest(null)
+      }
+      setFeedbackModal({
+        open: true,
+        message: 'Schedule request completed successfully',
+      })
+    } catch (err) {
+      console.error('Failed to complete request', err)
+      setFeedbackModal({
+        open: true,
+        message: err.message || 'Failed to complete request',
+      })
     }
   }
 
@@ -249,12 +283,15 @@ function AdminDonation() {
                   <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Last Donation
                   </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white">
                 {isLoading && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={4}>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
                       Loading donors...
                     </td>
                   </tr>
@@ -262,7 +299,7 @@ function AdminDonation() {
 
                 {!isLoading && error && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={4}>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={5}>
                       {error}
                     </td>
                   </tr>
@@ -270,7 +307,7 @@ function AdminDonation() {
 
                 {!isLoading && !error && donors.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={5}>
                       No donors added yet.
                     </td>
                   </tr>
@@ -295,6 +332,18 @@ function AdminDonation() {
                         {donor.last_donation_date
                           ? new Date(donor.last_donation_date).toLocaleDateString()
                           : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 ${donor.status === 'active'
+                              ? 'bg-green-100 text-green-700 ring-green-200'
+                              : donor.status === 'inactive'
+                                ? 'bg-red-100 text-red-700 ring-red-200'
+                                : 'bg-slate-100 text-slate-700 ring-slate-200'
+                            }`}
+                        >
+                          {donor.status ? donor.status.charAt(0).toUpperCase() + donor.status.slice(1) : 'Active'}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -447,13 +496,12 @@ function AdminDonation() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 ${
-                              request.status === 'approved'
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 ${request.status === 'approved' || request.status === 'completed'
                                 ? 'bg-green-100 text-green-700 ring-green-200'
                                 : request.status === 'rejected'
                                   ? 'bg-red-100 text-red-700 ring-red-200'
                                   : 'bg-yellow-100 text-yellow-700 ring-yellow-200'
-                            }`}
+                              }`}
                           >
                             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                           </span>
@@ -588,10 +636,22 @@ function AdminDonation() {
                       }
                       // Handle if it's already an object
                       if (typeof answers === 'object' && answers !== null) {
-                        return Object.entries(answers).map(([key, value]) => (
+                        const entries = Object.entries(answers)
+                        if (entries.length === 0) {
+                          return (
+                            <div className="text-slate-500">
+                              No health screening answers available
+                            </div>
+                          )
+                        }
+                        return entries.map(([key, value]) => (
                           <div key={key}>
                             <span className="text-slate-500 capitalize">
-                              {key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim()}:
+                              {key
+                                .replace(/([A-Z])/g, ' $1')
+                                .replace(/^./, (str) => str.toUpperCase())
+                                .trim()}
+                              :
                             </span>
                             <span className="ml-2 font-medium text-slate-900">
                               {value === 'yes' ? 'Yes' : value === 'no' ? 'No' : value || '—'}
@@ -599,7 +659,9 @@ function AdminDonation() {
                           </div>
                         ))
                       }
-                      return <div className="text-slate-500">No health screening answers available</div>
+                      return (
+                        <div className="text-slate-500">No health screening answers available</div>
+                      )
                     })()}
                   </div>
                 </div>
@@ -617,33 +679,34 @@ function AdminDonation() {
               <div className="border-b border-slate-200 pb-4">
                 <h4 className="text-sm font-semibold text-slate-900 mb-2">Status</h4>
                 <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-                    selectedRequest.status === 'approved'
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${selectedRequest.status === 'approved' || selectedRequest.status === 'completed'
                       ? 'bg-green-100 text-green-700 ring-green-200'
                       : selectedRequest.status === 'rejected'
                         ? 'bg-red-100 text-red-700 ring-red-200'
                         : 'bg-yellow-100 text-yellow-700 ring-yellow-200'
-                  }`}
+                    }`}
                 >
                   {selectedRequest.status.charAt(0).toUpperCase() + selectedRequest.status.slice(1)}
                 </span>
               </div>
 
               {/* Admin Actions */}
-              {selectedRequest.status === 'pending' && (
+              {(selectedRequest.status === 'pending' || selectedRequest.status === 'approved') && (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Admin Notes (Optional)
-                    </label>
-                    <textarea
-                      value={adminNotes}
-                      onChange={(e) => setAdminNotes(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                      placeholder="Add any notes for the donor..."
-                    />
-                  </div>
+                  {selectedRequest.status === 'pending' && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Admin Notes (Optional)
+                      </label>
+                      <textarea
+                        value={adminNotes}
+                        onChange={(e) => setAdminNotes(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                        placeholder="Add any notes for the donor..."
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
@@ -666,13 +729,24 @@ function AdminDonation() {
                     >
                       Reject
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleApprove(selectedRequest.id)}
-                      className="inline-flex items-center justify-center rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500"
-                    >
-                      Approve
-                    </button>
+                    {selectedRequest.status === 'pending' && (
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(selectedRequest.id)}
+                        className="inline-flex items-center justify-center rounded-full bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    {selectedRequest.status === 'approved' && (
+                      <button
+                        type="button"
+                        onClick={() => handleComplete(selectedRequest.id)}
+                        className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+                      >
+                        Complete
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -772,11 +846,10 @@ function AdminDonation() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 ${
-                              request.status === 'approved'
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 ${request.status === 'approved' || request.status === 'completed'
                                 ? 'bg-green-100 text-green-700 ring-green-200'
                                 : 'bg-red-100 text-red-700 ring-red-200'
-                            }`}
+                              }`}
                           >
                             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                           </span>
@@ -801,6 +874,36 @@ function AdminDonation() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {feedbackModal.open && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-base font-semibold text-slate-900">Schedule Request</h3>
+              <button
+                type="button"
+                onClick={() => setFeedbackModal({ open: false, message: '' })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm text-slate-700">{feedbackModal.message}</p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setFeedbackModal({ open: false, message: '' })}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
