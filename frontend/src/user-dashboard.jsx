@@ -19,7 +19,7 @@ function UserDashboard() {
     name: '',
     bloodType: '',
     status: 'Available',
-    bloodAvailable: '(Blood stocks)',
+    totalDonations: 0,
     avatar: null,
   })
 
@@ -53,14 +53,12 @@ function UserDashboard() {
           scheduleRequests,
           notificationsData,
           eligibilityData,
-          bloodAvailability,
         ] = await Promise.all([
           apiRequest('/api/user/me'),
           apiRequest('/api/user/donations'),
           apiRequest('/api/user/schedule-requests').catch(() => []),
           apiRequest('/api/notifications').catch(() => []),
           apiRequest('/api/user/donation-eligibility').catch(() => null),
-          apiRequest('/api/user/blood-availability').catch(() => null),
         ])
 
         // Determine overall status from eligibility (if available)
@@ -79,19 +77,17 @@ function UserDashboard() {
           return anyEligible ? 'Available' : 'Ineligible'
         })()
 
-        const totalAvailableUnits =
-          bloodAvailability && typeof bloodAvailability.totalAvailable === 'number'
-            ? bloodAvailability.totalAvailable
-            : 0
+        const donationCount = (donations || []).length
+        const completedSchedules = (scheduleRequests || []).filter(
+          (r) => r.status === 'completed',
+        ).length
+        const totalDonations = donationCount + completedSchedules
 
         setUserData({
           name: me.full_name || me.fullName || me.username || 'Donor',
           bloodType: me.blood_type || me.bloodType || '—',
           status: overallStatus,
-          bloodAvailable:
-            totalAvailableUnits > 0
-              ? `${totalAvailableUnits} unit${totalAvailableUnits !== 1 ? 's' : ''} available`
-              : '0 units available',
+          totalDonations,
           avatar: null,
         })
 
@@ -442,31 +438,38 @@ function UserDashboard() {
         {/* Hero Section - Statistic Cards */}
         <section className="mb-8 grid gap-4 sm:grid-cols-2">
           {/* Blood Type Card */}
-          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-            <p className="text-xs font-medium text-slate-500">Blood Type</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
+          <div className="rounded-2xl bg-white/95 p-5 shadow-sm ring-1 ring-slate-100">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Blood Type
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
               {isLoading ? '—' : userData.bloodType || '—'}
             </p>
-            <p className="mt-1 text-xs text-slate-500">Your blood group</p>
+            <p className="mt-1 text-xs text-slate-500">Your registered blood group</p>
           </div>
 
-          {/* Blood Available Card */}
-          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-            <p className="text-xs font-medium text-slate-500">Blood Available</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {userData.bloodAvailable}
+          {/* Total Donations Card */}
+          <div className="rounded-2xl bg-white/95 p-5 shadow-sm ring-1 ring-slate-100">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Total Donations
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
+              {isLoading ? '—' : userData.totalDonations}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {userData.totalDonations === 1 ? 'donation so far' : 'donations so far'}
             </p>
           </div>
         </section>
 
         {/* Donation Eligibility Section (per component type) */}
         <section className="mb-8">
-          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-2xl bg-white/95 p-5 shadow-sm ring-1 ring-slate-100">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">Donation Eligibility</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Donation eligibility</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Status and cooldown timers for each donation type
+                  See which donation types you can schedule today
                 </p>
               </div>
             </div>
@@ -483,14 +486,19 @@ function UserDashboard() {
                 })()
                 const nextEligibleAt = info?.nextEligibleAt || null
                 const remaining = nextEligibleAt ? formatCooldownRemaining(nextEligibleAt) : null
-                const statusLabel = isEligible ? 'Eligible' : 'In Cooldown'
+                const statusLabel = isEligible ? 'Eligible now' : 'In cooldown'
                 const statusColor = isEligible
                   ? 'bg-green-100 text-green-700 ring-green-200'
                   : 'bg-amber-100 text-amber-700 ring-amber-200'
 
                 return (
-                  <div key={type} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                    <p className="text-xs font-medium text-slate-500">{label}</p>
+                  <div
+                    key={type}
+                    className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                  >
+                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                      {label}
+                    </p>
                     <div className="mt-2 flex items-center gap-2">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${statusColor}`}
@@ -498,7 +506,7 @@ function UserDashboard() {
                         {statusLabel}
                       </span>
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-600">
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
                       {isEligible
                         ? 'You can request this donation type now.'
                         : nextEligibleAt

@@ -104,23 +104,42 @@ router.get('/blood-availability', async (req, res) => {
 
     const bloodType = userRows[0]?.blood_type
     if (!bloodType) {
-      return res.json({ bloodType: null, totalAvailable: 0 })
+      return res.json({ bloodType: null, totalAvailable: 0, nearExpiry: 0 })
     }
 
+    // Compute availability directly from blood_inventory to align with admin inventory
     const [rows] = await pool.query(
       `
-      SELECT blood_type, total_available
-      FROM v_blood_stock_summary
+      SELECT 
+        blood_type,
+        COALESCE(SUM(available_units), 0) AS total_available,
+        COALESCE(
+          SUM(
+            CASE 
+              WHEN DATEDIFF(expiration_date, CURDATE()) <= 7 
+                   AND DATEDIFF(expiration_date, CURDATE()) > 0 
+              THEN available_units 
+              ELSE 0 
+            END
+          ),
+          0
+        ) AS near_expiry_units
+      FROM blood_inventory
       WHERE blood_type = ?
+        AND status = 'available'
+        AND expiration_date > CURDATE()
+        AND (hospital_id IS NULL OR hospital_id = 0)
+      GROUP BY blood_type
     `,
       [bloodType],
     )
 
-    const summary = rows[0] || { blood_type: bloodType, total_available: 0 }
+    const summary = rows[0] || { blood_type: bloodType, total_available: 0, near_expiry_units: 0 }
 
     res.json({
       bloodType: summary.blood_type,
-      totalAvailable: summary.total_available,
+      totalAvailable: Number(summary.total_available || 0),
+      nearExpiry: Number(summary.near_expiry_units || 0),
     })
   } catch (error) {
     console.error('Blood availability error:', error)
