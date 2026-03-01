@@ -8,6 +8,10 @@ function UserDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
+  const [eligibility, setEligibility] = useState(null)
+  const [eligibilityLoading, setEligibilityLoading] = useState(false)
+  const [nowTs, setNowTs] = useState(Date.now())
+  const [cooldownModal, setCooldownModal] = useState({ open: false, message: '' })
   const [notifications, setNotifications] = useState([])
   const [scheduleRequest, setScheduleRequest] = useState(null)
 
@@ -26,7 +30,6 @@ function UserDashboard() {
     preferredDate: '',
     preferredTime: '',
     componentType: 'whole_blood',
-    lastDonationDate: '',
     weight: '',
     healthScreening: {
       feelingHealthy: '',
@@ -44,18 +47,51 @@ function UserDashboard() {
       setIsLoading(true)
       setError('')
       try {
-        const [me, donations, scheduleRequests, notificationsData] = await Promise.all([
+        const [
+          me,
+          donations,
+          scheduleRequests,
+          notificationsData,
+          eligibilityData,
+          bloodAvailability,
+        ] = await Promise.all([
           apiRequest('/api/user/me'),
           apiRequest('/api/user/donations'),
           apiRequest('/api/user/schedule-requests').catch(() => []),
           apiRequest('/api/notifications').catch(() => []),
+          apiRequest('/api/user/donation-eligibility').catch(() => null),
+          apiRequest('/api/user/blood-availability').catch(() => null),
         ])
+
+        // Determine overall status from eligibility (if available)
+        const overallStatus = (() => {
+          if (!eligibilityData) return 'Available'
+          const types = ['whole_blood', 'platelets', 'plasma']
+          const now = Date.now()
+          const anyEligible = types.some((t) => {
+            const info = eligibilityData[t]
+            if (!info) return true
+            const serverEligible = info.isEligible
+            const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
+            const locallyEligible = serverEligible || (nextEligibleAt && nextEligibleAt <= now)
+            return locallyEligible
+          })
+          return anyEligible ? 'Available' : 'Ineligible'
+        })()
+
+        const totalAvailableUnits =
+          bloodAvailability && typeof bloodAvailability.totalAvailable === 'number'
+            ? bloodAvailability.totalAvailable
+            : 0
 
         setUserData({
           name: me.full_name || me.fullName || me.username || 'Donor',
           bloodType: me.blood_type || me.bloodType || '—',
-          status: 'Available',
-          bloodAvailable: '(Blood stocks)',
+          status: overallStatus,
+          bloodAvailable:
+            totalAvailableUnits > 0
+              ? `${totalAvailableUnits} unit${totalAvailableUnits !== 1 ? 's' : ''} available`
+              : '0 units available',
           avatar: null,
         })
 
@@ -97,6 +133,11 @@ function UserDashboard() {
 
         // Set notifications
         setNotifications(notificationsData || [])
+
+        // Set initial eligibility (used when opening the modal)
+        if (eligibilityData) {
+          setEligibility(eligibilityData)
+        }
       } catch (err) {
         setError(err.message || 'Failed to load dashboard data')
       } finally {
@@ -107,12 +148,60 @@ function UserDashboard() {
     loadData()
   }, [])
 
+  // Tick "now" while schedule modal is open so cooldown countdowns update
+  useEffect(() => {
+    if (!isScheduleModalOpen) return
+    const interval = setInterval(() => {
+      setNowTs(Date.now())
+    }, 60000) // update every minute
+    return () => clearInterval(interval)
+  }, [isScheduleModalOpen])
+
   const handleLogout = () => {
     // Clear authentication tokens and user data
     localStorage.removeItem('token')
     localStorage.removeItem('role')
     // Navigate to home page
     navigate('/')
+  }
+
+  const handleOpenScheduleModal = async () => {
+    setError('')
+    setEligibilityLoading(true)
+    try {
+      const data = await apiRequest('/api/user/donation-eligibility')
+      setEligibility(data)
+
+      // Choose the first currently eligible component type as default
+      const typesInOrder = ['whole_blood', 'platelets', 'plasma']
+      const now = Date.now()
+      let defaultType = 'whole_blood'
+
+      if (data) {
+        for (const t of typesInOrder) {
+          const info = data[t]
+          if (!info) continue
+          const serverEligible = info.isEligible
+          const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
+          const locallyEligible = serverEligible || (nextEligibleAt && nextEligibleAt <= now)
+          if (locallyEligible) {
+            defaultType = t
+            break
+          }
+        }
+      }
+
+      setScheduleForm((prev) => ({
+        ...prev,
+        componentType: defaultType,
+      }))
+
+      setIsScheduleModalOpen(true)
+    } catch (err) {
+      setError(err.message || 'Failed to load donation eligibility')
+    } finally {
+      setEligibilityLoading(false)
+    }
   }
 
   const handleScheduleSubmit = async (e) => {
@@ -124,7 +213,6 @@ function UserDashboard() {
           preferredDate: scheduleForm.preferredDate,
           preferredTime: scheduleForm.preferredTime,
           componentType: scheduleForm.componentType,
-          lastDonationDate: scheduleForm.lastDonationDate || null,
           weight: parseFloat(scheduleForm.weight),
           healthScreeningAnswers: scheduleForm.healthScreening,
           notes: scheduleForm.notes || null,
@@ -137,7 +225,6 @@ function UserDashboard() {
         preferredDate: '',
         preferredTime: '',
         componentType: 'whole_blood',
-        lastDonationDate: '',
         weight: '',
         healthScreening: {
           feelingHealthy: '',
@@ -153,7 +240,12 @@ function UserDashboard() {
       // Reload data to show new request
       window.location.reload()
     } catch (err) {
-      setError(err.message || 'Failed to submit schedule request')
+      const message = err.message || 'Failed to submit schedule request'
+      if (message.toLowerCase().includes('still in cooldown')) {
+        setCooldownModal({ open: true, message })
+      } else {
+        setError(message)
+      }
     }
   }
 
@@ -176,6 +268,51 @@ function UserDashboard() {
       default:
         return 'bg-slate-100 text-slate-700 ring-slate-200'
     }
+  }
+
+  const formatCooldownRemaining = (nextEligibleAt) => {
+    if (!nextEligibleAt) return null
+    const diffMs = new Date(nextEligibleAt).getTime() - nowTs
+    if (diffMs <= 0) return 'Available now'
+    const totalMinutes = Math.floor(diffMs / (1000 * 60))
+    const days = Math.floor(totalMinutes / (60 * 24))
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+    if (days > 0) {
+      return `${days} day${days !== 1 ? 's' : ''}${hours > 0 ? ` ${hours} hour${hours !== 1 ? 's' : ''}` : ''}`
+    }
+    if (hours > 0) {
+      return `${hours} hour${hours !== 1 ? 's' : ''}`
+    }
+    return 'Less than 1 hour'
+  }
+
+  const getEligibleComponentOptions = () => {
+    const types = [
+      { value: 'whole_blood', label: 'Whole Blood' },
+      { value: 'platelets', label: 'Platelets' },
+      { value: 'plasma', label: 'Plasma' },
+    ]
+
+    if (!eligibility) return types
+
+    const now = nowTs
+
+    return types.filter(({ value }) => {
+      const info = eligibility[value]
+      if (!info) return true
+      const serverEligible = info.isEligible
+      const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
+      const locallyEligible = serverEligible || (nextEligibleAt && nextEligibleAt <= now)
+      return locallyEligible
+    })
+  }
+
+  const hasAnyCooldown = () => {
+    if (!eligibility) return false
+    return ['whole_blood', 'platelets', 'plasma'].some((t) => {
+      const info = eligibility[t]
+      return info && !info.isEligible && info.nextEligibleAt
+    })
   }
 
   return (
@@ -302,8 +439,8 @@ function UserDashboard() {
             {error}
           </p>
         )}
-        {/* Hero Section - Three Statistic Cards */}
-        <section className="mb-8 grid gap-4 sm:grid-cols-3">
+        {/* Hero Section - Statistic Cards */}
+        <section className="mb-8 grid gap-4 sm:grid-cols-2">
           {/* Blood Type Card */}
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
             <p className="text-xs font-medium text-slate-500">Blood Type</p>
@@ -313,24 +450,65 @@ function UserDashboard() {
             <p className="mt-1 text-xs text-slate-500">Your blood group</p>
           </div>
 
-          {/* Status Card */}
-          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-            <p className="text-xs font-medium text-slate-500">Status</p>
-            <div className="mt-2 flex items-center gap-2">
-              <span
-                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getStatusColor(userData.status)}`}
-              >
-                {userData.status}
-              </span>
-            </div>
-          </div>
-
           {/* Blood Available Card */}
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
             <p className="text-xs font-medium text-slate-500">Blood Available</p>
             <p className="mt-2 text-3xl font-bold text-slate-900">
               {userData.bloodAvailable}
             </p>
+          </div>
+        </section>
+
+        {/* Donation Eligibility Section (per component type) */}
+        <section className="mb-8">
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Donation Eligibility</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Status and cooldown timers for each donation type
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {['whole_blood', 'platelets', 'plasma'].map((type) => {
+                const info = eligibility?.[type]
+                const label =
+                  type === 'whole_blood' ? 'Whole Blood' : type === 'platelets' ? 'Platelets' : 'Plasma'
+                const isEligible = (() => {
+                  if (!info) return true
+                  const serverEligible = info.isEligible
+                  const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
+                  return serverEligible || (nextEligibleAt && nextEligibleAt <= nowTs)
+                })()
+                const nextEligibleAt = info?.nextEligibleAt || null
+                const remaining = nextEligibleAt ? formatCooldownRemaining(nextEligibleAt) : null
+                const statusLabel = isEligible ? 'Eligible' : 'In Cooldown'
+                const statusColor = isEligible
+                  ? 'bg-green-100 text-green-700 ring-green-200'
+                  : 'bg-amber-100 text-amber-700 ring-amber-200'
+
+                return (
+                  <div key={type} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                    <p className="text-xs font-medium text-slate-500">{label}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${statusColor}`}
+                      >
+                        {statusLabel}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-600">
+                      {isEligible
+                        ? 'You can request this donation type now.'
+                        : nextEligibleAt
+                          ? `Available on ${new Date(nextEligibleAt).toLocaleDateString()} (${remaining}).`
+                          : 'Cooldown information unavailable.'}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </section>
 
@@ -376,7 +554,7 @@ function UserDashboard() {
         <section className="mb-8">
           <button
             type="button"
-            onClick={() => setIsScheduleModalOpen(true)}
+            onClick={handleOpenScheduleModal}
             disabled={scheduleRequest && scheduleRequest.status === 'pending'}
             className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm transition ${
               scheduleRequest && scheduleRequest.status === 'pending'
@@ -515,6 +693,38 @@ function UserDashboard() {
                 <li>Must not have donated within the restricted period</li>
                 <li>Must answer health screening honestly</li>
               </ul>
+
+              {/* Cooldown information & countdowns */}
+              {eligibility && (
+                <div className="mt-3 space-y-1 text-xs">
+                  <p className="font-semibold text-blue-900">Donation cooldowns:</p>
+                  <p className="text-blue-800">
+                    Whole Blood: 90 days · Platelets: 14 days · Plasma: 28 days
+                  </p>
+                  {hasAnyCooldown() && (
+                    <div className="mt-2 rounded-md bg-blue-100/70 p-2">
+                      <p className="mb-1 text-[11px] font-semibold text-blue-900">
+                        Currently in cooldown:
+                      </p>
+                      <ul className="space-y-0.5 text-[11px] text-blue-900">
+                        {['whole_blood', 'platelets', 'plasma'].map((t) => {
+                          const info = eligibility[t]
+                          if (!info || info.isEligible || !info.nextEligibleAt) return null
+                          const label =
+                            t === 'whole_blood' ? 'Whole Blood' : t === 'platelets' ? 'Platelets' : 'Plasma'
+                          const remaining = formatCooldownRemaining(info.nextEligibleAt)
+                          const availableOn = new Date(info.nextEligibleAt).toLocaleDateString()
+                          return (
+                            <li key={t}>
+                              {label} — available on {availableOn} ({remaining})
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleScheduleSubmit} className="space-y-4">
@@ -563,43 +773,29 @@ function UserDashboard() {
                   }
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 >
-                  <option value="whole_blood">Whole Blood</option>
-                  <option value="platelets">Platelets</option>
-                  <option value="plasma">Plasma</option>
+                  {getEligibleComponentOptions().map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Last Donation Date
-                  </label>
-                  <input
-                    type="date"
-                    value={scheduleForm.lastDonationDate}
-                    onChange={(e) =>
-                      setScheduleForm({ ...scheduleForm, lastDonationDate: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Weight (kg) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.1"
-                    value={scheduleForm.weight}
-                    onChange={(e) =>
-                      setScheduleForm({ ...scheduleForm, weight: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Weight (kg) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.1"
+                  value={scheduleForm.weight}
+                  onChange={(e) =>
+                    setScheduleForm({ ...scheduleForm, weight: e.target.value })
+                  }
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
               </div>
 
               {/* Health Screening Questions */}
@@ -774,6 +970,37 @@ function UserDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Cooldown Info Modal */}
+      {cooldownModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-base font-semibold text-slate-900">Donation Cooldown</h3>
+              <button
+                type="button"
+                onClick={() => setCooldownModal({ open: false, message: '' })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm text-slate-700">
+              {cooldownModal.message}
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setCooldownModal({ open: false, message: '' })}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
