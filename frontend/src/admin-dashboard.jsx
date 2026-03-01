@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
+import HospitalSupplyMap from './HospitalSupplyMap.jsx'
 
 function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState(null)
@@ -103,17 +104,8 @@ function AdminDashboard() {
 
             {/* Main chart + recent stocks side panel */}
             <section className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2.5fr)_minmax(0,1.2fr)]">
-              {/* Center chart placeholder */}
-              <div className="flex items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="text-center px-6 py-10">
-                  <p className="text-sm font-semibold text-slate-900">
-                    Blood Stock Mapping
-                  </p>
-                  <p className="mt-2 text-[11px] text-slate-500">
-                    EMPTY
-                  </p>
-                </div>
-              </div>
+              {/* Supply Mapping container */}
+              <HospitalSupplyMap />
 
               {/* Recent blood stocks - right vertical card */}
               <div className="flex h-[420px] flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
