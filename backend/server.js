@@ -8,6 +8,8 @@ const adminRoutes = require('./routes/adminRoutes')
 const hospitalRoutes = require('./routes/hospitalRoutes')
 const userRoutes = require('./routes/userRoutes')
 const notificationRoutes = require('./routes/notificationRoutes')
+const errorHandler = require('./middleware/errorHandler')
+const { successResponse, errorResponse } = require('./utils/response')
 
 dotenv.config()
 
@@ -23,10 +25,16 @@ app.use(express.json())
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1')
-    res.json({ ok: true })
+    return successResponse(res, {
+      message: 'Health check OK',
+      data: { ok: true },
+    })
   } catch (error) {
     console.error('Health check failed:', error)
-    res.status(500).json({ ok: false, error: 'Database not available' })
+    return errorResponse(res, {
+      statusCode: 500,
+      message: 'Database not available',
+    })
   }
 })
 
@@ -39,8 +47,14 @@ app.use('/api/notifications', notificationRoutes)
 
 // Fallback 404 handler for API
 app.use('/api', (req, res) => {
-  res.status(404).json({ message: 'API route not found' })
+  return errorResponse(res, {
+    statusCode: 404,
+    message: 'API route not found',
+  })
 })
+
+// Global error handler (must be registered after all routes/middleware)
+app.use(errorHandler)
 
 app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`)
