@@ -2,6 +2,18 @@ const express = require('express')
 
 const { pool } = require('../db')
 const auth = require('../middleware/auth')
+const {
+  getDashboardSummaryController,
+  getHospitalsController,
+  createHospitalController,
+  updateHospitalController,
+  deleteHospitalController,
+} = require('../controllers/adminHospitalController')
+const {
+  validateHospitalIdParam,
+  validateCreateHospital,
+  validateUpdateHospital,
+} = require('../validators/adminHospitalValidators')
 
 const router = express.Router()
 
@@ -9,43 +21,7 @@ const router = express.Router()
 router.use(auth(['admin']))
 
 // GET /api/admin/dashboard-summary
-router.get('/dashboard-summary', async (req, res) => {
-  try {
-    const [[bloodStockRows], [donorSummaryRows], [pendingRequestsRows], [countsRows]] =
-      await Promise.all([
-        pool.query('SELECT * FROM v_blood_stock_summary'),
-        // Donor summary derived directly from users/donations instead of a DB view
-        pool.query(`
-          SELECT 
-            u.blood_type,
-            COUNT(*) AS donor_count,
-            MAX(u.last_donation_date) AS last_donation_date
-          FROM users u
-          WHERE u.role = 'donor'
-          GROUP BY u.blood_type
-        `),
-        pool.query('SELECT * FROM v_pending_requests_summary'),
-        pool.query(`
-          SELECT
-            (SELECT COUNT(*) FROM hospitals WHERE is_active = TRUE) AS partnerHospitals,
-            (SELECT COUNT(*) FROM users WHERE role = 'donor') AS totalDonors,
-            (SELECT COUNT(*) FROM blood_requests WHERE status = 'pending') AS pendingRequests,
-            (SELECT COUNT(*) FROM donations WHERE status = 'completed') + 
-            COALESCE((SELECT SUM(units_transferred) FROM blood_transfers), 0) AS completedDonations
-        `),
-      ])
-
-    res.json({
-      bloodStock: bloodStockRows,
-      donorSummary: donorSummaryRows,
-      pendingRequestsSummary: pendingRequestsRows,
-      counts: countsRows[0] || {},
-    })
-  } catch (error) {
-    console.error('Dashboard summary error:', error)
-    res.status(500).json({ message: 'Failed to fetch dashboard summary' })
-  }
-})
+router.get('/dashboard-summary', getDashboardSummaryController)
 
 // ===== Hospitals / Partners =====
 

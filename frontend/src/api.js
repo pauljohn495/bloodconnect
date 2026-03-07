@@ -26,6 +26,13 @@ export async function apiRequest(path, options = {}) {
     throw new Error(message)
   }
 
+  // Support standardized API responses of shape:
+  // { status: 'success', message: '...', data: {...} }
+  // while remaining backward compatible with plain JSON payloads.
+  if (data && Object.prototype.hasOwnProperty.call(data, 'data')) {
+    return data.data
+  }
+
   return data
 }
 
