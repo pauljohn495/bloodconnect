@@ -90,6 +90,132 @@ router.get('/inventory', async (req, res) => {
   }
 })
 
+// POST /api/hospital/inventory/donate
+router.post('/inventory/donate', async (req, res) => {
+  const { inventoryId, units } = req.body
+
+  if (!inventoryId || !units) {
+    return res.status(400).json({ message: 'inventoryId and units are required' })
+  }
+
+  const intUnits = parseInt(units, 10)
+  if (Number.isNaN(intUnits) || intUnits <= 0) {
+    return res.status(400).json({ message: 'units must be a positive integer' })
+  }
+
+  try {
+    const hospitalId = await getHospitalIdForUser(req.user.id)
+    if (!hospitalId) {
+      return res.status(400).json({ message: 'Hospital record not found for this user' })
+    }
+
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        id,
+        hospital_id,
+        blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
+        available_units,
+        expiration_date,
+        status
+      FROM blood_inventory
+      WHERE id = ? AND hospital_id = ?
+      `,
+      [inventoryId, hospitalId],
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Inventory item not found for this hospital' })
+    }
+
+    const item = rows[0]
+
+    if (item.status === 'expired') {
+      return res.status(400).json({ message: 'Cannot donate from an expired inventory item' })
+    }
+
+    if (item.available_units < intUnits) {
+      return res.status(400).json({
+        message: `Insufficient units available. Requested ${intUnits}, available ${item.available_units}.`,
+      })
+    }
+
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+
+      // Reduce available units from this inventory record
+      await conn.query(
+        'UPDATE blood_inventory SET available_units = available_units - ? WHERE id = ?',
+        [intUnits, inventoryId],
+      )
+
+      // Record donation history for this hospital
+      await conn.query(
+        `
+        INSERT INTO hospital_donations
+          (hospital_id, inventory_id, blood_type, component_type, units, donation_date)
+        VALUES (?, ?, ?, ?, ?, NOW())
+        `,
+        [hospitalId, item.id, item.blood_type, item.component_type, intUnits],
+      )
+
+      await conn.commit()
+
+      res.json({
+        message: 'Donation recorded and inventory updated successfully',
+        donated: {
+          hospitalId,
+          inventoryId: item.id,
+          bloodType: item.blood_type,
+          componentType: item.component_type,
+          units: intUnits,
+        },
+      })
+    } catch (error) {
+      await conn.rollback()
+      throw error
+    } finally {
+      conn.release()
+    }
+  } catch (error) {
+    console.error('Hospital inventory donate error:', error)
+    res.status(500).json({ message: 'Failed to record donation and update inventory' })
+  }
+})
+
+// GET /api/hospital/donations
+router.get('/donations', async (req, res) => {
+  try {
+    const hospitalId = await getHospitalIdForUser(req.user.id)
+    if (!hospitalId) {
+      return res.status(400).json({ message: 'Hospital record not found for this user' })
+    }
+
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        id,
+        inventory_id,
+        blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
+        units,
+        donation_date
+      FROM hospital_donations
+      WHERE hospital_id = ?
+      ORDER BY donation_date DESC
+      `,
+      [hospitalId],
+    )
+
+    res.json(rows)
+  } catch (error) {
+    console.error('Hospital donations history error:', error)
+    res.status(500).json({ message: 'Failed to fetch donation history' })
+  }
+})
+
 // POST /api/hospital/requests
 router.post('/requests', async (req, res) => {
   const { bloodType, componentType, unitsRequested, notes } = req.body
