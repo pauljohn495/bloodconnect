@@ -132,15 +132,7 @@ function HospitalReports() {
       pageDescription="Early detection for shortages and wastage risks."
     >
       <section className="space-y-6">
-        {/* Early Detection System - Analytics */}
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="border-b border-slate-100 px-4 py-3 bg-slate-50/60">
-            <h2 className="text-sm font-semibold text-slate-900">Analytics — Early Detection System</h2>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Predicted wastage forecast and expiration alerts based on current inventory. Updates every 30 seconds.
-            </p>
-          </div>
-
           <div className="p-4 space-y-6">
             {isLoading ? (
               <div className="py-8 text-center text-sm text-slate-500">Loading analytics...</div>
