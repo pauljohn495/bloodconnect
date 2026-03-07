@@ -1278,14 +1278,18 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
     const priorityActions = []
 
     // Action 1: Items expiring in next 3 days
-    const expiring3Days = highRiskInventory.filter((item) => item.days_until_expiry <= 3 && item.available_units > 0)
+    const expiring3Days = highRiskInventory.filter(
+      (item) => item.days_until_expiry <= 3 && item.available_units > 0,
+    )
     if (expiring3Days.length > 0) {
       const totalUnits = expiring3Days.reduce((sum, item) => sum + item.available_units, 0)
+      const minDays = Math.min(...expiring3Days.map((item) => item.days_until_expiry))
+      const daysLabel = minDays === 1 ? '1 day' : `${minDays} days`
       priorityActions.push({
         type: 'urgent_alert',
         priority: 'critical',
-        title: 'Critical: Blood Expiring in 3 Days',
-        description: `${totalUnits} units expiring within 3 days. Immediate action required.`,
+        title: `Critical: Blood Expiring in ${daysLabel}`,
+        description: `${totalUnits} units expiring in ${daysLabel}. Immediate action required.`,
         bloodTypes: [...new Set(expiring3Days.map((item) => item.blood_type))],
         affectedUnits: totalUnits,
         action: 'Review and transfer to hospitals with high demand immediately',
@@ -1330,6 +1334,7 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
     // Action 3: Near-expiry items without matching requests
     const unmatchedNearExpiry = highRiskInventory.filter(
       (item) =>
+        item.days_until_expiry > 3 &&
         item.days_until_expiry <= 7 &&
         !transferRecommendations.some((rec) => rec.inventoryId === item.id) &&
         item.available_units > 0,
@@ -1337,11 +1342,16 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
 
     if (unmatchedNearExpiry.length > 0) {
       const totalUnmatched = unmatchedNearExpiry.reduce((sum, item) => sum + item.available_units, 0)
+      const minUnmatchedDays = Math.min(
+        ...unmatchedNearExpiry.map((item) => item.days_until_expiry),
+      )
+      const unmatchedDaysLabel =
+        minUnmatchedDays === 1 ? '1 day' : `${minUnmatchedDays} days`
       priorityActions.push({
         type: 'alert',
         priority: 'high',
         title: 'Near-Expiry Items Need Attention',
-        description: `${totalUnmatched} units expiring within 7 days without matching requests.`,
+        description: `${totalUnmatched} units expiring in ${unmatchedDaysLabel} without matching requests.`,
         bloodTypes: [...new Set(unmatchedNearExpiry.map((item) => item.blood_type))],
         affectedUnits: totalUnmatched,
         action: 'Contact hospitals to check if they need these blood types',
@@ -1357,6 +1367,13 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
     res.json({
       transferRecommendations: transferRecommendations.slice(0, 20), // Top 20 recommendations
       priorityActions,
+      expiringSoonInventory: expiring3Days.map((item) => ({
+        id: item.id,
+        bloodType: item.blood_type,
+        componentType: item.component_type || 'whole_blood',
+        units: item.available_units,
+        daysUntilExpiry: item.days_until_expiry,
+      })),
       summary: {
         totalRecommendations: transferRecommendations.length,
         criticalActions: priorityActions.filter((a) => a.priority === 'critical').length,
