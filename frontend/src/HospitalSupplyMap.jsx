@@ -5,12 +5,12 @@ import L from 'leaflet'
 import { apiRequest } from './api.js'
 
 const HOSPITAL_COORDINATES = {
-  'ST. JUDE': { lat: 14.5995, lng: 120.9842 },
-  'SIMBULAN SNGH': { lat: 14.5958, lng: 120.9721 },
-  LVGHI: { lat: 14.61, lng: 120.99 },
-  VPGHI: { lat: 14.605, lng: 120.98 },
-  MPGHI: { lat: 14.59, lng: 120.99 },
-  AMCV: { lat: 14.6, lng: 120.97 },
+  'ST. JUDE': { lat: 8.15514, lng: 125.12983 },
+  'SIMBULAN SNGH': { lat: 7.68181, lng: 124.99663 },
+  LVGHI: { lat: 7.90809, lng: 125.09225 },
+  VPGHI: { lat: 7.91491, lng: 125.09202 },
+  MPGHI: { lat: 8.14901, lng: 125.13193 },
+  AMCV: { lat: 7.91255, lng: 125.09233 },
 }
 
 const DEFAULT_THRESHOLDS = {
