@@ -73,6 +73,8 @@ router.get('/hospitals', async (req, res) => {
         br.units_approved,
         br.status,
         br.request_date,
+        br.priority,
+        br.notes,
         COALESCE(
           (
             SELECT SUM(bt.units_transferred)
@@ -97,12 +99,22 @@ router.get('/hospitals', async (req, res) => {
       const isFullyFulfilled = remainingBalance === 0
       const isPartiallyFulfilled = unitsFulfilled > 0 && remainingBalance > 0
 
+      // Normalize priority (supports legacy encoding in notes)
+      let priority = (req.priority || 'normal').toLowerCase()
+      if ((!req.priority || req.priority === null) && typeof req.notes === 'string' && req.notes.startsWith('[PRIORITY:')) {
+        const match = req.notes.match(/^\[PRIORITY:([a-zA-Z]+)\]\s*(.*)$/)
+        if (match) {
+          priority = match[1].toLowerCase()
+        }
+      }
+
       return {
         ...req,
         unitsFulfilled,
         remainingBalance,
         isFullyFulfilled,
         isPartiallyFulfilled,
+        normalizedPriority: priority,
       }
     })
 
@@ -121,6 +133,7 @@ router.get('/hospitals', async (req, res) => {
         remainingBalance: req.remainingBalance,
         status: req.isFullyFulfilled ? 'fulfilled' : req.isPartiallyFulfilled ? 'partially_fulfilled' : 'approved',
         requestDate: req.request_date,
+        priority: req.normalizedPriority || 'normal',
       })
     })
 
@@ -886,19 +899,66 @@ router.get('/transfers', async (req, res) => {
 // GET /api/admin/requests
 router.get('/requests', async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `
-      SELECT br.*, h.hospital_name
-      FROM blood_requests br
-      JOIN hospitals h ON br.hospital_id = h.id
-      ORDER BY br.request_date DESC
-    `,
-    )
-    // Add default component_type if column doesn't exist
-    const rowsWithComponent = rows.map((row) => ({
-      ...row,
-      component_type: row.component_type || 'whole_blood',
-    }))
+    let rows
+    try {
+      // Prefer ordering by priority (critical/urgent first) when column exists
+      const [rowsWithPriority] = await pool.query(
+        `
+        SELECT br.*, h.hospital_name
+        FROM blood_requests br
+        JOIN hospitals h ON br.hospital_id = h.id
+        ORDER BY
+          CASE 
+            WHEN br.status = 'pending' THEN 0
+            ELSE 1
+          END,
+          CASE 
+            WHEN br.priority = 'critical' THEN 0
+            WHEN br.priority = 'urgent' THEN 1
+            WHEN br.priority = 'normal' OR br.priority IS NULL THEN 2
+            ELSE 3
+          END,
+          br.request_date DESC
+      `,
+      )
+      rows = rowsWithPriority
+    } catch (err) {
+      // Fallback for databases without priority column
+      if (err.code === 'ER_BAD_FIELD_ERROR') {
+        const [rowsFallback] = await pool.query(
+          `
+          SELECT br.*, h.hospital_name
+          FROM blood_requests br
+          JOIN hospitals h ON br.hospital_id = h.id
+          ORDER BY br.request_date DESC
+        `,
+        )
+        rows = rowsFallback
+      } else {
+        throw err
+      }
+    }
+
+    // Normalize component_type and priority (including legacy priority stored in notes)
+    const rowsWithComponent = rows.map((row) => {
+      let priority = (row.priority || 'normal').toLowerCase()
+      let cleanNotes = row.notes
+
+      if ((!row.priority || row.priority === null) && typeof row.notes === 'string' && row.notes.startsWith('[PRIORITY:')) {
+        const match = row.notes.match(/^\[PRIORITY:([a-zA-Z]+)\]\s*(.*)$/)
+        if (match) {
+          priority = match[1].toLowerCase()
+          cleanNotes = match[2] || null
+        }
+      }
+
+      return {
+        ...row,
+        component_type: row.component_type || 'whole_blood',
+        notes: cleanNotes,
+        priority,
+      }
+    })
     res.json(rowsWithComponent)
   } catch (error) {
     console.error('Fetch requests error:', error)
@@ -1171,7 +1231,7 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
     )
 
     // Get pending requests from hospitals
-    const [pendingRequests] = await pool.query(
+    const [pendingRequestsRaw] = await pool.query(
       `
       SELECT 
         br.id,
@@ -1180,6 +1240,9 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
         COALESCE(br.component_type, 'whole_blood') as component_type,
         br.units_requested,
         br.request_date,
+        br.status,
+        br.priority,
+        br.notes,
         h.hospital_name
       FROM blood_requests br
       JOIN hospitals h ON br.hospital_id = h.id
@@ -1188,7 +1251,27 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
     `,
     )
 
-    // Get hospital inventory levels
+    // Normalize priority (including legacy requests where priority is encoded in notes)
+    const pendingRequests = pendingRequestsRaw.map((row) => {
+      let priority = (row.priority || 'normal').toLowerCase()
+      let cleanNotes = row.notes
+
+      if ((!row.priority || row.priority === null) && typeof row.notes === 'string' && row.notes.startsWith('[PRIORITY:')) {
+        const match = row.notes.match(/^\[PRIORITY:([a-zA-Z]+)\]\s*(.*)$/)
+        if (match) {
+          priority = match[1].toLowerCase()
+          cleanNotes = match[2] || null
+        }
+      }
+
+      return {
+        ...row,
+        priority,
+        notes: cleanNotes,
+      }
+    })
+
+    // Get hospital inventory levels (not currently used, but kept for possible future extensions)
     const [hospitalInventory] = await pool.query(
       `
       SELECT 
@@ -1202,6 +1285,28 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
       GROUP BY hospital_id, blood_type
     `,
     )
+
+    // Get central inventory availability by blood type & component for "out of stock" detection
+    const [centralInventory] = await pool.query(
+      `
+      SELECT
+        blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
+        SUM(available_units) as total_available
+      FROM blood_inventory
+      WHERE status = 'available'
+        AND expiration_date > CURDATE()
+        AND available_units > 0
+        AND (hospital_id IS NULL OR hospital_id = 0)
+      GROUP BY blood_type, component_type
+    `,
+    )
+
+    const centralInventoryMap = {}
+    centralInventory.forEach((row) => {
+      const key = `${row.blood_type}_${row.component_type}`
+      centralInventoryMap[key] = row.total_available || 0
+    })
 
     // Generate transfer recommendations
     const transferRecommendations = []
@@ -1231,6 +1336,7 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
             transferRecommendations.push({
               type: 'transfer',
               priority: inventory.days_until_expiry <= 3 ? 'high' : inventory.days_until_expiry <= 7 ? 'medium' : 'low',
+              requestPriority: request.priority, // 'normal' | 'urgent' | 'critical'
               inventoryId: inventory.id,
               bloodType: inventory.blood_type,
               componentType: inventory.component_type || 'whole_blood',
@@ -1340,6 +1446,62 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
       return priorityOrder[b.priority] - priorityOrder[a.priority]
     })
 
+    // Collect urgent / critical pending requests for prescriptive display
+    const priorityRequests = pendingRequests
+      .filter(
+        (req) =>
+          req.status === 'pending' &&
+          (req.priority === 'urgent' || req.priority === 'critical'),
+      )
+      .sort((a, b) => {
+        const order = { critical: 0, urgent: 1, normal: 2 }
+        const pa = order[a.priority] ?? 2
+        const pb = order[b.priority] ?? 2
+        if (pa !== pb) return pa - pb
+        return new Date(a.request_date) - new Date(b.request_date)
+      })
+
+    // Detect pending requests whose requested component is completely out of central stock
+    const unavailableRequests = pendingRequests
+      .filter((req) => {
+        const key = `${req.blood_type}_${req.component_type || 'whole_blood'}`
+        const totalAvailable = centralInventoryMap[key] || 0
+        return totalAvailable <= 0
+      })
+      .map((req) => {
+        const priority = req.priority || 'normal'
+        let recommendedAction
+        const isPlatelets = (req.component_type || 'whole_blood') === 'platelets'
+        const isPlasma = (req.component_type || 'whole_blood') === 'plasma'
+
+        if (priority === 'critical') {
+          recommendedAction = isPlatelets || isPlasma
+            ? 'Critical: Requested blood component is unavailable. Prioritize emergency donor contact and urgent replenishment for platelets/plasma.'
+            : 'Critical: Requested blood component is unavailable. Prioritize emergency donor contact and urgent replenishment.'
+        } else if (priority === 'urgent') {
+          recommendedAction = isPlatelets || isPlasma
+            ? 'Urgent: Requested blood component is out of stock. Check partner hospitals and contact eligible donors for platelets/plasma immediately.'
+            : 'Urgent: Requested blood component is out of stock. Check partner hospitals or contact eligible matching donors immediately.'
+        } else {
+          recommendedAction = isPlatelets || isPlasma
+            ? 'Normal: Requested blood component is unavailable. Recommend donor sourcing or restocking process for platelets/plasma.'
+            : 'Normal: Requested blood component is unavailable. Recommend donor sourcing or restocking process.'
+        }
+
+        return {
+          id: req.id,
+          hospital_id: req.hospital_id,
+          hospital_name: req.hospital_name,
+          blood_type: req.blood_type,
+          component_type: req.component_type || 'whole_blood',
+          units_requested: req.units_requested,
+          priority,
+          request_date: req.request_date,
+          stock_status: 'out_of_stock',
+          recommendedAction,
+        }
+      })
+
     res.json({
       transferRecommendations: transferRecommendations.slice(0, 20), // Top 20 recommendations
       priorityActions,
@@ -1350,6 +1512,8 @@ router.get('/analytics/wastage-prescriptions', async (req, res) => {
         units: item.available_units,
         daysUntilExpiry: item.days_until_expiry,
       })),
+      priorityRequests,
+      unavailableRequests,
       summary: {
         totalRecommendations: transferRecommendations.length,
         criticalActions: priorityActions.filter((a) => a.priority === 'critical').length,

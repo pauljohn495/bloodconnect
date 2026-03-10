@@ -27,7 +27,7 @@ function validateInventoryDonation(req, res, next) {
 }
 
 function validateHospitalRequest(req, res, next) {
-  const { bloodType, componentType, unitsRequested, notes } = req.body
+  const { bloodType, componentType, unitsRequested, notes, priority } = req.body
 
   if (!bloodType || !unitsRequested) {
     return errorResponse(res, {
@@ -44,11 +44,22 @@ function validateHospitalRequest(req, res, next) {
     })
   }
 
+  // Normalize and validate priority (optional)
+  const normalizedPriority = (priority || 'normal').toLowerCase()
+  const allowedPriorities = ['normal', 'urgent', 'critical']
+  if (!allowedPriorities.includes(normalizedPriority)) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'priority must be one of: normal, urgent, critical',
+    })
+  }
+
   req.validatedRequest = {
     bloodType,
     componentType: componentType || 'whole_blood',
     unitsRequested: intUnits,
     notes: notes || null,
+    priority: normalizedPriority,
   }
 
   return next()

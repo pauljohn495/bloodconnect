@@ -460,12 +460,12 @@ function AdminPartner() {
                         {hospital.hospital_name || hospital.hospitalName}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm">
-                        <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-[13px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-[13px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
                           {hospital.total_available_units ?? 0}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm">
-                        <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-sky-50 px-2 py-1 text-[13px] font-semibold text-sky-700 ring-1 ring-sky-100">
+                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-sky-50 px-2 py-1 text-[13px] font-semibold text-sky-700 ring-1 ring-sky-100">
                           {hospital.total_donated_units ?? 0}
                         </span>
                       </td>
@@ -474,32 +474,55 @@ function AdminPartner() {
                           <div className="flex flex-col gap-2">
                             {hospital.requestedBlood
                               .filter((req) => req.status !== 'fulfilled')
-                              .map((req) => (
-                                <div key={req.requestId} className="flex flex-col gap-1">
-                                  <div className="flex items-center gap-1">
-                                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                                      {req.bloodType}: {req.unitsRequested} units
-                                    </span>
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                      req.status === 'partially_fulfilled'
-                                        ? 'bg-yellow-100 text-yellow-700'
-                                        : 'bg-slate-100 text-slate-600'
-                                    }`}>
-                                      {req.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
-                                    </span>
-                                  </div>
-                                  {req.unitsFulfilled > 0 && (
-                                    <span className="text-[10px] text-slate-600">
-                                      Fulfilled: {req.unitsFulfilled} / {req.unitsRequested}
-                                      {req.remainingBalance > 0 && (
-                                        <span className="ml-1 text-slate-500">
-                                          ({req.remainingBalance} remaining)
+                              .map((req) => {
+                                const priority = (req.priority || 'normal').toLowerCase()
+                                const showPriority = priority === 'urgent' || priority === 'critical'
+                                return (
+                                  <div key={req.requestId} className="flex flex-col gap-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
+                                        {req.bloodType}{' '}
+                                        {req.componentType === 'platelets'
+                                          ? '(Platelets)'
+                                          : req.componentType === 'plasma'
+                                          ? '(Plasma)'
+                                          : ''}
+                                        : {req.unitsRequested} units
+                                      </span>
+                                      <span
+                                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                          req.status === 'partially_fulfilled'
+                                            ? 'bg-yellow-100 text-yellow-700'
+                                            : 'bg-slate-100 text-slate-600'
+                                        }`}
+                                      >
+                                        {req.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
+                                      </span>
+                                      {showPriority && (
+                                        <span
+                                          className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                            priority === 'critical'
+                                              ? 'bg-red-100 text-red-700'
+                                              : 'bg-orange-100 text-orange-700'
+                                          }`}
+                                        >
+                                          {priority === 'critical' ? 'Critical' : 'Urgent'}
                                         </span>
                                       )}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
+                                    </div>
+                                    {req.unitsFulfilled > 0 && (
+                                      <span className="text-[10px] text-slate-600">
+                                        Fulfilled: {req.unitsFulfilled} / {req.unitsRequested}
+                                        {req.remainingBalance > 0 && (
+                                          <span className="ml-1 text-slate-500">
+                                            ({req.remainingBalance} remaining)
+                                          </span>
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             {hospital.requestedBlood.filter((req) => req.status !== 'fulfilled').length === 0 && (
                               <span className="text-slate-400">—</span>
                             )}
@@ -834,9 +857,15 @@ function AdminPartner() {
                             onChange={() => toggleRequestSelection(request.requestId)}
                           />
                           <div className="flex flex-col gap-0.5">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                                {request.bloodType} {request.componentType === 'platelets' ? '(Platelets)' : request.componentType === 'plasma' ? '(Plasma)' : ''}: {request.unitsRequested} units
+                                {request.bloodType}{' '}
+                                {request.componentType === 'platelets'
+                                  ? '(Platelets)'
+                                  : request.componentType === 'plasma'
+                                  ? '(Plasma)'
+                                  : ''}
+                                : {request.unitsRequested} units
                                 {request.remainingBalance > 0 &&
                                   request.remainingBalance < request.unitsRequested && (
                                     <span className="ml-2 text-[10px]">
@@ -853,6 +882,17 @@ function AdminPartner() {
                               >
                                 {request.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
                               </span>
+                              {request.priority && request.priority !== 'normal' && (
+                                <span
+                                  className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                    request.priority === 'critical'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-orange-100 text-orange-700'
+                                  }`}
+                                >
+                                  {request.priority === 'critical' ? 'Critical' : 'Urgent'}
+                                </span>
+                              )}
                               <select
                                 value={plannedRequestStatuses[request.requestId] || request.status}
                                 onChange={(e) =>
@@ -963,7 +1003,7 @@ function AdminPartner() {
                               {item.component_type === 'platelets' ? 'Platelets' : item.component_type === 'plasma' ? 'Plasma' : item.componentType === 'platelets' ? 'Platelets' : item.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'}
                             </td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                              <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
                                 {availableUnits}
                               </span>
                             </td>
@@ -1048,7 +1088,7 @@ function AdminPartner() {
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
           <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
             <button
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 transition"
@@ -1220,7 +1260,7 @@ function AdminPartner() {
 
       {/* Notification Container */}
       {notification && (
-        <div className="fixed top-4 right-4 z-[200] transition-all duration-300 ease-in-out">
+        <div className="fixed top-4 right-4 z-200 transition-all duration-300 ease-in-out">
           <div
             className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg min-w-[300px] max-w-md ${
               notification.type === 'destructive'

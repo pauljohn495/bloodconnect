@@ -10,6 +10,7 @@ function HospitalInventory() {
   const [componentType, setComponentType] = useState('whole_blood')
   const [unitsRequested, setUnitsRequested] = useState('')
   const [notes, setNotes] = useState('')
+  const [requestPriority, setRequestPriority] = useState('normal')
   const [notification, setNotification] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false)
@@ -59,6 +60,7 @@ function HospitalInventory() {
     setComponentType('whole_blood')
     setUnitsRequested('')
     setNotes('')
+    setRequestPriority('normal')
   }
 
   const handleCloseRequestModal = () => {
@@ -67,6 +69,7 @@ function HospitalInventory() {
     setComponentType('whole_blood')
     setUnitsRequested('')
     setNotes('')
+    setRequestPriority('normal')
   }
 
   const showNotification = (message, type = 'primary') => {
@@ -97,6 +100,7 @@ function HospitalInventory() {
           componentType,
           unitsRequested: units,
           notes: notes || null,
+          priority: requestPriority,
         }),
       })
       handleCloseRequestModal()
@@ -301,6 +305,22 @@ function HospitalInventory() {
                   <option value="whole_blood">Whole Blood</option>
                   <option value="platelets">Platelets</option>
                   <option value="plasma">Plasma</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Request Priority <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={requestPriority}
+                  onChange={(e) => setRequestPriority(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                >
+                  <option value="normal">Normal – Standard request</option>
+                  <option value="urgent">Urgent – Needed soon</option>
+                  <option value="critical">Critical / Emergency – Immediate</option>
                 </select>
               </div>
 

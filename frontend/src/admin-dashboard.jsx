@@ -23,17 +23,20 @@ function AdminDashboard() {
         ])
 
         setDashboardData(summaryData)
-        
+
         // Sort all stocks by created_at DESC
         const sortedStocks = inventoryData.sort(
-          (a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt)
+          (a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt),
         )
-        
-        // Get recent stocks (last 10)
-        setRecentStocks(sortedStocks.slice(0, 10))
-        
-        // Store all stocks for the modal
-        setAllStocks(sortedStocks)
+
+        // Filter out expired stocks for the "Recent blood stocks" widget and modal
+        const nonExpiredStocks = sortedStocks.filter((item) => item.status !== 'expired')
+
+        // Get recent stocks (last 10, non-expired only)
+        setRecentStocks(nonExpiredStocks.slice(0, 10))
+
+        // Store all non-expired stocks for the modal
+        setAllStocks(nonExpiredStocks)
 
         // Set recent transfers
         setRecentTransfers(transfersData || [])
@@ -130,6 +133,9 @@ function AdminDashboard() {
                           Blood Type
                         </th>
                         <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                          Component
+                        </th>
+                        <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
                           Units
                         </th>
                         <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
@@ -143,7 +149,7 @@ function AdminDashboard() {
                     <tbody className="bg-white">
                       {isLoading && (
                         <tr>
-                          <td className="px-4 py-6 text-center text-xs text-slate-500" colSpan={4}>
+                          <td className="px-4 py-6 text-center text-xs text-slate-500" colSpan={5}>
                             Loading recent stocks...
                           </td>
                         </tr>
@@ -151,7 +157,7 @@ function AdminDashboard() {
 
                       {!isLoading && recentStocks.length === 0 && (
                         <tr>
-                          <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={4}>
+                          <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={5}>
                             No recent blood stocks yet.
                           </td>
                         </tr>
@@ -162,6 +168,14 @@ function AdminDashboard() {
                           <tr key={stock.id} className="hover:bg-slate-50/60">
                             <td className="whitespace-nowrap px-4 py-2 text-xs font-medium text-slate-900">
                               {stock.blood_type || stock.bloodType}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
+                              {(() => {
+                                const component = stock.component_type || stock.componentType || 'whole_blood'
+                                if (component === 'platelets') return 'Platelets'
+                                if (component === 'plasma') return 'Plasma'
+                                return 'Whole Blood'
+                              })()}
                             </td>
                             <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
                               <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
@@ -286,7 +300,7 @@ function AdminDashboard() {
 
       {/* View All Modal */}
       {isViewAllModalOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/50 p-4">
+      <div className="fixed inset-0 z-1000 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="flex h-[85vh] w-full max-w-6xl flex-col rounded-2xl bg-white shadow-xl">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
@@ -317,6 +331,9 @@ function AdminDashboard() {
                       Blood Type
                     </th>
                     <th className="whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                      Component
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                       Available Units
                     </th>
                     <th className="whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
@@ -336,7 +353,7 @@ function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {isLoading && (
                     <tr>
-                      <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={6}>
+                      <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={7}>
                         Loading blood stocks...
                       </td>
                     </tr>
@@ -344,7 +361,7 @@ function AdminDashboard() {
 
                   {!isLoading && allStocks.length === 0 && (
                     <tr>
-                      <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                      <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
                         No blood stocks available yet.
                       </td>
                     </tr>
@@ -355,6 +372,14 @@ function AdminDashboard() {
                       <tr key={stock.id} className="hover:bg-slate-50/60 transition">
                         <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900">
                           {stock.blood_type || stock.bloodType}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                          {(() => {
+                            const component = stock.component_type || stock.componentType || 'whole_blood'
+                            if (component === 'platelets') return 'Platelets'
+                            if (component === 'plasma') return 'Plasma'
+                            return 'Whole Blood'
+                          })()}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">
                           <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-[13px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
