@@ -8,6 +8,7 @@ function AdminRequests() {
   const [error, setError] = useState('')
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [notification, setNotification] = useState(null)
+  const [priorityFilter, setPriorityFilter] = useState('all')
 
   const loadRequests = async () => {
     try {
@@ -60,7 +61,28 @@ function AdminRequests() {
     }
   }
 
-  const pendingRequests = requests.filter((req) => req.status === 'pending')
+  const getPriorityRank = (priority) => {
+    if (priority === 'critical') return 3
+    if (priority === 'urgent') return 2
+    return 1 // normal or undefined
+  }
+
+  const pendingRequests = requests
+    .filter((req) => req.status === 'pending')
+    .filter((req) => {
+      if (priorityFilter === 'all') return true
+      const p = (req.priority || 'normal').toLowerCase()
+      return p === priorityFilter
+    })
+    .slice()
+    .sort((a, b) => {
+      const pa = getPriorityRank((a.priority || 'normal').toLowerCase())
+      const pb = getPriorityRank((b.priority || 'normal').toLowerCase())
+      if (pa !== pb) return pb - pa // higher rank first (critical > urgent > normal)
+      const da = a.request_date ? new Date(a.request_date) : 0
+      const db = b.request_date ? new Date(b.request_date) : 0
+      return da - db // older requests first within same priority
+    })
   const allRequests = requests
 
   return (
@@ -77,13 +99,28 @@ function AdminRequests() {
                 Active requests from partner hospitals
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleOpenHistory}
-              className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
-            >
-              History
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-2 sm:flex">
+                <span className="text-[11px] font-medium text-slate-600">Priority:</span>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="all">All</option>
+                  <option value="critical">Critical</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="normal">Normal</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenHistory}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+              >
+                History
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -104,6 +141,9 @@ function AdminRequests() {
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
                     Request Date
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                    Priority
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
                     Status
@@ -157,6 +197,23 @@ function AdminRequests() {
                         {request.request_date
                           ? new Date(request.request_date).toLocaleDateString()
                           : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-xs">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ring-1 ${
+                            (request.priority || 'normal') === 'critical'
+                              ? 'bg-red-50 text-red-700 ring-red-100'
+                              : (request.priority || 'normal') === 'urgent'
+                              ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                              : 'bg-slate-50 text-slate-700 ring-slate-100'
+                          }`}
+                        >
+                          {(request.priority || 'normal') === 'critical'
+                            ? 'Critical'
+                            : (request.priority || 'normal') === 'urgent'
+                            ? 'Urgent'
+                            : 'Normal'}
+                        </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-xs">
                         <span
@@ -298,7 +355,7 @@ function AdminRequests() {
 
       {/* Notification Container */}
       {notification && (
-        <div className="fixed top-4 right-4 z-[200] transition-all duration-300 ease-in-out">
+        <div className="fixed top-4 right-4 z-200 transition-all duration-300 ease-in-out">
           <div
             className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg min-w-[300px] max-w-md ${
               notification.type === 'destructive'

@@ -154,7 +154,7 @@ async function createRequestHandler(req, res, next) {
     const hospitalId = await resolveHospitalIdOrBadRequest(req.user.id, res)
     if (!hospitalId) return
 
-    const { bloodType, componentType, unitsRequested, notes } = req.validatedRequest
+    const { bloodType, componentType, unitsRequested, notes, priority } = req.validatedRequest
 
     const created = await createHospitalRequest({
       hospitalId,
@@ -162,6 +162,7 @@ async function createRequestHandler(req, res, next) {
       componentType,
       unitsRequested,
       notes,
+      priority,
     })
 
     return successResponse(res, {

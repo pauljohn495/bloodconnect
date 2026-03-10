@@ -161,6 +161,39 @@ function AdminReports() {
   // Use historicalChartData directly (already aggregated by date)
   const aggregatedChartData = historicalChartData
 
+  // Prepare high-risk inventory items for the table, de-duplicated by inventory/id to avoid double counting.
+  // Only include central inventory (exclude hospital-owned inventory rows).
+  const highRiskInventoryRows = (() => {
+    if (!predictions?.inventoryWithRisk) return []
+
+    const seenKeys = new Set()
+    const result = []
+
+    const filtered = predictions.inventoryWithRisk.filter((item) => {
+      // Exclude hospital inventory; we only want central stock here
+      if (item.hospital_id && item.hospital_id !== 0) return false
+      if (item.riskScore < 50) return false
+      if (componentFilter === 'all') return true
+      return (item.component_type || 'whole_blood') === componentFilter
+    })
+
+    for (const item of filtered) {
+      const key =
+        item.inventory_id ??
+        item.inventoryId ??
+        item.id ??
+        `${item.blood_type || ''}|${item.component_type || 'whole_blood'}|${
+          item.expiration_date || item.expirationDate || item.days_until_expiry || ''
+        }`
+
+      if (seenKeys.has(key)) continue
+      seenKeys.add(key)
+      result.push(item)
+    }
+
+    return result
+  })()
+
   return (
     <AdminLayout pageTitle="Reports & Analytics" pageDescription="View detailed reports and system analytics.">
       {/* Tabs and Component Filter */}
@@ -481,14 +514,7 @@ function AdminReports() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-red-200/40 bg-white/80">
-                          {predictions?.inventoryWithRisk
-                            ?.filter((item) => {
-                              if (item.riskScore < 50) return false
-                              if (componentFilter === 'all') return true
-                              return (item.component_type || 'whole_blood') === componentFilter
-                            })
-                            .slice(0, 10)
-                            .map((item) => {
+                          {highRiskInventoryRows.slice(0, 10).map((item) => {
                               const isCritical = item.riskScore >= 70
                               const isHigh = item.riskScore >= 50 && item.riskScore < 70
                               const rowBg = isCritical ? 'bg-red-100/50' : isHigh ? 'bg-amber-50/60' : 'bg-white'
@@ -517,11 +543,19 @@ function AdminReports() {
                                   </td>
                                 </tr>
                               )
-                            }) || (
+                            })}
+                          {highRiskInventoryRows.length === 0 && (
                             <tr>
                               <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
                                 No high-risk items found
-                                {componentFilter !== 'all' && ` for ${componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'}`}
+                                {componentFilter !== 'all' &&
+                                  ` for ${
+                                    componentFilter === 'whole_blood'
+                                      ? 'Whole Blood'
+                                      : componentFilter === 'platelets'
+                                      ? 'Platelets'
+                                      : 'Plasma'
+                                  }`}
                               </td>
                             </tr>
                           )}
@@ -548,6 +582,185 @@ function AdminReports() {
                   </div>
                 </div>
                 <div className="p-6">
+                  {/* Unavailable Requested Components */}
+                  {Array.isArray(prescriptions?.unavailableRequests) &&
+                    prescriptions.unavailableRequests.length > 0 && (
+                      <div className="mb-8 rounded-xl border-2 border-red-200 bg-red-50/40 p-4">
+                        <h3 className="mb-2 text-sm font-bold text-red-900">
+                          Unavailable Requested Components
+                        </h3>
+                        <p className="mb-3 text-[11px] text-red-700">
+                          Pending hospital requests for whole blood, platelets, or plasma that are currently out of
+                          stock in central inventory.
+                        </p>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-red-200/70 text-xs">
+                            <thead className="bg-red-100/60">
+                              <tr>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
+                                  Hospital
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
+                                  Blood / Component
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
+                                  Units
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
+                                  Stock
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
+                                  Priority
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
+                                  Recommended Action
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-red-100 bg-white">
+                              {prescriptions.unavailableRequests
+                                .filter((req) => {
+                                  if (componentFilter === 'all') return true
+                                  return (req.component_type || 'whole_blood') === componentFilter
+                                })
+                                .map((req) => {
+                                  const isCritical = req.priority === 'critical'
+                                  const isUrgent = req.priority === 'urgent'
+                                  const rowBg = isCritical
+                                    ? 'bg-red-50'
+                                    : isUrgent
+                                    ? 'bg-orange-50/60'
+                                    : 'bg-white'
+                                  return (
+                                    <tr key={req.id} className={`${rowBg} hover:bg-red-50/70 transition`}>
+                                      <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-slate-900">
+                                        {req.hospital_name}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-800">
+                                        {req.blood_type}{' '}
+                                        {req.component_type === 'platelets'
+                                          ? '· Platelets'
+                                          : req.component_type === 'plasma'
+                                          ? '· Plasma'
+                                          : '· Whole Blood'}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2 text-xs">
+                                        <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-200">
+                                          {req.units_requested}
+                                        </span>
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2 text-[11px] font-semibold text-red-700">
+                                        Out of Stock
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2 text-xs">
+                                        <span
+                                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ring-1 ${
+                                            isCritical
+                                              ? 'bg-red-50 text-red-700 ring-red-200'
+                                              : isUrgent
+                                              ? 'bg-orange-50 text-orange-700 ring-orange-200'
+                                              : 'bg-slate-50 text-slate-700 ring-slate-200'
+                                          }`}
+                                        >
+                                          {isCritical ? 'Critical' : isUrgent ? 'Urgent' : 'Normal'}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2 text-[11px] text-slate-800">
+                                        {req.recommendedAction}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Urgent / Critical Hospital Requests (only those that are not out-of-stock) */}
+                  {(() => {
+                    if (!Array.isArray(prescriptions?.priorityRequests)) return null
+
+                    const unavailableIds = new Set(
+                      (prescriptions.unavailableRequests || []).map((req) => req.id),
+                    )
+
+                    const visiblePriorityRequests = prescriptions.priorityRequests.filter(
+                      (req) => !unavailableIds.has(req.id),
+                    )
+
+                    if (visiblePriorityRequests.length === 0) return null
+
+                    return (
+                      <div className="mb-8 rounded-xl border border-blue-200 bg-white/80 p-4">
+                        <h3 className="mb-3 text-sm font-bold text-blue-900">
+                          Urgent &amp; Critical Hospital Requests
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-blue-100 text-xs">
+                            <thead className="bg-blue-50/60">
+                              <tr>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
+                                  Hospital
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
+                                  Blood / Component
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
+                                  Units
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
+                                  Priority
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
+                                  Requested
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-blue-50 bg-white">
+                              {visiblePriorityRequests.map((req) => (
+                                <tr key={req.id} className="hover:bg-blue-50/50">
+                                  <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-slate-900">
+                                    {req.hospital_name}
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-700">
+                                    {req.blood_type}{' '}
+                                    {req.component_type === 'platelets'
+                                      ? '· Platelets'
+                                      : req.component_type === 'plasma'
+                                      ? '· Plasma'
+                                      : '· Whole Blood'}
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2 text-xs">
+                                    <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-100">
+                                      {req.units_requested}
+                                    </span>
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2 text-xs">
+                                    <span
+                                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ring-1 ${
+                                        req.priority === 'critical'
+                                          ? 'bg-red-50 text-red-700 ring-red-100'
+                                          : 'bg-orange-50 text-orange-700 ring-orange-100'
+                                      }`}
+                                    >
+                                      {req.priority === 'critical' ? 'Critical' : 'Urgent'}
+                                    </span>
+                                  </td>
+                                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-700">
+                                    {req.request_date
+                                      ? new Date(req.request_date).toLocaleString()
+                                      : '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
                   {/* Priority Actions */}
                   {(() => {
                     const filteredActions = (prescriptions?.priorityActions || []).filter((action) => {
@@ -638,13 +851,27 @@ function AdminReports() {
                           <table className="min-w-full divide-y divide-blue-200/50 text-sm">
                             <thead>
                               <tr className="bg-blue-100/40">
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Priority</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Blood Type</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Component Type</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Units</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Days Until Expiry</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Transfer To</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">Impact</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
+                                  Priority
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
+                                  Blood Type
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
+                                  Component Type
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
+                                  Units
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
+                                  Days Until Expiry
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
+                                  Transfer To
+                                </th>
+                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
+                                  Impact
+                                </th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-blue-200/40 bg-white/80">

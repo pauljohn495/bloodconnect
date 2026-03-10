@@ -98,27 +98,33 @@ async function getHospitalDonations(hospitalId) {
   return rows
 }
 
-async function createHospitalRequest({ hospitalId, bloodType, componentType, unitsRequested, notes }) {
+async function createHospitalRequest({ hospitalId, bloodType, componentType, unitsRequested, notes, priority }) {
   const component = componentType || 'whole_blood'
+  const safePriority = priority || 'normal'
 
   let result
   try {
     const [result1] = await pool.query(
       `
-      INSERT INTO blood_requests (hospital_id, blood_type, component_type, units_requested, notes)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO blood_requests (hospital_id, blood_type, component_type, units_requested, notes, priority)
+      VALUES (?, ?, ?, ?, ?, ?)
     `,
-      [hospitalId, bloodType, component, unitsRequested, notes || null],
+      [hospitalId, bloodType, component, unitsRequested, notes || null, safePriority],
     )
     result = result1
   } catch (error) {
     if (error.code === 'ER_BAD_FIELD_ERROR' || (error.message && error.message.includes('component_type'))) {
+      // Fallback when priority/component_type columns don't exist:
+      // embed priority as a tag in notes so we can recover it later.
+      const priorityTag = `[PRIORITY:${safePriority}]`
+      const storedNotes = notes && notes.length > 0 ? `${priorityTag} ${notes}` : priorityTag
+
       const [result2] = await pool.query(
         `
         INSERT INTO blood_requests (hospital_id, blood_type, units_requested, notes)
         VALUES (?, ?, ?, ?)
       `,
-        [hospitalId, bloodType, unitsRequested, notes || null],
+        [hospitalId, bloodType, unitsRequested, storedNotes],
       )
       result = result2
     } else {
@@ -133,21 +139,86 @@ async function createHospitalRequest({ hospitalId, bloodType, componentType, uni
     componentType: component,
     unitsRequested,
     notes: notes || null,
+    priority: safePriority,
     status: 'pending',
   }
 }
 
 async function getHospitalRequests(hospitalId) {
-  const [rows] = await pool.query(
-    `
-    SELECT *
-    FROM blood_requests
-    WHERE hospital_id = ?
-    ORDER BY request_date DESC
-  `,
-    [hospitalId],
-  )
-  return rows
+  try {
+    // Try to order by priority when column exists
+    const [rowsWithPriority] = await pool.query(
+      `
+      SELECT *
+      FROM blood_requests
+      WHERE hospital_id = ?
+      ORDER BY
+        CASE 
+          WHEN status = 'pending' THEN 0
+          ELSE 1
+        END,
+        CASE 
+          WHEN priority = 'critical' THEN 0
+          WHEN priority = 'urgent' THEN 1
+          WHEN priority = 'normal' OR priority IS NULL THEN 2
+          ELSE 3
+        END,
+        request_date DESC
+    `,
+      [hospitalId],
+    )
+    const normalized = rowsWithPriority.map((row) => {
+      let priority = (row.priority || 'normal').toLowerCase()
+      let cleanNotes = row.notes
+
+      if ((!row.priority || row.priority === null) && typeof row.notes === 'string' && row.notes.startsWith('[PRIORITY:')) {
+        const match = row.notes.match(/^\[PRIORITY:([a-zA-Z]+)\]\s*(.*)$/)
+        if (match) {
+          priority = match[1].toLowerCase()
+          cleanNotes = match[2] || null
+        }
+      }
+
+      return {
+        ...row,
+        notes: cleanNotes,
+        priority,
+      }
+    })
+    return normalized
+  } catch (error) {
+    if (error.code === 'ER_BAD_FIELD_ERROR') {
+      const [rowsFallback] = await pool.query(
+        `
+        SELECT *
+        FROM blood_requests
+        WHERE hospital_id = ?
+        ORDER BY request_date DESC
+      `,
+        [hospitalId],
+      )
+      const normalized = rowsFallback.map((row) => {
+        let priority = 'normal'
+        let cleanNotes = row.notes
+
+        if (typeof row.notes === 'string' && row.notes.startsWith('[PRIORITY:')) {
+          const match = row.notes.match(/^\[PRIORITY:([a-zA-Z]+)\]\s*(.*)$/)
+          if (match) {
+            priority = match[1].toLowerCase()
+            cleanNotes = match[2] || null
+          }
+        }
+
+        return {
+          ...row,
+          notes: cleanNotes,
+          priority,
+        }
+      })
+      return normalized
+    }
+    throw error
+  }
 }
 
 async function getHospitalHistoricalWastage(hospitalId, days) {

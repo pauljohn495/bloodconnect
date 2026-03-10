@@ -78,6 +78,9 @@ function HospitalRequests() {
                     Request Date
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                    Priority
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
                     Status
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
@@ -135,6 +138,23 @@ function HospitalRequests() {
                         {request.request_date
                           ? new Date(request.request_date).toLocaleDateString()
                           : '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-xs">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ring-1 ${
+                            (request.priority || 'normal') === 'critical'
+                              ? 'bg-red-50 text-red-700 ring-red-100'
+                              : (request.priority || 'normal') === 'urgent'
+                              ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                              : 'bg-slate-50 text-slate-700 ring-slate-100'
+                          }`}
+                        >
+                          {(request.priority || 'normal') === 'critical'
+                            ? 'Critical'
+                            : (request.priority || 'normal') === 'urgent'
+                            ? 'Urgent'
+                            : 'Normal'}
+                        </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-xs">
                         <span
