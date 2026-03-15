@@ -142,7 +142,7 @@ function AdminDashboard() {
                           Status
                         </th>
                         <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
-                          Expiration Date
+                          Added Date
                         </th>
                       </tr>
                     </thead>
@@ -200,8 +200,8 @@ function AdminDashboard() {
                               </span>
                             </td>
                             <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
-                              {stock.expiration_date || stock.expirationDate
-                                ? new Date(stock.expiration_date || stock.expirationDate).toLocaleDateString()
+                              {stock.created_at || stock.createdAt
+                                ? new Date(stock.created_at || stock.createdAt).toLocaleDateString()
                                 : '—'}
                             </td>
                           </tr>
@@ -343,9 +343,6 @@ function AdminDashboard() {
                       Status
                     </th>
                     <th className="whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                      Expiration Date
-                    </th>
-                    <th className="whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                       Added Date
                     </th>
                   </tr>
@@ -353,7 +350,7 @@ function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {isLoading && (
                     <tr>
-                      <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={7}>
+                      <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={6}>
                         Loading blood stocks...
                       </td>
                     </tr>
@@ -361,7 +358,7 @@ function AdminDashboard() {
 
                   {!isLoading && allStocks.length === 0 && (
                     <tr>
-                      <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
+                      <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
                         No blood stocks available yet.
                       </td>
                     </tr>
@@ -405,11 +402,6 @@ function AdminDashboard() {
                           >
                             {stock.status === 'near_expiry' ? 'Near Expiry' : stock.status || 'available'}
                           </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
-                          {stock.expiration_date || stock.expirationDate
-                            ? new Date(stock.expiration_date || stock.expirationDate).toLocaleDateString()
-                            : '—'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
                           {stock.created_at || stock.createdAt

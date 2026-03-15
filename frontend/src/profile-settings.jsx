@@ -27,6 +27,8 @@ function ProfileSettings() {
       setError('')
       try {
         const data = await apiRequest('/api/user/me')
+        const savedAvatar = localStorage.getItem('profileAvatar')
+
         setProfileData({
           name: data.full_name || '',
           username: data.username || '',
@@ -34,7 +36,7 @@ function ProfileSettings() {
           email: data.email || '',
           bloodType: data.blood_type || '',
           lastDonationDate: data.last_donation_date || null,
-          avatar: null,
+          avatar: savedAvatar || null,
         })
         setEditedData({
           name: data.full_name || '',
@@ -43,7 +45,7 @@ function ProfileSettings() {
           email: data.email || '',
           bloodType: data.blood_type || '',
           lastDonationDate: data.last_donation_date || null,
-          avatar: null,
+          avatar: savedAvatar || null,
         })
       } catch (err) {
         setError(err.message || 'Failed to load profile')
@@ -78,6 +80,14 @@ function ProfileSettings() {
         }),
       })
       setProfileData({ ...editedData })
+
+      // Persist avatar locally so it stays after a reload (backend does not store avatars)
+      if (editedData.avatar) {
+        localStorage.setItem('profileAvatar', editedData.avatar)
+      } else {
+        localStorage.removeItem('profileAvatar')
+      }
+
       setIsEditing(false)
     } catch (err) {
       setError(err.message || 'Failed to save profile')

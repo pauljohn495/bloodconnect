@@ -6,6 +6,7 @@ const sidebarItems = [
   { name: 'Inventory', path: '/admin/inventory' },
   { name: 'Donations', path: '/admin/donations' },
   { name: 'Hospitals / Partner Centers', path: '/admin/partners' },
+  { name: 'Manage Users', path: '/admin/users' },
   { name: 'Reports & Analytics', path: '/admin/reports' },
 ]
 

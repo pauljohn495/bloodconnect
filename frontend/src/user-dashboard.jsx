@@ -83,12 +83,14 @@ function UserDashboard() {
         ).length
         const totalDonations = donationCount + completedSchedules
 
+        const savedAvatar = localStorage.getItem('profileAvatar')
+
         setUserData({
           name: me.full_name || me.fullName || me.username || 'Donor',
           bloodType: me.blood_type || me.bloodType || '—',
           status: overallStatus,
           totalDonations,
-          avatar: null,
+          avatar: savedAvatar || null,
         })
 
         const formattedDonations = (donations || []).map((d) => ({

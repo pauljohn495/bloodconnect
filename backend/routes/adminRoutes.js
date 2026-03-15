@@ -18,7 +18,7 @@ const {
 const router = express.Router()
 
 // All admin routes require admin role
-router.use(auth(['admin']))
+router.use(auth(['admin', 'super_admin']))
 
 // GET /api/admin/dashboard-summary
 router.get('/dashboard-summary', getDashboardSummaryController)
@@ -1859,6 +1859,27 @@ router.patch('/schedule-requests/:id/complete', async (req, res) => {
     res.status(500).json({ message: 'Failed to complete schedule request' })
   }
 })
+
+// ===== Admin Users =====
+
+const {
+  getAdminsController,
+  createAdminController,
+  updateAdminController,
+  deleteAdminController,
+} = require('../controllers/adminUserController')
+
+// GET /api/admin/admins
+router.get('/admins', getAdminsController)
+
+// POST /api/admin/admins
+router.post('/admins', createAdminController)
+
+// PUT /api/admin/admins/:id
+router.put('/admins/:id', updateAdminController)
+
+// DELETE /api/admin/admins/:id
+router.delete('/admins/:id', deleteAdminController)
 
 module.exports = router
 
