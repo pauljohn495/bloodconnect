@@ -1,1154 +1,864 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Label,
-  LabelList,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 function AdminReports() {
-  const [activeTab, setActiveTab] = useState('analytics') // 'analytics' | 'reports'
-  const [predictions, setPredictions] = useState(null)
-  const [prescriptions, setPrescriptions] = useState(null)
-  const [historicalWastage, setHistoricalWastage] = useState(null)
+  const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'
+  const [inventory, setInventory] = useState([])
+  const [requests, setRequests] = useState([])
+  const [donors, setDonors] = useState([])
+  const [hospitals, setHospitals] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [componentFilter, setComponentFilter] = useState('all') // 'all', 'whole_blood', 'platelets', 'plasma'
-
-  const loadAnalytics = async () => {
-    try {
-      setIsLoading(true)
-      setError('')
-      const [predData, prescData, histData] = await Promise.all([
-        apiRequest('/api/admin/analytics/wastage-predictions'),
-        apiRequest('/api/admin/analytics/wastage-prescriptions'),
-        apiRequest('/api/admin/analytics/historical-wastage?days=90'),
-      ])
-      setPredictions(predData)
-      setPrescriptions(prescData)
-      setHistoricalWastage(histData)
-    } catch (err) {
-      setError(err.message || 'Failed to load analytics')
-      console.error('Analytics error:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const loadReports = async () => {
-    try {
-      setIsLoading(true)
-      setError('')
-      const [prescData, histData] = await Promise.all([
-        apiRequest('/api/admin/analytics/wastage-prescriptions'),
-        apiRequest('/api/admin/analytics/historical-wastage?days=90'),
-      ])
-      setPrescriptions(prescData)
-      setHistoricalWastage(histData)
-    } catch (err) {
-      setError(err.message || 'Failed to load reports')
-      console.error('Reports error:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   useEffect(() => {
-    if (activeTab === 'analytics') {
-      loadAnalytics()
-    } else if (activeTab === 'reports') {
-      loadReports()
+    const loadData = async () => {
+      try {
+        setIsLoading(true)
+        setError('')
+        const [inventoryData, requestsData, donorsData, hospitalsData] = await Promise.all([
+          apiRequest('/api/admin/inventory'),
+          apiRequest('/api/admin/requests'),
+          apiRequest('/api/admin/donors'),
+          apiRequest('/api/admin/hospitals'),
+        ])
+        setInventory(inventoryData || [])
+        setRequests(requestsData || [])
+        setDonors(donorsData || [])
+        setHospitals(hospitalsData || [])
+      } catch (err) {
+        console.error('Failed to load reports data', err)
+        setError(err.message || 'Failed to load reports data')
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [activeTab])
 
-  // Improved color palette for better distinction
-  const COLORS = [
-    '#dc2626', // Red - High risk
-    '#ea580c', // Orange
-    '#f59e0b', // Amber
-    '#10b981', // Green
-    '#2563eb', // Blue
-    '#7c3aed', // Violet
-    '#ec4899', // Pink
-    '#14b8a6', // Teal
-  ]
+    loadData()
+  }, [])
 
-  const getRiskColor = (score) => {
-    if (score >= 70) return 'text-red-600 bg-red-50 ring-red-100'
-    if (score >= 50) return 'text-orange-600 bg-orange-50 ring-orange-100'
-    return 'text-yellow-600 bg-yellow-50 ring-yellow-100'
+  const now = new Date()
+  const msPerDay = 1000 * 60 * 60 * 24
+
+  const diffInDays = (dateA, dateB) => {
+    const a = new Date(dateA)
+    const b = new Date(dateB)
+    return Math.max(0, Math.round((a - b) / msPerDay))
   }
 
-  const getPriorityColor = (priority) => {
-    if (priority === 'critical' || priority === 'high') return 'text-red-600 bg-red-50 ring-red-100'
-    if (priority === 'medium') return 'text-orange-600 bg-orange-50 ring-orange-100'
-    return 'text-blue-600 bg-blue-50 ring-blue-100'
+  const getHospitalName = (hospitalId) => {
+    if (!hospitalId) return 'Central Inventory'
+    const h = hospitals.find((x) => x.id === hospitalId)
+    return h?.hospital_name || h?.hospitalName || `Hospital #${hospitalId}`
   }
 
-  // Prepare chart data - filter predicted wastage by component type if filter is set
-  const wastageForecastData = predictions
-    ? (() => {
-        // If component filter is set, calculate wastage only for that component type
-        if (componentFilter !== 'all' && predictions.inventoryWithRisk) {
-          const filteredInventory = predictions.inventoryWithRisk.filter(
-            (item) => (item.component_type || 'whole_blood') === componentFilter,
-          )
-          const predictWastage = (days) => {
-            const expiringSoon = filteredInventory.filter(
-              (item) => item.days_until_expiry <= days && item.days_until_expiry > 0,
-            )
-            const avgWastageRate = 0.15
-            return expiringSoon.reduce((sum, item) => {
-              const wastageProbability = item.riskScore / 100
-              return sum + Math.round(item.available_units * wastageProbability * avgWastageRate)
-            }, 0)
-          }
-          return [
-            { period: 'Next 7 Days', predicted: predictWastage(7) },
-            { period: 'Next 14 Days', predicted: predictWastage(14) },
-            { period: 'Next 30 Days', predicted: predictWastage(30) },
-          ]
-        }
-        // Otherwise use original predictions
-        return [
-          { period: 'Next 7 Days', predicted: predictions.predictedWastage.next7Days },
-          { period: 'Next 14 Days', predicted: predictions.predictedWastage.next14Days },
-          { period: 'Next 30 Days', predicted: predictions.predictedWastage.next30Days },
-        ]
-      })()
-    : []
+  // ---------- PREDICTIVE ANALYTICS ----------
 
-  // Filter wastage by component type if filter is set
-  const wastageByBloodTypeData = (predictions?.wastageByBloodType || []).filter((item) => {
-    if (componentFilter === 'all') return true
-    return (item.componentType || 'whole_blood') === componentFilter
+  // Blood Shortage Forecast
+  const usageWindowDays = 30
+  const windowStart = new Date(now.getTime() - usageWindowDays * msPerDay)
+
+  const fulfilledRequestsInWindow = requests.filter((req) => {
+    if (req.status !== 'fulfilled') return false
+    if (!req.request_date) return false
+    const d = new Date(req.request_date)
+    return d >= windowStart && d <= now
   })
 
-  // Group historical wastage by date and component type, filter by componentFilter
-  const historicalChartData = historicalWastage?.wastageByDate
-    ? historicalWastage.wastageByDate
-        .filter((item) => {
-          if (componentFilter === 'all') return true
-          return (item.component_type || 'whole_blood') === componentFilter
+  const usageByBloodType = fulfilledRequestsInWindow.reduce((acc, req) => {
+    const bt = req.blood_type || req.bloodType
+    if (!bt) return acc
+    const units = req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0
+    acc[bt] = (acc[bt] || 0) + Number(units || 0)
+    return acc
+  }, {})
+
+  const stockByBloodType = inventory
+    .filter((item) => item.status !== 'expired')
+    .reduce((acc, item) => {
+      const bt = item.blood_type || item.bloodType
+      if (!bt) return acc
+      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
+      acc[bt] = (acc[bt] || 0) + Number(units || 0)
+      return acc
+    }, {})
+
+  const bloodShortageForecast = Object.entries(stockByBloodType).map(([bloodType, currentStock]) => {
+    const usedInWindow = usageByBloodType[bloodType] || 0
+    const averageDailyUsage =
+      usedInWindow > 0 ? usedInWindow / Math.max(1, usageWindowDays) : 0
+    const daysRemaining =
+      averageDailyUsage > 0 ? currentStock / averageDailyUsage : Infinity
+
+    let status = 'sufficient'
+    if (daysRemaining < 7) status = 'critical'
+    else if (daysRemaining < 14) status = 'low'
+
+    return {
+      bloodType,
+      currentStock,
+      estimatedDaysRemaining: daysRemaining === Infinity ? '—' : daysRemaining.toFixed(1),
+      numericDaysRemaining: daysRemaining,
+      status,
+    }
+  })
+
+  bloodShortageForecast.sort((a, b) => a.numericDaysRemaining - b.numericDaysRemaining)
+
+  const getSupplyStatusClasses = (status) => {
+    if (status === 'critical') return 'bg-red-50 text-red-700 ring-red-200'
+    if (status === 'low') return 'bg-yellow-50 text-yellow-700 ring-yellow-200'
+    return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+  }
+
+  const getSupplyStatusLabel = (status) => {
+    if (status === 'critical') return 'Critical'
+    if (status === 'low') return 'Low'
+    return 'Sufficient'
+  }
+
+  // Blood Usage Trends (fulfilled usage in window)
+  const bloodUsageTrendsData = Object.entries(usageByBloodType)
+    .map(([bloodType, unitsUsed]) => ({ bloodType, unitsUsed }))
+    .sort((a, b) => b.unitsUsed - a.unitsUsed)
+
+  // Donor Availability Forecast
+  const donorBuckets = {
+    tomorrow: 0, // now
+    within3: 0, // within 7 days
+    within7: 0, // within 30 days
+  }
+
+  donors.forEach((donor) => {
+    // If donor has never donated, treat as eligible now
+    if (!donor.last_donation_date && !donor.lastDonationDate) {
+      donorBuckets.tomorrow += 1
+      return
+    }
+    const lastDate = donor.last_donation_date || donor.lastDonationDate
+    const donationType =
+      donor.last_donation_type || donor.lastDonationType || 'whole_blood'
+
+    let waitDays = 56
+    if (donationType === 'platelets') waitDays = 7
+    else if (donationType === 'plasma') waitDays = 28
+
+    const nextEligibleDate = new Date(lastDate)
+    nextEligibleDate.setDate(nextEligibleDate.getDate() + waitDays)
+
+    const daysUntilEligible = Math.round((nextEligibleDate - now) / msPerDay)
+
+    if (daysUntilEligible <= 0) {
+      // Eligible now
+      donorBuckets.tomorrow += 1
+    } else if (daysUntilEligible > 0 && daysUntilEligible <= 7) {
+      // Within 7 days
+      donorBuckets.within3 += 1
+    } else if (daysUntilEligible > 7 && daysUntilEligible <= 30) {
+      // Within 30 days
+      donorBuckets.within7 += 1
+    }
+  })
+
+  // Blood Expiry Risk Detection
+  const expiryThresholdDays = 7
+  const expiringSoonMap = inventory.reduce((acc, item) => {
+    if (item.status === 'expired') return acc
+    const bt = item.blood_type || item.bloodType
+    if (!bt) return acc
+    const expDate = item.expiration_date || item.expirationDate
+    if (!expDate) return acc
+    const daysLeft = diffInDays(expDate, now)
+    const units = Number(
+      item.available_units ?? item.availableUnits ?? item.units ?? 0,
+    )
+    if (daysLeft <= expiryThresholdDays && units > 0) {
+      if (!acc[bt]) acc[bt] = { units: 0, minDaysLeft: daysLeft }
+      acc[bt].units += units
+      acc[bt].minDaysLeft = Math.min(acc[bt].minDaysLeft, daysLeft)
+    }
+    return acc
+  }, {})
+
+  const expiringBloodList = Object.entries(expiringSoonMap)
+    .map(([bloodType, info]) => ({
+      bloodType,
+      units: info.units,
+      minDaysLeft: info.minDaysLeft,
+    }))
+    .sort((a, b) => a.minDaysLeft - b.minDaysLeft)
+
+  // ---------- PRESCRIPTIVE ANALYTICS ----------
+
+  // Transfer Recommendations between hospitals
+  const criticalThreshold = 10
+  const sufficientThreshold = 20
+
+  const hospitalStockByBlood = inventory
+    .filter((item) => item.hospital_id || item.hospitalId)
+    .reduce((acc, item) => {
+      const hospitalId = item.hospital_id || item.hospitalId
+      const bt = item.blood_type || item.bloodType
+      if (!hospitalId || !bt) return acc
+      const key = `${hospitalId}|${bt}`
+      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
+      acc[key] = (acc[key] || 0) + Number(units || 0)
+      return acc
+    }, {})
+
+  const groupedByBloodType = {}
+  Object.entries(hospitalStockByBlood).forEach(([key, units]) => {
+    const [hospitalIdStr, bt] = key.split('|')
+    const hospitalId = Number(hospitalIdStr)
+    if (!groupedByBloodType[bt]) groupedByBloodType[bt] = []
+    let level = 'sufficient'
+    if (units < criticalThreshold) level = 'critical'
+    else if (units <= sufficientThreshold) level = 'low'
+    groupedByBloodType[bt].push({ hospitalId, units, level })
+  })
+
+  const transferRecommendations = []
+  Object.entries(groupedByBloodType).forEach(([bloodType, hospitalsForType]) => {
+    const criticalHospitals = hospitalsForType.filter((h) => h.level === 'critical')
+    const sufficientHospitals = hospitalsForType.filter((h) => h.level === 'sufficient')
+
+    criticalHospitals.forEach((criticalHospital) => {
+      sufficientHospitals.forEach((sourceHospital) => {
+        const maxSendable = sourceHospital.units - sufficientThreshold
+        if (maxSendable <= 0) return
+        const needed = criticalThreshold - criticalHospital.units
+        if (needed <= 0) return
+        const suggestedUnits = Math.min(maxSendable, needed)
+        if (suggestedUnits <= 0) return
+        transferRecommendations.push({
+          bloodType,
+          sourceHospitalId: sourceHospital.hospitalId,
+          destinationHospitalId: criticalHospital.hospitalId,
+          sourceHospitalName: getHospitalName(sourceHospital.hospitalId),
+          destinationHospitalName: getHospitalName(criticalHospital.hospitalId),
+          suggestedUnits,
         })
-        .reduce((acc, item) => {
-          const date = item.date
-          const existing = acc.find((a) => a.date === date)
-          if (existing) {
-            existing.total += item.wasted_units || 0
-          } else {
-            acc.push({ date, total: item.wasted_units || 0 })
-          }
-          return acc
-        }, [])
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .slice(-30) // Last 30 days
-    : []
+      })
+    })
+  })
 
-  // Use historicalChartData directly (already aggregated by date)
-  const aggregatedChartData = historicalChartData
+  transferRecommendations.sort((a, b) => b.suggestedUnits - a.suggestedUnits)
 
-  // Prepare high-risk inventory items for the table, de-duplicated by inventory/id to avoid double counting.
-  // Only include central inventory (exclude hospital-owned inventory rows).
-  const highRiskInventoryRows = (() => {
-    if (!predictions?.inventoryWithRisk) return []
-
-    const seenKeys = new Set()
-    const result = []
-
-    const filtered = predictions.inventoryWithRisk.filter((item) => {
-      // Exclude hospital inventory; we only want central stock here
-      if (item.hospital_id && item.hospital_id !== 0) return false
-      if (item.riskScore < 50) return false
-      if (componentFilter === 'all') return true
-      return (item.component_type || 'whole_blood') === componentFilter
+  // Urgent or Critical Hospital Requests
+  const urgentRequests = requests
+    .filter((req) => {
+      const status = (req.status || '').toLowerCase()
+      if (status === 'fulfilled' || status === 'completed' || status === 'cancelled') {
+        return false
+      }
+      const priority = (req.priority || 'normal').toLowerCase()
+      return priority === 'urgent' || priority === 'critical'
+    })
+    .sort((a, b) => {
+      const priOrder = { critical: 2, urgent: 1 }
+      const pa = priOrder[(a.priority || 'urgent').toLowerCase()] || 0
+      const pb = priOrder[(b.priority || 'urgent').toLowerCase()] || 0
+      if (pa !== pb) return pb - pa
+      const da = a.request_date ? new Date(a.request_date) : 0
+      const db = b.request_date ? new Date(b.request_date) : 0
+      return da - db
     })
 
-    for (const item of filtered) {
-      const key =
-        item.inventory_id ??
-        item.inventoryId ??
-        item.id ??
-        `${item.blood_type || ''}|${item.component_type || 'whole_blood'}|${
-          item.expiration_date || item.expirationDate || item.days_until_expiry || ''
-        }`
+  // Donor Contact Suggestions (for critically low or zero stock)
+  const shortageByBloodType = bloodShortageForecast.filter(
+    (b) => b.status === 'critical' || (b.currentStock || 0) === 0,
+  )
 
-      if (seenKeys.has(key)) continue
-      seenKeys.add(key)
-      result.push(item)
+  const eligibleDonorSuggestions = shortageByBloodType.flatMap((shortage) => {
+    const bt = shortage.bloodType
+    const matchingDonors = donors.filter((donor) => {
+      const donorBt = donor.blood_type || donor.bloodType
+      if (donorBt !== bt) return false
+      if (!donor.last_donation_date && !donor.lastDonationDate) return true
+      const lastDate = donor.last_donation_date || donor.lastDonationDate
+      const donationType =
+        donor.last_donation_type || donor.lastDonationType || 'whole_blood'
+      let waitDays = 56
+      if (donationType === 'platelets') waitDays = 7
+      else if (donationType === 'plasma') waitDays = 28
+      const nextEligibleDate = new Date(lastDate)
+      nextEligibleDate.setDate(nextEligibleDate.getDate() + waitDays)
+      return nextEligibleDate <= now
+    })
+    return matchingDonors.slice(0, 5).map((donor) => ({
+      bloodType: bt,
+      donorName:
+        donor.full_name ||
+        donor.fullName ||
+        donor.donor_name ||
+        donor.donorName ||
+        donor.username ||
+        'Unnamed donor',
+    }))
+  })
+
+  // Expiring Blood Action Suggestions
+  const usageByHospitalAndBlood = requests.reduce((acc, req) => {
+    const bt = req.blood_type || req.bloodType
+    const hospitalName = req.hospital_name || req.hospitalName
+    if (!bt || !hospitalName) return acc
+    const key = `${hospitalName}|${bt}`
+    const units = req.units_requested ?? 0
+    acc[key] = (acc[key] || 0) + Number(units || 0)
+    return acc
+  }, {})
+
+  const expiringActionMap = inventory.reduce((acc, item) => {
+    if (item.status === 'expired') return acc
+    const bt = item.blood_type || item.bloodType
+    if (!bt) return acc
+    const expDate = item.expiration_date || item.expirationDate
+    if (!expDate) return acc
+    const daysLeft = diffInDays(expDate, now)
+    if (daysLeft > expiryThresholdDays) return acc
+    const units = Number(
+      item.available_units ?? item.availableUnits ?? item.units ?? 0,
+    )
+    if (units <= 0) return acc
+    if (!acc[bt]) acc[bt] = { units: 0, daysLeft }
+    acc[bt].units += units
+    acc[bt].daysLeft = Math.min(acc[bt].daysLeft, daysLeft)
+    return acc
+  }, {})
+
+  const expiringActionSuggestions = Object.entries(expiringActionMap).map(
+    ([bloodType, info]) => {
+      let bestHospital = null
+      let bestUsage = 0
+      Object.entries(usageByHospitalAndBlood).forEach(([key, usage]) => {
+        const [hospitalName, bt] = key.split('|')
+        if (bt !== bloodType) return
+        if (usage > bestUsage) {
+          bestUsage = usage
+          bestHospital = hospitalName
+        }
+      })
+      return {
+        bloodType,
+        units: info.units,
+        daysLeft: info.daysLeft,
+        suggestedHospital: bestHospital,
+      }
+    },
+  )
+
+  expiringActionSuggestions.sort((a, b) => a.daysLeft - b.daysLeft)
+
+  const handleFulfillRequest = async (requestId) => {
+    try {
+      await apiRequest(`/api/admin/requests/${requestId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'fulfilled',
+        }),
+      })
+      // Refresh only the requests list so analytics update
+      const updatedRequests = await apiRequest('/api/admin/requests')
+      setRequests(updatedRequests || [])
+    } catch (err) {
+      console.error('Failed to fulfill request from reports page', err)
+      // Keep it simple here; main status handling is on the Requests page
     }
-
-    return result
-  })()
+  }
 
   return (
-    <AdminLayout pageTitle="Reports & Analytics" pageDescription="View detailed reports and system analytics.">
-      {/* Tabs and Component Filter */}
+    <AdminLayout
+      pageTitle="Reports & Analytics"
+      pageDescription="View predictive and prescriptive analytics for inventory, donors, and hospital requests."
+    >
+      {/* Tabs */}
       <div className="mb-4 flex items-center justify-between border-b border-slate-200">
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab('analytics')}
+            onClick={() => setActiveTab('prescriptive')}
             className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
-              activeTab === 'analytics'
+              activeTab === 'prescriptive'
                 ? 'border-red-600 text-red-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            Analytics
+            Prescriptive Analytics
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('reports')}
+            onClick={() => setActiveTab('predictive')}
             className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
-              activeTab === 'reports'
+              activeTab === 'predictive'
                 ? 'border-red-600 text-red-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            Reports
+            Predictive Analytics
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-600">Filter:</span>
-          <button
-            type="button"
-            onClick={() => setComponentFilter('all')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-              componentFilter === 'all'
-                ? 'bg-red-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            onClick={() => setComponentFilter('whole_blood')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-              componentFilter === 'whole_blood'
-                ? 'bg-red-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Whole Blood
-          </button>
-          <button
-            type="button"
-            onClick={() => setComponentFilter('platelets')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-              componentFilter === 'platelets'
-                ? 'bg-red-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Platelets
-          </button>
-          <button
-            type="button"
-            onClick={() => setComponentFilter('plasma')}
-            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-              componentFilter === 'plasma'
-                ? 'bg-red-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Plasma
-          </button>
-        </div>
+        <div />
       </div>
 
-      {/* Analytics content */}
-      {activeTab === 'analytics' && (
+      {isLoading && (
+        <div className="mt-6 rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-100">
+          <p className="text-sm text-slate-500">Loading reports and analytics...</p>
+        </div>
+      )}
+
+      {!isLoading && error && (
+        <div className="mt-6 rounded-2xl bg-red-50 p-4 shadow-sm ring-1 ring-red-100">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {!isLoading && !error && (
         <>
-          {isLoading ? (
-            <div className="mt-4 rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-100">
-              <p className="text-sm text-slate-500">Loading analytics...</p>
-            </div>
-          ) : error ? (
-            <div className="mt-4 rounded-2xl bg-red-50 p-4 shadow-sm ring-1 ring-red-100">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          ) : (
-            <>
-              {/* Summary Cards */}
-              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <p className="text-[11px] font-medium text-slate-500">Total At Risk</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">
-                    {componentFilter === 'all'
-                      ? predictions?.summary?.totalAtRisk || 0
-                      : predictions?.inventoryWithRisk
-                          ?.filter((item) => (item.component_type || 'whole_blood') === componentFilter)
-                          .reduce((sum, item) => sum + item.available_units, 0) || 0}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-400">units</p>
+          {/* Prescriptive Analytics */}
+          {activeTab === 'prescriptive' && (
+            <div className="mt-6 space-y-6">
+              {/* Transfer Recommendations */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">Transfer Recommendations</h2>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Balance stocks by moving surplus units to hospitals with critical shortages.
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
+                    {transferRecommendations.length} suggestions
+                  </span>
                 </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <p className="text-[11px] font-medium text-slate-500">High Risk Items</p>
-                  <p className="mt-1 text-2xl font-semibold text-red-600">
-                    {componentFilter === 'all'
-                      ? predictions?.summary?.highRiskItems || 0
-                      : predictions?.inventoryWithRisk?.filter(
-                          (item) => item.riskScore >= 70 && (item.component_type || 'whole_blood') === componentFilter,
-                        ).length || 0}
+                {transferRecommendations.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No transfer recommendations at the moment.
                   </p>
-                  <p className="mt-1 text-[10px] text-slate-400">items</p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <p className="text-[11px] font-medium text-slate-500">Avg Risk Score</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">
-                    {(() => {
-                      if (componentFilter === 'all') return predictions?.summary?.averageRiskScore || 0
-                      const filtered = predictions?.inventoryWithRisk?.filter(
-                        (item) => (item.component_type || 'whole_blood') === componentFilter,
-                      ) || []
-                      return filtered.length > 0
-                        ? Math.round(filtered.reduce((sum, item) => sum + item.riskScore, 0) / filtered.length)
-                        : 0
-                    })()}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-400">out of 100</p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <p className="text-[11px] font-medium text-slate-500">Recommendations</p>
-                  <p className="mt-1 text-2xl font-semibold text-blue-600">
-                    {componentFilter === 'all'
-                      ? prescriptions?.summary?.totalRecommendations || 0
-                      : prescriptions?.transferRecommendations?.filter(
-                          (rec) => (rec.componentType || 'whole_blood') === componentFilter,
-                        ).length || 0}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-400">actions available</p>
-                </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-100 text-xs">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">From</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">To</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Units</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white">
+                        {transferRecommendations.slice(0, 20).map((rec, idx) => (
+                          <tr
+                            key={idx}
+                            className={
+                              'transition-colors hover:bg-slate-50 ' +
+                              (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
+                            }
+                          >
+                            <td className="px-3 py-2">
+                              <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
+                                {rec.bloodType}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {rec.sourceHospitalName}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {rec.destinationHospitalName}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
+                              <span className="inline-flex min-w-[2.5rem] items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
+                                {rec.suggestedUnits}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </section>
 
-              {/* Predictive Analytics Section */}
-              <section className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-                <div className="border-b border-slate-100 px-6 py-4">
-                  <p className="text-base font-semibold text-slate-900">Predictive Analytics</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Wastage risk predictions and forecasts based on current inventory
-                  </p>
-                </div>
-                <div className="p-6">
-                  {/* Wastage Forecast Chart */}
-                  <div className="mb-10">
-                    <h3 className="mb-4 text-sm font-semibold text-slate-900">Predicted Wastage Forecast</h3>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={wastageForecastData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
-                        <XAxis
-                          dataKey="period"
-                          tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
-                          stroke="#64748b"
-                          tickLine={{ stroke: '#64748b' }}
-                        >
-                          <Label value="Time Period" offset={-5} position="insideBottom" style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }} />
-                        </XAxis>
-                        <YAxis
-                          tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
-                          stroke="#64748b"
-                          tickLine={{ stroke: '#64748b' }}
-                        >
-                          <Label
-                            value="Predicted Units"
-                            angle={-90}
-                            position="insideLeft"
-                            style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }}
-                          />
-                        </YAxis>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '2px solid #e2e8f0',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            padding: '10px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                          }}
-                          formatter={(value) => [`${value} units`, 'Predicted Wastage']}
-                          labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
-                        />
-                        <Legend
-                          wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '10px' }}
-                        />
-                        <Bar
-                          dataKey="predicted"
-                          fill="#dc2626"
-                          radius={[6, 6, 0, 0]}
-                          name="Predicted Wastage (units)"
-                        >
-                          <LabelList
-                            dataKey="predicted"
-                            position="top"
-                            style={{ fontSize: 12, fill: '#1e293b', fontWeight: 600 }}
-                            formatter={(value) => `${value}`}
-                          />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+              {/* Urgent / Critical Requests */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      Urgent &amp; Critical Requests
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Prioritize hospitals with the most time-sensitive needs.
+                    </p>
                   </div>
-
-                  {/* Risk by Blood Type & Component Type */}
-                  {wastageByBloodTypeData.length > 0 && (
-                    <div className="mb-10">
-                      <h3 className="mb-4 text-sm font-semibold text-slate-900">
-                        Risk by Blood Type & Component
-                        {componentFilter !== 'all' && (
-                          <span className="ml-2 text-xs font-normal text-slate-500">
-                            ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
-                          </span>
-                        )}
-                      </h3>
-                      <ResponsiveContainer width="100%" height={320}>
-                        <PieChart>
-                          <Pie
-                            data={wastageByBloodTypeData}
-                            dataKey="totalAtRisk"
-                            nameKey="bloodType"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={100}
-                            innerRadius={40}
-                            label={({ bloodType, componentType, totalAtRisk, percent }) => {
-                              const componentLabel = componentType === 'whole_blood' ? 'WB' : componentType === 'platelets' ? 'PLT' : 'PLA'
-                              return `${bloodType} ${componentLabel}\n${totalAtRisk} units\n(${(percent * 100).toFixed(1)}%)`
-                            }}
-                            labelLine={{ stroke: '#475569', strokeWidth: 1 }}
-                            style={{ fontSize: 12, fontWeight: 500 }}
-                          >
-                            {wastageByBloodTypeData.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={COLORS[index % COLORS.length]}
-                                stroke="#ffffff"
-                                strokeWidth={2}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'white',
-                              border: '2px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '13px',
-                              fontWeight: 500,
-                              padding: '10px',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                            }}
-                            formatter={(value, name, props) => {
-                              const componentLabel = props.payload.componentType === 'whole_blood' ? 'Whole Blood' : props.payload.componentType === 'platelets' ? 'Platelets' : 'Plasma'
-                              const total = wastageByBloodTypeData.reduce((sum, item) => sum + item.totalAtRisk, 0)
-                              return [
-                                `${value} units (${total > 0 ? ((value / total) * 100).toFixed(1) : 0}%)`,
-                                `${props.payload.bloodType} ${componentLabel}`,
-                              ]
-                            }}
-                            labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
-                          />
-                          <Legend
-                            verticalAlign="bottom"
-                            height={36}
-                            wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '15px' }}
-                            formatter={(value, entry) => {
-                              const componentLabel = entry.payload.componentType === 'whole_blood' ? 'Whole Blood' : entry.payload.componentType === 'platelets' ? 'Platelets' : 'Plasma'
-                              return `${entry.payload.bloodType} ${componentLabel}: ${entry.payload.totalAtRisk} units`
-                            }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-
-                  {/* High Risk Inventory Table - prominent card with color */}
-                  <div className="rounded-xl border-2 border-red-200 bg-red-50/30 ring-1 ring-red-100">
-                    <div className="flex items-center gap-2 border-b border-red-200/60 px-4 py-3 bg-red-100/50">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white" aria-hidden>
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                      </span>
-                      <h3 className="text-sm font-bold text-red-900">
-                        High Risk Inventory Items
-                        {componentFilter !== 'all' && (
-                          <span className="ml-2 text-sm font-normal text-red-700">
-                            ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
-                          </span>
-                        )}
-                      </h3>
-                    </div>
-                    <div className="overflow-x-auto p-4">
-                      <table className="min-w-full divide-y divide-red-200/60 text-sm">
-                        <thead>
-                          <tr className="bg-red-100/40">
-                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
-                              Blood Type
-                            </th>
-                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
-                              Component Type
-                            </th>
-                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
-                              Units
-                            </th>
-                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
-                              Days Until Expiry
-                            </th>
-                            <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-red-800">
-                              Risk Score
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-red-200/40 bg-white/80">
-                          {highRiskInventoryRows.slice(0, 10).map((item) => {
-                              const isCritical = item.riskScore >= 70
-                              const isHigh = item.riskScore >= 50 && item.riskScore < 70
-                              const rowBg = isCritical ? 'bg-red-100/50' : isHigh ? 'bg-amber-50/60' : 'bg-white'
-                              return (
-                                <tr key={item.id} className={`${rowBg} hover:opacity-90 transition`}>
-                                  <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                                    {item.blood_type}
-                                  </td>
-                                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                                    {item.component_type === 'whole_blood' ? 'Whole Blood' : item.component_type === 'platelets' ? 'Platelets' : item.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
-                                  </td>
-                                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                                    {item.available_units}
-                                  </td>
-                                  <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                                    {item.days_until_expiry} days
-                                  </td>
-                                  <td className="whitespace-nowrap px-4 py-3">
-                                    <span
-                                      className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-bold ring-2 ${getRiskColor(
-                                        item.riskScore,
-                                      )}`}
-                                    >
-                                      {item.riskScore}
-                                    </span>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          {highRiskInventoryRows.length === 0 && (
-                            <tr>
-                              <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
-                                No high-risk items found
-                                {componentFilter !== 'all' &&
-                                  ` for ${
-                                    componentFilter === 'whole_blood'
-                                      ? 'Whole Blood'
-                                      : componentFilter === 'platelets'
-                                      ? 'Platelets'
-                                      : 'Plasma'
-                                  }`}
+                  <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
+                    {urgentRequests.length} active
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-100 text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Hospital</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Units</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Priority</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {urgentRequests.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
+                            No urgent or critical requests.
+                          </td>
+                        </tr>
+                      ) : (
+                        urgentRequests.slice(0, 20).map((req, idx) => {
+                          const priority = (req.priority || 'normal').toLowerCase()
+                          const priorityClasses =
+                            priority === 'critical'
+                              ? 'bg-red-50 text-red-700 ring-red-100'
+                              : 'bg-orange-50 text-orange-700 ring-orange-100'
+                          const rowBg = priority === 'critical' ? 'bg-red-50/40' : 'bg-white'
+                          return (
+                            <tr
+                              key={req.id}
+                              className={`transition-colors hover:bg-slate-50 ${idx % 2 === 1 ? 'bg-slate-50/40' : rowBg}`}
+                            >
+                              <td className="px-3 py-2 text-xs font-semibold text-slate-900">
+                                {req.hospital_name}
+                              </td>
+                              <td className="px-3 py-2 text-xs font-semibold text-slate-900">
+                                {req.blood_type}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-slate-700">
+                                {req.units_requested}
+                              </td>
+                              <td className="px-3 py-2 text-xs">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${priorityClasses}`}
+                                >
+                                  {(req.priority || 'normal').toUpperCase()}
+                                </span>
                               </td>
                             </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
 
-              {/* Prescriptive Analytics Section - prominent card with color */}
-              <section className="mt-6 overflow-hidden rounded-xl border-2 border-blue-200 bg-blue-50/20 ring-1 ring-blue-100">
-                <div className="flex items-center gap-2 border-b border-blue-200/60 px-4 py-3 bg-blue-100/50">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white" aria-hidden>
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </span>
+              {/* Donor Contact Suggestions */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-bold text-blue-900">Prescriptive Analytics</p>
-                    <p className="text-xs text-blue-700">
-                      Actionable recommendations to reduce wastage
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      Donor Contact Suggestions
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Top donors to reach out to for critically low or zero-stock blood types.
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
+                    {eligibleDonorSuggestions.length} suggested
+                  </span>
+                </div>
+                {eligibleDonorSuggestions.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No eligible donors to suggest at the moment.
+                  </p>
+                ) : (
+                  <ul className="space-y-2 text-xs text-slate-700">
+                    {eligibleDonorSuggestions.slice(0, 15).map((d, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
+                      >
+                        <span className="font-semibold text-slate-900 truncate">
+                          {d.donorName}
+                        </span>
+                        <span className="ml-3 inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
+                          {d.bloodType}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {/* Expiring Blood Action Suggestions */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-amber-100/80">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-amber-900">
+                      Expiring Blood Action Suggestions
+                    </h2>
+                    <p className="mt-1 text-[11px] text-amber-800">
+                      Redirect near-expiry units to the hospitals most likely to use them.
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
+                    {expiringActionSuggestions.length} at risk
+                  </span>
+                </div>
+                {expiringActionSuggestions.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No units are within the expiry risk threshold.
+                  </p>
+                ) : (
+                  <ul className="space-y-2 text-xs text-slate-700">
+                    {expiringActionSuggestions.slice(0, 15).map((item, idx) => (
+                      <li
+                        key={idx}
+                        className="flex flex-col rounded-lg bg-amber-50 px-3 py-2 ring-1 ring-amber-100"
+                      >
+                        <span className="font-semibold text-amber-900">
+                          {item.bloodType} – {item.units} unit(s), {item.daysLeft} day(s) left
+                        </span>
+                        <span className="text-amber-800">
+                          Suggested destination:{' '}
+                          {item.suggestedHospital || 'high-demand hospital not identified yet'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* Predictive Analytics */}
+          {activeTab === 'predictive' && (
+            <div className="mt-6 space-y-6">
+              {/* Blood Shortage Forecast */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      Blood Shortage Forecast
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Estimate how long each blood type will last based on the last 30 days of usage.
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
+                    {bloodShortageForecast.length} blood types tracked
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-100 text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Stock</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">
+                          Est. Days Remaining
+                        </th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {bloodShortageForecast.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
+                            No active inventory to forecast.
+                          </td>
+                        </tr>
+                      ) : (
+                        bloodShortageForecast.map((row, idx) => (
+                          <tr
+                            key={row.bloodType}
+                            className={
+                              'transition-colors hover:bg-slate-50 ' +
+                              (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
+                            }
+                          >
+                            <td className="px-3 py-2 text-xs font-semibold text-slate-900">
+                              {row.bloodType}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {row.currentStock}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {row.estimatedDaysRemaining === '—'
+                                ? 'No recent usage'
+                                : `${row.estimatedDaysRemaining} days`}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${getSupplyStatusClasses(
+                                  row.status,
+                                )}`}
+                              >
+                                {getSupplyStatusLabel(row.status)}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {/* Blood Usage Trends */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      Blood Usage Trends
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Compare which blood types are most frequently requested over time.
                     </p>
                   </div>
                 </div>
-                <div className="p-6">
-                  {/* Unavailable Requested Components */}
-                  {Array.isArray(prescriptions?.unavailableRequests) &&
-                    prescriptions.unavailableRequests.length > 0 && (
-                      <div className="mb-8 rounded-xl border-2 border-red-200 bg-red-50/40 p-4">
-                        <h3 className="mb-2 text-sm font-bold text-red-900">
-                          Unavailable Requested Components
-                        </h3>
-                        <p className="mb-3 text-[11px] text-red-700">
-                          Pending hospital requests for whole blood, platelets, or plasma that are currently out of
-                          stock in central inventory.
-                        </p>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-red-200/70 text-xs">
-                            <thead className="bg-red-100/60">
-                              <tr>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
-                                  Hospital
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
-                                  Blood / Component
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
-                                  Units
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
-                                  Stock
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
-                                  Priority
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-red-800">
-                                  Recommended Action
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-red-100 bg-white">
-                              {prescriptions.unavailableRequests
-                                .filter((req) => {
-                                  if (componentFilter === 'all') return true
-                                  return (req.component_type || 'whole_blood') === componentFilter
-                                })
-                                .map((req) => {
-                                  const isCritical = req.priority === 'critical'
-                                  const isUrgent = req.priority === 'urgent'
-                                  const rowBg = isCritical
-                                    ? 'bg-red-50'
-                                    : isUrgent
-                                    ? 'bg-orange-50/60'
-                                    : 'bg-white'
-                                  return (
-                                    <tr key={req.id} className={`${rowBg} hover:bg-red-50/70 transition`}>
-                                      <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-slate-900">
-                                        {req.hospital_name}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-800">
-                                        {req.blood_type}{' '}
-                                        {req.component_type === 'platelets'
-                                          ? '· Platelets'
-                                          : req.component_type === 'plasma'
-                                          ? '· Plasma'
-                                          : '· Whole Blood'}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-xs">
-                                        <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-200">
-                                          {req.units_requested}
-                                        </span>
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-[11px] font-semibold text-red-700">
-                                        Out of Stock
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-xs">
-                                        <span
-                                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ring-1 ${
-                                            isCritical
-                                              ? 'bg-red-50 text-red-700 ring-red-200'
-                                              : isUrgent
-                                              ? 'bg-orange-50 text-orange-700 ring-orange-200'
-                                              : 'bg-slate-50 text-slate-700 ring-slate-200'
-                                          }`}
-                                        >
-                                          {isCritical ? 'Critical' : isUrgent ? 'Urgent' : 'Normal'}
-                                        </span>
-                                      </td>
-                                      <td className="px-3 py-2 text-[11px] text-slate-800">
-                                        {req.recommendedAction}
-                                      </td>
-                                    </tr>
-                                  )
-                                })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Urgent / Critical Hospital Requests (only those that are not out-of-stock) */}
-                  {(() => {
-                    if (!Array.isArray(prescriptions?.priorityRequests)) return null
-
-                    const unavailableIds = new Set(
-                      (prescriptions.unavailableRequests || []).map((req) => req.id),
-                    )
-
-                    const visiblePriorityRequests = prescriptions.priorityRequests.filter(
-                      (req) => !unavailableIds.has(req.id),
-                    )
-
-                    if (visiblePriorityRequests.length === 0) return null
-
-                    return (
-                      <div className="mb-8 rounded-xl border border-blue-200 bg-white/80 p-4">
-                        <h3 className="mb-3 text-sm font-bold text-blue-900">
-                          Urgent &amp; Critical Hospital Requests
-                        </h3>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-blue-100 text-xs">
-                            <thead className="bg-blue-50/60">
-                              <tr>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
-                                  Hospital
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
-                                  Blood / Component
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
-                                  Units
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
-                                  Priority
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left font-semibold uppercase tracking-wide text-blue-800">
-                                  Requested
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-blue-50 bg-white">
-                              {visiblePriorityRequests.map((req) => (
-                                <tr key={req.id} className="hover:bg-blue-50/50">
-                                  <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-slate-900">
-                                    {req.hospital_name}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-700">
-                                    {req.blood_type}{' '}
-                                    {req.component_type === 'platelets'
-                                      ? '· Platelets'
-                                      : req.component_type === 'plasma'
-                                      ? '· Plasma'
-                                      : '· Whole Blood'}
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-xs">
-                                    <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-100">
-                                      {req.units_requested}
-                                    </span>
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-xs">
-                                    <span
-                                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ring-1 ${
-                                        req.priority === 'critical'
-                                          ? 'bg-red-50 text-red-700 ring-red-100'
-                                          : 'bg-orange-50 text-orange-700 ring-orange-100'
-                                      }`}
-                                    >
-                                      {req.priority === 'critical' ? 'Critical' : 'Urgent'}
-                                    </span>
-                                  </td>
-                                  <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-700">
-                                    {req.request_date
-                                      ? new Date(req.request_date).toLocaleString()
-                                      : '—'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )
-                  })()}
-
-                  {/* Priority Actions */}
-                  {(() => {
-                    const filteredActions = (prescriptions?.priorityActions || []).filter((action) => {
-                      if (componentFilter === 'all') return true
-                      return !action.componentType || action.componentType === componentFilter
-                    })
-                    return filteredActions.length > 0 ? (
-                      <div className="mb-8">
-                        <h3 className="mb-4 text-base font-bold text-blue-900">
-                          Priority Actions
-                          {componentFilter !== 'all' && (
-                            <span className="ml-2 text-sm font-normal text-blue-700">
-                              ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
-                            </span>
-                          )}
-                        </h3>
-                        <div className="space-y-4">
-                          {filteredActions.map((action, index) => (
-                          <div
-                            key={index}
-                            className={`rounded-xl border-2 p-5 ring-1 ${getPriorityColor(action.priority)}`}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span
-                                    className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-bold uppercase ring-2 ${getPriorityColor(
-                                      action.priority,
-                                    )}`}
-                                  >
-                                    {action.priority}
-                                  </span>
-                                  <p className="text-base font-semibold text-slate-900">{action.title}</p>
-                                </div>
-                                <p className="mt-3 text-sm text-slate-600">{action.description}</p>
-                                <p className="mt-3 text-sm font-semibold text-slate-700">
-                                  💡 {action.action}
-                                </p>
-                                {action.bloodTypes && (
-                                  <div className="mt-3 flex flex-wrap gap-2">
-                                    {action.bloodTypes.map((bt) => (
-                                      <span
-                                        key={bt}
-                                        className="inline-flex items-center rounded-lg bg-slate-200/80 px-3 py-1.5 text-sm font-medium text-slate-800"
-                                      >
-                                        {bt}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                {action.componentType && (
-                                  <div className="mt-2">
-                                    <span className="inline-flex items-center rounded-lg bg-blue-200 px-3 py-1.5 text-sm font-medium text-blue-800">
-                                      Component: {action.componentType === 'whole_blood' ? 'Whole Blood' : action.componentType === 'platelets' ? 'Platelets' : 'Plasma'}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null
-                  })()}
-
-                  {/* Transfer Recommendations */}
-                  {(() => {
-                    const filteredRecommendations = (prescriptions?.transferRecommendations || []).filter(
-                      (rec) => {
-                        if (componentFilter === 'all') return true
-                        return (rec.componentType || 'whole_blood') === componentFilter
-                      },
-                    )
-                    return filteredRecommendations.length > 0 ? (
-                      <div className="rounded-xl border-2 border-blue-200/60 bg-white/60 overflow-hidden">
-                        <div className="flex items-center gap-2 border-b border-blue-200/60 px-4 py-3 bg-blue-100/40">
-                          <h3 className="text-sm font-bold text-blue-900">
-                            Transfer Recommendations
-                            {componentFilter !== 'all' && (
-                              <span className="ml-2 text-sm font-normal text-blue-700">
-                                ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
-                              </span>
-                            )}
-                          </h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-blue-200/50 text-sm">
-                            <thead>
-                              <tr className="bg-blue-100/40">
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
-                                  Priority
-                                </th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
-                                  Blood Type
-                                </th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
-                                  Component Type
-                                </th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
-                                  Units
-                                </th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
-                                  Days Until Expiry
-                                </th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
-                                  Transfer To
-                                </th>
-                                <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-blue-800">
-                                  Impact
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-blue-200/40 bg-white/80">
-                              {filteredRecommendations.map((rec, index) => {
-                                const isCritical = rec.priority === 'critical' || rec.priority === 'high'
-                                const isMedium = rec.priority === 'medium'
-                                const rowBg = isCritical ? 'bg-red-50/50' : isMedium ? 'bg-amber-50/50' : 'bg-blue-50/30'
-                                return (
-                                  <tr key={index} className={`${rowBg} hover:opacity-90 transition`}>
-                                    <td className="whitespace-nowrap px-4 py-3">
-                                      <span
-                                        className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-bold uppercase ring-2 ${getPriorityColor(
-                                          rec.priority,
-                                        )}`}
-                                      >
-                                        {rec.priority}
-                                      </span>
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                                      {rec.bloodType}
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                                      {rec.componentType === 'whole_blood' ? 'Whole Blood' : rec.componentType === 'platelets' ? 'Platelets' : rec.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'}
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">{rec.units}</td>
-                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                                      {rec.daysUntilExpiry} days
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                                      {rec.targetHospitalName}
-                                    </td>
-                                    <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
-                                      {rec.impact}
-                                    </td>
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    ) : null
-                  })()}
-                </div>
-              </section>
-            </>
-          )}
-        </>
-      )}
-
-      {/* Reports content */}
-      {activeTab === 'reports' && (
-        <>
-          {isLoading ? (
-            <div className="mt-4 rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-100">
-              <p className="text-sm text-slate-500">Loading reports...</p>
-            </div>
-          ) : error ? (
-            <div className="mt-4 rounded-2xl bg-red-50 p-4 shadow-sm ring-1 ring-red-100">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          ) : (
-            <>
-              {/* Summary Cards */}
-              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <p className="text-[11px] font-medium text-slate-500">Total Wastage (90 days)</p>
-                  <p className="mt-1 text-2xl font-semibold text-red-600">
-                    {(() => {
-                      if (componentFilter === 'all') {
-                        return historicalWastage?.totalWastage !== undefined
-                          ? Number(historicalWastage.totalWastage)
-                          : historicalWastage?.wastageByBloodType
-                            ? historicalWastage.wastageByBloodType.reduce(
-                                (sum, item) => sum + Number(item.total_wasted || 0),
-                                0,
-                              )
-                            : 0
-                      }
-                      // Filter by component type
-                      return (historicalWastage?.wastageByBloodType || [])
-                        .filter((item) => (item.component_type || 'whole_blood') === componentFilter)
-                        .reduce((sum, item) => sum + Number(item.total_wasted || 0), 0)
-                    })()}
+                {bloodUsageTrendsData.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    Not enough fulfilled requests to show usage trends.
                   </p>
-                  <p className="mt-1 text-[10px] text-slate-400">units wasted</p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <p className="text-[11px] font-medium text-slate-500">Wastage Reduction Potential</p>
-                  <p className="mt-1 text-2xl font-semibold text-blue-600">
-                    {componentFilter === 'all'
-                      ? prescriptions?.summary?.estimatedWastageReduction || 0
-                      : (prescriptions?.transferRecommendations || [])
-                          .filter((rec) => (rec.componentType || 'whole_blood') === componentFilter)
-                          .reduce((sum, rec) => sum + (rec.units || 0), 0)}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-400">units if recommendations followed</p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
-                  <p className="text-[11px] font-medium text-slate-500">Critical Actions</p>
-                  <p className="mt-1 text-2xl font-semibold text-orange-600">
-                    {componentFilter === 'all'
-                      ? prescriptions?.summary?.criticalActions || 0
-                      : (prescriptions?.priorityActions || []).filter(
-                          (action) =>
-                            action.priority === 'critical' &&
-                            (!action.componentType || action.componentType === componentFilter),
-                        ).length}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-400">urgent items</p>
-                </div>
-              </section>
-
-              {/* Historical Wastage Chart */}
-              <section className="mt-6">
-                <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-                  <h3 className="mb-5 text-base font-semibold text-slate-900">Historical Wastage Trend (Last 30 Days)</h3>
-                  {aggregatedChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={350}>
-                      <LineChart data={aggregatedChartData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
+                ) : (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={bloodUsageTrendsData}
+                        margin={{ top: 16, right: 20, left: 0, bottom: 24 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
-                          stroke="#64748b"
-                          tickLine={{ stroke: '#64748b' }}
-                          tickFormatter={(value) => {
-                            const date = new Date(value)
-                            return `${date.getMonth() + 1}/${date.getDate()}`
-                          }}
-                        >
-                          <Label value="Date" offset={-5} position="insideBottom" style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }} />
-                        </XAxis>
+                          dataKey="bloodType"
+                          tick={{ fontSize: 12, fill: '#475569' }}
+                          stroke="#cbd5f5"
+                        />
                         <YAxis
-                          tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
-                          stroke="#64748b"
-                          tickLine={{ stroke: '#64748b' }}
-                        >
-                          <Label
-                            value="Wasted Units"
-                            angle={-90}
-                            position="insideLeft"
-                            style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }}
-                          />
-                        </YAxis>
+                          tick={{ fontSize: 12, fill: '#475569' }}
+                          stroke="#cbd5f5"
+                        />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'white',
-                            border: '2px solid #e2e8f0',
+                            border: '1px solid #e2e8f0',
                             borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            padding: '10px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            fontSize: '12px',
                           }}
-                          labelFormatter={(value) => {
-                            const date = new Date(value)
-                            return `Date: ${date.toLocaleDateString()}`
-                          }}
-                          formatter={(value) => [`${value} units`, 'Wasted']}
-                          labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
+                          formatter={(value) => [`${value} units`, 'Units used']}
                         />
-                        <Legend
-                          wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '10px' }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="total"
-                          stroke="#dc2626"
-                          strokeWidth={3}
-                          name="Wasted Units"
-                          dot={{ r: 5, fill: '#dc2626', strokeWidth: 2, stroke: '#ffffff' }}
-                          activeDot={{ r: 7, fill: '#dc2626' }}
-                        />
-                      </LineChart>
+                        <Bar dataKey="unitsUsed" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                      </BarChart>
                     </ResponsiveContainer>
-                  ) : (
-                    <div className="flex h-[350px] items-center justify-center">
-                      <p className="text-sm text-slate-400">No historical wastage data available</p>
-                    </div>
-                  )}
+                  </div>
+                )}
+              </section>
+
+              {/* Donor Availability Forecast */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      Donor Availability Forecast
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Plan upcoming drives by seeing how soon existing donors can donate again.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3 text-xs text-slate-700">
+                  <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                    <p className="text-[11px] font-medium text-emerald-700">Eligible Now</p>
+                    <p className="mt-1 text-2xl font-semibold text-emerald-900">
+                      {donorBuckets.tomorrow}
+                    </p>
+                    <p className="mt-1 text-[11px] text-emerald-800">
+                      Can be contacted immediately for donation.
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-100">
+                    <p className="text-[11px] font-medium text-sky-700">
+                      Eligible within 7 days
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-sky-900">
+                      {donorBuckets.within3}
+                    </p>
+                    <p className="mt-1 text-[11px] text-sky-800">
+                      Short-term planning window for outreach.
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
+                    <p className="text-[11px] font-medium text-indigo-700">
+                      Eligible within 30 days
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-indigo-900">
+                      {donorBuckets.within7}
+                    </p>
+                    <p className="mt-1 text-[11px] text-indigo-800">
+                      Medium-term donor pipeline for future needs.
+                    </p>
+                  </div>
                 </div>
               </section>
 
-              {/* Wastage Distribution - full width */}
-              <section className="mt-6">
-                <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-                  <h3 className="mb-5 text-base font-semibold text-slate-900">
-                    Wastage Distribution (90 days)
-                    {componentFilter !== 'all' && (
-                      <span className="ml-2 text-sm font-normal text-slate-500">
-                        ({componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'})
-                      </span>
-                    )}
-                  </h3>
-                  {(() => {
-                    const filteredData = (historicalWastage?.wastageByBloodType || []).filter((item) => {
-                      if (componentFilter === 'all') return true
-                      return (item.component_type || 'whole_blood') === componentFilter
-                    })
-                    return Array.isArray(filteredData) && filteredData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={420}>
-                      <PieChart>
-                        <Pie
-                          data={filteredData}
-                          dataKey="total_wasted"
-                          nameKey="blood_type"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={140}
-                          innerRadius={56}
-                          label={({ blood_type, component_type, total_wasted, percent }) => {
-                            const componentLabel = component_type === 'whole_blood' ? 'WB' : component_type === 'platelets' ? 'PLT' : 'PLA'
-                            return `${blood_type} ${componentLabel}\n${total_wasted} units\n(${(percent * 100).toFixed(1)}%)`
-                          }}
-                          labelLine={{ stroke: '#475569', strokeWidth: 1 }}
-                          style={{ fontSize: 12, fontWeight: 500 }}
-                        >
-                          {filteredData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={COLORS[index % COLORS.length]}
-                              stroke="#ffffff"
-                              strokeWidth={2}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '2px solid #e2e8f0',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            padding: '10px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                          }}
-                          formatter={(value, name, props) => {
-                            const total = filteredData.reduce(
-                              (sum, item) => sum + (item.total_wasted || 0),
-                              0,
-                            )
-                            const componentLabel = props.payload.component_type === 'whole_blood' ? 'Whole Blood' : props.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
-                            return [
-                              `${value} units (${total > 0 ? ((value / total) * 100).toFixed(1) : 0}%)`,
-                              `${props.payload.blood_type} ${componentLabel}`,
-                            ]
-                          }}
-                          labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
-                        />
-                        <Legend
-                          verticalAlign="bottom"
-                          height={36}
-                          wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '15px' }}
-                          formatter={(value, entry) => {
-                            const componentLabel = entry.payload.component_type === 'whole_blood' ? 'Whole Blood' : entry.payload.component_type === 'platelets' ? 'Platelets' : 'Plasma'
-                            return `${entry.payload.blood_type} ${componentLabel}: ${entry.payload.total_wasted || 0} units`
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex h-[420px] items-center justify-center">
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-slate-600">No wastage distribution data</p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {historicalWastage
-                            ? `No expired ${componentFilter === 'all' ? 'blood units' : componentFilter === 'whole_blood' ? 'whole blood' : componentFilter === 'platelets' ? 'platelets' : 'plasma'} found in the last 90 days`
-                            : 'Loading wastage data...'}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                  })()}
+              {/* Blood Expiry Risk Detection */}
+              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      Blood Expiry Risk Detection
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Identify blood types at highest risk of wastage in the next 7 days.
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                    {expiringBloodList.length} blood types at risk
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-100 text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">
+                          Units Expiring Soon
+                        </th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">
+                          Min Days Left
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {expiringBloodList.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={3}>
+                            No units within the expiry threshold.
+                          </td>
+                        </tr>
+                      ) : (
+                        expiringBloodList.map((row, idx) => (
+                          <tr
+                            key={row.bloodType}
+                            className={
+                              'transition-colors hover:bg-slate-50 ' +
+                              (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
+                            }
+                          >
+                            <td className="px-3 py-2 text-xs font-semibold text-slate-900">
+                              {row.bloodType}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {row.units}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {row.minDaysLeft}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
-            </>
+            </div>
           )}
         </>
       )}
@@ -1157,3 +867,4 @@ function AdminReports() {
 }
 
 export default AdminReports
+

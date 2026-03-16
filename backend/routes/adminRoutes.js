@@ -403,20 +403,31 @@ router.get('/donors', async (req, res) => {
 router.post('/donors', async (req, res) => {
   const { donorName, bloodType, contactPhone, contactEmail, username, password } = req.body
 
-  if (!donorName || !bloodType || !contactPhone || !username || !password) {
+  // Allow admin to add a donor with only basic info.
+  if (!donorName || !bloodType || !contactPhone) {
     return res
       .status(400)
-      .json({ message: 'donorName, bloodType, contactPhone, username and password are required' })
+      .json({ message: 'donorName, bloodType and contactPhone are required' })
   }
 
   try {
-    // Ensure username is unique
-    const [existingUserByUsername] = await pool.query(
-      'SELECT id FROM users WHERE username = ? LIMIT 1',
-      [username],
-    )
-    if (existingUserByUsername.length > 0) {
-      return res.status(400).json({ message: 'Username is already taken' })
+    // Generate username/password automatically if not provided
+    let finalUsername =
+      (username && username.trim()) || `donor_${String(contactPhone).replace(/\D/g, '')}`
+    let finalPassword = (password && password.trim()) || Math.random().toString(36).slice(-10)
+
+    // Ensure username is unique; if auto-generated one collides, append random suffix
+    // Try a few times before giving up
+    for (let i = 0; i < 5; i += 1) {
+      const [existingUserByUsername] = await pool.query(
+        'SELECT id FROM users WHERE username = ? LIMIT 1',
+        [finalUsername],
+      )
+      if (existingUserByUsername.length === 0) {
+        break
+      }
+      // Collision – tweak generated username
+      finalUsername = `${finalUsername}_${Math.floor(Math.random() * 1000)}`
     }
 
     // Ensure phone is unique
@@ -440,7 +451,7 @@ router.post('/donors', async (req, res) => {
     }
 
     const bcrypt = require('bcryptjs')
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(finalPassword, 10)
 
     const safeEmail =
       contactEmail && contactEmail.trim() !== ''
@@ -452,7 +463,7 @@ router.post('/donors', async (req, res) => {
       INSERT INTO users (username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date)
       VALUES (?, ?, ?, 'donor', ?, ?, ?, 'active', NULL)
     `,
-      [username, safeEmail, passwordHash, donorName, contactPhone, bloodType],
+      [finalUsername, safeEmail, passwordHash, donorName, contactPhone, bloodType],
     )
 
     res.status(201).json({
@@ -461,11 +472,139 @@ router.post('/donors', async (req, res) => {
       bloodType,
       contactPhone,
       contactEmail: contactEmail || null,
-      username,
+      username: finalUsername,
     })
   } catch (error) {
     console.error('Create donor error:', error)
     res.status(500).json({ message: 'Failed to create donor' })
+  }
+})
+
+// GET /api/admin/donors/:id/details - donation status & stats for a donor
+router.get('/donors/:id/details', async (req, res) => {
+  const { id } = req.params
+  const donorId = parseInt(id, 10)
+
+  if (Number.isNaN(donorId)) {
+    return res.status(400).json({ message: 'Invalid donor id' })
+  }
+
+  // Cooldown periods in days by donation component type (match userController)
+  const DONATION_COOLDOWNS = {
+    whole_blood: 90,
+    platelets: 14,
+    plasma: 28,
+  }
+
+  try {
+    // Basic donor info
+    const [users] = await pool.query(
+      `
+      SELECT id, full_name, phone, blood_type, status, last_donation_date
+      FROM users
+      WHERE id = ? AND role = 'donor'
+      LIMIT 1
+    `,
+      [donorId],
+    )
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'Donor not found' })
+    }
+
+    const donor = users[0]
+
+    // Completed schedule requests by component
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        COALESCE(component_type, 'whole_blood') AS component_type,
+        COUNT(*) AS completed_count,
+        MAX(reviewed_at) AS last_completed_at
+      FROM schedule_requests
+      WHERE user_id = ? AND status = 'completed'
+      GROUP BY COALESCE(component_type, 'whole_blood')
+    `,
+      [donorId],
+    )
+
+    const now = new Date()
+
+    const base = {
+      whole_blood: {
+        componentType: 'whole_blood',
+        cooldownDays: DONATION_COOLDOWNS.whole_blood,
+        lastCompletedAt: null,
+        completedCount: 0,
+      },
+      platelets: {
+        componentType: 'platelets',
+        cooldownDays: DONATION_COOLDOWNS.platelets,
+        lastCompletedAt: null,
+        completedCount: 0,
+      },
+      plasma: {
+        componentType: 'plasma',
+        cooldownDays: DONATION_COOLDOWNS.plasma,
+        lastCompletedAt: null,
+        completedCount: 0,
+      },
+    }
+
+    rows.forEach((row) => {
+      const key = row.component_type || 'whole_blood'
+      if (base[key]) {
+        base[key].lastCompletedAt = row.last_completed_at
+        base[key].completedCount = Number(row.completed_count || 0)
+      }
+    })
+
+    const stats = {}
+    let totalDonations = 0
+
+    Object.values(base).forEach((entry) => {
+      const { componentType, cooldownDays, lastCompletedAt, completedCount } = entry
+      let isEligible = true
+      let nextEligibleAt = null
+
+      if (lastCompletedAt && cooldownDays && cooldownDays > 0) {
+        const last = new Date(lastCompletedAt)
+        const next = new Date(last)
+        next.setDate(next.getDate() + cooldownDays)
+
+        if (next > now) {
+          isEligible = false
+          nextEligibleAt = next.toISOString()
+        }
+      }
+
+      totalDonations += completedCount
+
+      stats[componentType] = {
+        componentType,
+        cooldownDays,
+        lastCompletedAt: lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null,
+        completedCount,
+        isEligible,
+        nextEligibleAt,
+      }
+    })
+
+    return res.json({
+      donor: {
+        id: donor.id,
+        fullName: donor.full_name,
+        phone: donor.phone,
+        bloodType: donor.blood_type,
+        status: donor.status,
+        lastDonationDate: donor.last_donation_date,
+      },
+      stats,
+      totalDonations,
+    })
+  } catch (error) {
+    console.error('Fetch donor details error:', error)
+    return res.status(500).json({ message: 'Failed to fetch donor details' })
   }
 })
 

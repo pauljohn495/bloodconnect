@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 
@@ -34,6 +34,12 @@ function AdminPartner() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [selectedRequestIds, setSelectedRequestIds] = useState(new Set())
   const [plannedRequestStatuses, setPlannedRequestStatuses] = useState({})
+
+  const selectedRequests = useMemo(() => hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId)), [hospitalApprovedRequests, selectedRequestIds])
+
+  const selectedBloodTypes = useMemo(() => [...new Set(selectedRequests.map((req) => req.bloodType))], [selectedRequests])
+
+  const filteredInventory = useMemo(() => selectedBloodTypes.length > 0 ? availableInventory.filter((item) => selectedBloodTypes.includes(item.blood_type || item.bloodType)) : availableInventory, [selectedBloodTypes, availableInventory])
 
   const loadHospitals = async () => {
     try {
@@ -379,6 +385,7 @@ function AdminPartner() {
       pageTitle="Hospitals / Partner Centers"
       pageDescription="Manage partner hospitals."
     >
+      <React.Fragment>
       <section className="mt-2">
         <div className="h-[600px] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
           <div className="flex items-center justify-between px-4 py-3">
@@ -576,8 +583,8 @@ function AdminPartner() {
         </div>
       </section>
 
-      {/* Menu dropdown rendered outside table to escape overflow */}
-      {openMenuHospitalId && (
+    {/* Menu dropdown rendered outside table to escape overflow */}
+    {openMenuHospitalId && (
         <>
           {/* Backdrop to close menu on outside click */}
           <div
@@ -826,329 +833,366 @@ function AdminPartner() {
         </div>
       )}
 
-      {/* Transfer Modal */}
-      {isTransferModalOpen && selectedHospital && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
-          <div className="w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white shadow-xl flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Transfer Blood Stock
-                </h3>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
-                  Transfer to: <span className="text-blue-600">{selectedHospital.hospital_name || selectedHospital.hospitalName}</span>
-                </p>
-                {hospitalApprovedRequests.filter((req) => req.status !== 'fulfilled').length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-xs font-semibold text-slate-700">
-                      Approved Requests Summary (select which request to prioritize):
+      {/* Transfer & Confirmation Modals */}
+      {(isTransferModalOpen && selectedHospital) || showConfirmDialog ? (
+        <>
+          {isTransferModalOpen && selectedHospital && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
+              <div className="w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white shadow-xl flex flex-col">
+                <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      Transfer Blood Stock
+                    </h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      Transfer to: <span className="text-blue-600">{selectedHospital.hospital_name || selectedHospital.hospitalName}</span>
                     </p>
-                    {hospitalApprovedRequests
-                      .filter((req) => req.status !== 'fulfilled')
-                      .map((request, index) => (
-                        <div
-                          key={request.requestId || index}
-                          className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5"
-                        >
-                          <input
-                            type="checkbox"
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                            checked={selectedRequestIds.has(request.requestId)}
-                            onChange={() => toggleRequestSelection(request.requestId)}
-                          />
-                          <div className="flex flex-col gap-0.5">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                                {request.bloodType}{' '}
-                                {request.componentType === 'platelets'
-                                  ? '(Platelets)'
-                                  : request.componentType === 'plasma'
-                                  ? '(Plasma)'
-                                  : ''}
-                                : {request.unitsRequested} units
-                                {request.remainingBalance > 0 &&
-                                  request.remainingBalance < request.unitsRequested && (
-                                    <span className="ml-2 text-[10px]">
-                                      ({request.remainingBalance} remaining)
-                                    </span>
-                                  )}
-                              </span>
-                              <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full ${
-                                  request.status === 'partially_fulfilled'
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-blue-100 text-blue-700'
-                                }`}
-                              >
-                                {request.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
-                              </span>
-                              {request.priority && request.priority !== 'normal' && (
-                                <span
-                                  className={`text-[10px] px-2 py-0.5 rounded-full ${
-                                    request.priority === 'critical'
-                                      ? 'bg-red-100 text-red-700'
-                                      : 'bg-orange-100 text-orange-700'
-                                  }`}
-                                >
-                                  {request.priority === 'critical' ? 'Critical' : 'Urgent'}
-                                </span>
-                              )}
-                              <select
-                                value={plannedRequestStatuses[request.requestId] || request.status}
-                                onChange={(e) =>
-                                  handlePlannedStatusChange(request.requestId, e.target.value)
-                                }
-                                className="ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-red-500"
-                              >
-                                <option value="approved">Approved</option>
-                                <option value="partially_fulfilled">Partially Fulfilled</option>
-                                <option value="fulfilled">Fulfilled</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseTransferModal}
-                className="text-slate-400 hover:text-slate-600 transition"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {isLoadingInventory ? (
-                <div className="py-10 text-center text-sm text-slate-500">
-                  Loading available inventory...
-                </div>
-              ) : availableInventory.length === 0 ? (
-                <div className="py-10 text-center text-sm text-slate-500">
-                  No available blood stocks to transfer.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          <input
-                            type="checkbox"
-                            className="rounded border-slate-300 text-red-600 focus:ring-red-500"
-                            checked={
-                              availableInventory.length > 0 &&
-                              availableInventory.every((item) => selectedStocks[item.id])
-                            }
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                const allSelected = {}
-                                availableInventory.forEach((item) => {
-                                  allSelected[item.id] = 1
-                                })
-                                setSelectedStocks(allSelected)
-                              } else {
-                                setSelectedStocks({})
-                              }
-                            }}
-                          />
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          Blood Type
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          Component Type
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          Available Units
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          Expiration Date
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                          Units to Transfer
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
-                      {availableInventory.map((item) => {
-                        const availableUnits = item.available_units || item.availableUnits || 0
-                        const isSelected = !!selectedStocks[item.id]
-                        const transferQuantity = selectedStocks[item.id] || 1
-
-                        return (
-                          <tr
-                            key={item.id}
-                            className={`hover:bg-slate-50 ${isSelected ? 'bg-red-50/30' : ''}`}
-                          >
-                            <td className="px-4 py-3">
+                    {hospitalApprovedRequests.filter((req) => req.status !== 'fulfilled').length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs font-semibold text-slate-700">
+                          Approved Requests Summary (select which request to prioritize):
+                        </p>
+                        {hospitalApprovedRequests
+                          .filter((req) => req.status !== 'fulfilled')
+                          .map((request, index) => (
+                            <div
+                              key={request.requestId || index}
+                              className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5"
+                            >
                               <input
                                 type="checkbox"
-                                className="rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                checked={isSelected}
-                                onChange={() => handleStockToggle(item.id, availableUnits)}
+                                className="h-3.5 w-3.5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                checked={selectedRequestIds.has(request.requestId)}
+                                onChange={() => toggleRequestSelection(request.requestId)}
                               />
-                            </td>
-                            <td className="px-4 py-3 font-semibold text-slate-900">
-                              {item.blood_type || item.bloodType}
-                            </td>
-                            <td className="px-4 py-3 text-slate-700">
-                              {item.component_type === 'platelets' ? 'Platelets' : item.component_type === 'plasma' ? 'Plasma' : item.componentType === 'platelets' ? 'Platelets' : item.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                                {availableUnits}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-slate-700">
-                              {item.expiration_date
-                                ? new Date(item.expiration_date).toLocaleDateString()
-                                : item.expirationDate
-                                ? new Date(item.expirationDate).toLocaleDateString()
-                                : '—'}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${
-                                  item.status === 'available'
-                                    ? 'bg-green-50 text-green-700 ring-green-100'
-                                    : item.status === 'near_expiry' || item.status === 'Near Expiry'
-                                    ? 'bg-orange-50 text-orange-700 ring-orange-100'
-                                    : item.status === 'expired'
-                                    ? 'bg-red-50 text-red-700 ring-red-100'
-                                    : item.status === 'reserved'
-                                    ? 'bg-yellow-50 text-yellow-700 ring-yellow-100'
-                                    : 'bg-slate-50 text-slate-700 ring-slate-100'
-                                }`}
-                              >
-                                {item.status === 'near_expiry' ? 'Near Expiry' : item.status || 'available'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              {isSelected ? (
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max={availableUnits}
-                                  value={transferQuantity}
-                                  onChange={(e) =>
-                                    handleQuantityChange(item.id, e.target.value, availableUnits)
-                                  }
-                                  className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                                />
-                              ) : (
-                                <span className="text-slate-400">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                                    {request.bloodType}{' '}
+                                    {request.componentType === 'platelets'
+                                      ? '(Platelets)'
+                                      : request.componentType === 'plasma'
+                                      ? '(Plasma)'
+                                      : ''}
+                                    : {request.unitsRequested} units
+                                    {request.remainingBalance > 0 &&
+                                      request.remainingBalance < request.unitsRequested && (
+                                        <span className="ml-2 text-[10px]">
+                                          ({request.remainingBalance} remaining)
+                                        </span>
+                                      )}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                      request.status === 'partially_fulfilled'
+                                        ? 'bg-yellow-100 text-yellow-700'
+                                        : 'bg-blue-100 text-blue-700'
+                                    }`}
+                                  >
+                                    {request.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
+                                  </span>
+                                  {request.priority && request.priority !== 'normal' && (
+                                    <span
+                                      className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                        request.priority === 'critical'
+                                          ? 'bg-red-100 text-red-700'
+                                          : 'bg-orange-100 text-orange-700'
+                                      }`}
+                                    >
+                                      {request.priority === 'critical' ? 'Critical' : 'Urgent'}
+                                    </span>
+                                  )}
+                                  <select
+                                    value={plannedRequestStatuses[request.requestId] || request.status}
+                                    onChange={(e) =>
+                                      handlePlannedStatusChange(request.requestId, e.target.value)
+                                    }
+                                    className="ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                  >
+                                    <option value="approved">Approved</option>
+                                    <option value="partially_fulfilled">Partially Fulfilled</option>
+                                    <option value="fulfilled">Fulfilled</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseTransferModal}
+                    className="text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-              )}
-            </div>
 
-            <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
-              <div className="text-sm text-slate-600">
-                {Object.keys(selectedStocks).length > 0 && (
-                  <span>
-                    {Object.keys(selectedStocks).length} stock(s) selected
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseTransferModal}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmTransferClick}
-                  disabled={Object.keys(selectedStocks).length === 0}
-                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Confirm Transfer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Dialog */}
-      {showConfirmDialog && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
-            <button
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 transition"
-              type="button"
-              onClick={() => setShowConfirmDialog(false)}
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            
-            <div className="border-b border-slate-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">Confirm Transfer</h2>
-            </div>
-            
-            <div className="px-6 py-4">
-              <p className="text-sm text-slate-700">
-                Are you sure you want to transfer{' '}
-                <strong>{Object.keys(selectedStocks).length}</strong> blood stock(s) to{' '}
-                <strong>{selectedHospital?.hospital_name || selectedHospital?.hospitalName}</strong>?
-              </p>
-              <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
-                {Object.entries(selectedStocks).map(([inventoryId, units]) => {
-                  const item = availableInventory.find((i) => i.id === parseInt(inventoryId))
-                  if (!item) return null
-                  return (
-                    <div key={inventoryId} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                      <span className="font-semibold text-slate-900">
-                        {item.blood_type || item.bloodType}
-                        {(item.component_type || item.componentType) === 'platelets' && ' (Platelets)'}
-                        {(item.component_type || item.componentType) === 'plasma' && ' (Plasma)'}
-                      </span>
-                      <span className="text-slate-600">{units} unit(s)</span>
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  {isLoadingInventory ? (
+                    <div className="py-10 text-center text-sm text-slate-500">
+                      Loading available inventory...
                     </div>
-                  )
-                })}
+                  ) : (
+                    (() => {
+                      const selectedRequests = hospitalApprovedRequests.filter((req) =>
+                        selectedRequestIds.has(req.requestId)
+                      )
+                      const selectedBloodTypes = [...new Set(selectedRequests.map((req) => req.bloodType))]
+                      const filteredInventory =
+                        selectedBloodTypes.length > 0
+                          ? availableInventory.filter((item) =>
+                              selectedBloodTypes.includes(item.blood_type || item.bloodType)
+                            )
+                          : availableInventory
+
+                      if (isLoadingInventory) {
+                        return (
+                          <div className="py-10 text-center text-sm text-slate-500">
+                            Loading available inventory...
+                          </div>
+                        )
+                      }
+
+                      if (filteredInventory.length === 0) {
+                        return (
+                          <div className="py-10 text-center text-sm text-slate-500">
+                            No matching blood stocks available for selected requests.
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead className="bg-slate-50">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                  <input
+                                    type="checkbox"
+                                    className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                    checked={
+                                      filteredInventory.length > 0 &&
+                                      filteredInventory.every((item) => selectedStocks[item.id])
+                                    }
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        const allSelected = {}
+                                        filteredInventory.forEach((item) => {
+                                          allSelected[item.id] = 1
+                                        })
+                                        setSelectedStocks(allSelected)
+                                      } else {
+                                        setSelectedStocks({})
+                                      }
+                                    }}
+                                  />
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                  Blood Type
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                  Component Type
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                  Available Units
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                  Expiration Date
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                  Status
+                                </th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                                  Units to Transfer
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-slate-200">
+                              {filteredInventory.map((item) => {
+                                const availableUnits = item.available_units || item.availableUnits || 0
+                                const isSelected = !!selectedStocks[item.id]
+                                const transferQuantity = selectedStocks[item.id] || 1
+
+                                return (
+                                  <tr
+                                    key={item.id}
+                                    className={isSelected ? 'hover:bg-slate-50 bg-red-50' : 'hover:bg-slate-50'}
+                                  >
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="checkbox"
+                                        className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                                        checked={isSelected}
+                                        onChange={() => handleStockToggle(item.id, availableUnits)}
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3 font-semibold text-slate-900">
+                                      {item.blood_type || item.bloodType}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                      {item.component_type === 'platelets'
+                                        ? 'Platelets'
+                                        : item.component_type === 'plasma'
+                                        ? 'Plasma'
+                                        : item.componentType === 'platelets'
+                                        ? 'Platelets'
+                                        : item.componentType === 'plasma'
+                                        ? 'Plasma'
+                                        : 'Whole Blood'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                                        {availableUnits}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                      {item.expiration_date
+                                        ? new Date(item.expiration_date).toLocaleDateString()
+                                        : item.expirationDate
+                                        ? new Date(item.expirationDate).toLocaleDateString()
+                                        : '—'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span
+                                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${
+                                          item.status === 'available'
+                                            ? 'bg-green-50 text-green-700 ring-green-100'
+                                            : item.status === 'near_expiry' || item.status === 'Near Expiry'
+                                            ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                                            : item.status === 'expired'
+                                            ? 'bg-red-50 text-red-700 ring-red-100'
+                                            : item.status === 'reserved'
+                                            ? 'bg-yellow-50 text-yellow-700 ring-yellow-100'
+                                            : 'bg-slate-50 text-slate-700 ring-slate-100'
+                                        }`}
+                                      >
+                                        {item.status === 'near_expiry' ? 'Near Expiry' : item.status || 'available'}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {isSelected ? (
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          max={availableUnits}
+                                          value={transferQuantity}
+                                          onChange={(e) =>
+                                            handleQuantityChange(item.id, e.target.value, availableUnits)
+                                          }
+                                          className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                                        />
+                                      ) : (
+                                        <span className="text-slate-400">—</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })()
+                  )}
+                  {Object.keys(selectedStocks).length > 0 && (
+                    <span>
+                      {Object.keys(selectedStocks).length} stock(s) selected
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2 px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={handleCloseTransferModal}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmTransferClick}
+                    disabled={Object.keys(selectedStocks).length === 0}
+                    className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Confirm Transfer
+                  </button>
+                </div>
               </div>
             </div>
-            
-            <div className="border-t border-slate-200 px-6 py-4">
-              <div className="flex justify-end gap-2">
+          )}
+
+          {showConfirmDialog && (
+            <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+              <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl">
                 <button
+                  className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 transition"
                   type="button"
                   onClick={() => setShowConfirmDialog(false)}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
                 >
-                  Cancel
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmTransfer}
-                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition"
-                >
-                  Confirm Transfer
-                </button>
+
+                <div className="border-b border-slate-200 px-6 py-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Confirm Transfer</h2>
+                </div>
+
+                <div className="px-6 py-4">
+                  <p className="text-sm text-slate-700">
+                    Are you sure you want to transfer{' '}
+                    <strong>{Object.keys(selectedStocks).length}</strong> blood stock(s) to{' '}
+                    <strong>{selectedHospital?.hospital_name || selectedHospital?.hospitalName}</strong>?
+                  </p>
+                  <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                    {Object.entries(selectedStocks).map(([inventoryId, units]) => {
+                      const item = availableInventory.find((i) => i.id === parseInt(inventoryId, 10))
+                      if (!item) return null
+                      return (
+                        <div
+                          key={inventoryId}
+                          className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                        >
+                          <span className="font-semibold text-slate-900">
+                            {item.blood_type || item.bloodType}
+                            {(item.component_type || item.componentType) === 'platelets' && ' (Platelets)'}
+                            {(item.component_type || item.componentType) === 'plasma' && ' (Plasma)'}
+                          </span>
+                          <span className="text-slate-600">{units} unit(s)</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 px-6 py-4">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmDialog(false)}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmTransfer}
+                      className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition"
+                    >
+                      Confirm Transfer
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </>
+      ) : null}
 
       {/* History Modal */}
       {isHistoryModalOpen && (
@@ -1289,6 +1333,8 @@ function AdminPartner() {
           </div>
         </div>
       )}
+
+      </React.Fragment>
     </AdminLayout>
   )
 }

@@ -9,6 +9,8 @@ function AdminRequests() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [notification, setNotification] = useState(null)
   const [priorityFilter, setPriorityFilter] = useState('all')
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false)
+  const [selectedRequestNotes, setSelectedRequestNotes] = useState(null)
 
   const loadRequests = async () => {
     try {
@@ -34,6 +36,47 @@ function AdminRequests() {
 
   const handleCloseHistory = () => {
     setIsHistoryOpen(false)
+  }
+
+  const handleOpenNotesModal = (request) => {
+    setSelectedRequestNotes(request)
+    setIsNotesModalOpen(true)
+  }
+
+  const handleCloseNotesModal = () => {
+    setIsNotesModalOpen(false)
+    setSelectedRequestNotes(null)
+  }
+
+  const formatNotesText = (notes) => {
+    if (!notes) return ''
+
+    // Split by sentence endings (period, question mark, exclamation mark)
+    const sentences = notes.split(/[.!?]+/).filter(s => s.trim().length > 0)
+
+    if (sentences.length <= 3) {
+      return notes
+    }
+
+    // Take first 3 sentences and join them back
+    const firstThreeSentences = sentences.slice(0, 3)
+    let result = firstThreeSentences.join('. ').trim()
+
+    // Add period if not already there
+    if (result && !result.match(/[.!?]$/)) {
+      result += '.'
+    }
+
+    // Add remaining sentences with line breaks
+    if (sentences.length > 3) {
+      const remainingSentences = sentences.slice(3)
+      result += '\n\n' + remainingSentences.join('. ').trim()
+      if (remainingSentences.length > 0 && !result.match(/[.!?]$/)) {
+        result += '.'
+      }
+    }
+
+    return result
   }
 
   const showNotification = (message, type = 'primary') => {
@@ -146,6 +189,9 @@ function AdminRequests() {
                     Priority
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                    Notes
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
                     Status
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-right font-medium text-slate-500">
@@ -156,21 +202,21 @@ function AdminRequests() {
               <tbody className="bg-white">
                 {isLoading && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={7}>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={8}>
                       Loading requests...
                     </td>
                   </tr>
                 )}
                 {!isLoading && error && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-red-500" colSpan={7}>
+                    <td className="px-4 py-10 text-center text-xs text-red-500" colSpan={8}>
                       {error}
                     </td>
                   </tr>
                 )}
                 {!isLoading && !error && pendingRequests.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={7}>
+                    <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={8}>
                       No pending hospital requests.
                     </td>
                   </tr>
@@ -214,6 +260,20 @@ function AdminRequests() {
                             ? 'Urgent'
                             : 'Normal'}
                         </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
+                        {request.notes ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenNotesModal(request)}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200"
+                            title="View notes"
+                          >
+                            <span className="text-sm font-bold leading-none">⋯</span>
+                          </button>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-xs">
                         <span
@@ -381,6 +441,55 @@ function AdminRequests() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Notes Modal */}
+      {isNotesModalOpen && selectedRequestNotes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-900">Request Notes</h3>
+              <button
+                type="button"
+                onClick={handleCloseNotesModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <div className="text-xs text-slate-500 mb-2">
+                <strong>Hospital:</strong> {selectedRequestNotes.hospital_name}
+              </div>
+              <div className="text-xs text-slate-500 mb-2">
+                <strong>Blood Type:</strong> {selectedRequestNotes.blood_type}
+              </div>
+              <div className="text-xs text-slate-500 mb-4">
+                <strong>Request Date:</strong> {selectedRequestNotes.request_date ? new Date(selectedRequestNotes.request_date).toLocaleDateString() : 'N/A'}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
+              <h4 className="text-sm font-medium text-slate-900 mb-2">Notes:</h4>
+              <div className="text-sm text-slate-700 bg-slate-50 rounded-lg p-3 max-h-40 overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-words">
+                {formatNotesText(selectedRequestNotes.notes)}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={handleCloseNotesModal}
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
