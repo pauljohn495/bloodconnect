@@ -22,6 +22,8 @@ function AdminDonation() {
   const [isScheduleHistoryLoading, setIsScheduleHistoryLoading] = useState(false)
   const [previousModalOpen, setPreviousModalOpen] = useState(null) // Track which modal was open before details
   const [feedbackModal, setFeedbackModal] = useState({ open: false, message: '' })
+  const [isDonorDetailsOpen, setIsDonorDetailsOpen] = useState(false)
+  const [selectedDonorDetails, setSelectedDonorDetails] = useState(null)
 
   const loadDonors = async () => {
     try {
@@ -228,6 +230,17 @@ function AdminDonation() {
     }
   }
 
+  const loadDonorDetails = async (donorId) => {
+    try {
+      const data = await apiRequest(`/api/admin/donors/${donorId}/details`)
+      setSelectedDonorDetails(data)
+      setIsDonorDetailsOpen(true)
+    } catch (err) {
+      console.error('Failed to load donor details', err)
+      alert(err.message || 'Failed to load donor details')
+    }
+  }
+
   return (
     <AdminLayout
       pageTitle="Donors"
@@ -281,7 +294,7 @@ function AdminDonation() {
                     Contact
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                    Last Donation
+                    Details
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                     Status
@@ -329,9 +342,13 @@ function AdminDonation() {
                         {donor.phone || donor.contact_phone || donor.contactPhone || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                        {donor.last_donation_date
-                          ? new Date(donor.last_donation_date).toLocaleDateString()
-                          : '—'}
+                        <button
+                          type="button"
+                          onClick={() => loadDonorDetails(donor.id)}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          View Details
+                        </button>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm">
                         <span
@@ -903,6 +920,128 @@ function AdminDonation() {
               >
                 OK
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Donor Details Modal */}
+      {isDonorDetailsOpen && selectedDonorDetails && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-slate-900">
+                Donor Details
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDonorDetailsOpen(false)
+                  setSelectedDonorDetails(null)
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm">
+              {/* Basic Info */}
+              <div className="border-b border-slate-200 pb-3">
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Basic Information
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[11px] text-slate-500">Name</p>
+                    <p className="font-medium text-slate-900">
+                      {selectedDonorDetails.donor.fullName || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500">Blood Type</p>
+                    <p className="font-medium text-slate-900">
+                      {selectedDonorDetails.donor.bloodType || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500">Contact</p>
+                    <p className="font-medium text-slate-900">
+                      {selectedDonorDetails.donor.phone || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500">Last Donation</p>
+                    <p className="font-medium text-slate-900">
+                      {selectedDonorDetails.donor.lastDonationDate
+                        ? new Date(selectedDonorDetails.donor.lastDonationDate).toLocaleDateString()
+                        : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500">Total Donations</p>
+                    <p className="font-medium text-slate-900">
+                      {selectedDonorDetails.totalDonations || 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Component Status */}
+              <div>
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  Component Status
+                </h4>
+                <div className="space-y-3">
+                  {['whole_blood', 'platelets', 'plasma'].map((key) => {
+                    const info = selectedDonorDetails.stats?.[key]
+                    if (!info) return null
+                    const label =
+                      key === 'whole_blood'
+                        ? 'Whole Blood'
+                        : key === 'platelets'
+                        ? 'Platelets'
+                        : 'Plasma'
+                    const eligibleBadgeClasses = info.isEligible
+                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                      : 'bg-amber-50 text-amber-700 ring-amber-200'
+                    return (
+                      <div
+                        key={key}
+                        className="flex items-start justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-slate-900">
+                            {label}
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-600">
+                            Completed donations: <span className="font-semibold">{info.completedCount}</span>
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-slate-600">
+                            Last donation:{' '}
+                            {info.lastCompletedAt
+                              ? new Date(info.lastCompletedAt).toLocaleDateString()
+                              : '—'}
+                          </p>
+                          {!info.isEligible && info.nextEligibleAt && (
+                            <p className="mt-0.5 text-[11px] text-amber-700">
+                              Next eligible on{' '}
+                              {new Date(info.nextEligibleAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className={`mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${eligibleBadgeClasses}`}
+                        >
+                          {info.isEligible ? 'Eligible' : 'In cooldown'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
