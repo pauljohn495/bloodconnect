@@ -24,6 +24,7 @@ function AdminDonation() {
   const [feedbackModal, setFeedbackModal] = useState({ open: false, message: '' })
   const [isDonorDetailsOpen, setIsDonorDetailsOpen] = useState(false)
   const [selectedDonorDetails, setSelectedDonorDetails] = useState(null)
+  const [donorSearch, setDonorSearch] = useState('')
 
   const loadDonors = async () => {
     try {
@@ -41,6 +42,24 @@ function AdminDonation() {
   useEffect(() => {
     loadDonors()
   }, [])
+
+  const donorNameForSearch = (donor) =>
+    (
+      donor.full_name ||
+      donor.fullName ||
+      donor.donor_name ||
+      donor.donorName ||
+      donor.username ||
+      ''
+    )
+      .toString()
+      .toLowerCase()
+
+  const filteredDonors = donors.filter((donor) => {
+    const q = donorSearch.trim().toLowerCase()
+    if (!q) return true
+    return donorNameForSearch(donor).includes(q)
+  })
 
   const handleOpenModal = () => {
     setIsModalOpen(true)
@@ -256,6 +275,14 @@ function AdminDonation() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <div className="hidden sm:block">
+                <input
+                  value={donorSearch}
+                  onChange={(e) => setDonorSearch(e.target.value)}
+                  placeholder="Search donor name..."
+                  className="w-56 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+              </div>
               <button
                 type="button"
                 onClick={handleOpenScheduleRequests}
@@ -328,13 +355,13 @@ function AdminDonation() {
 
                 {!isLoading &&
                   !error &&
-                  donors.map((donor) => (
+                  filteredDonors.map((donor) => (
                     <tr key={donor.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         {donor.full_name || donor.fullName || donor.donor_name || donor.donorName || donor.username || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                        <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
+                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
                           {donor.blood_type || donor.bloodType || '—'}
                         </span>
                       </td>
@@ -547,7 +574,7 @@ function AdminDonation() {
 
       {/* Request Details Modal */}
       {isDetailsModalOpen && selectedRequest && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40">
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Request Details</h3>
@@ -897,7 +924,7 @@ function AdminDonation() {
 
       {/* Feedback Modal */}
       {feedbackModal.open && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/40">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between mb-3">
               <h3 className="text-base font-semibold text-slate-900">Schedule Request</h3>
@@ -927,7 +954,7 @@ function AdminDonation() {
 
       {/* Donor Details Modal */}
       {isDonorDetailsOpen && selectedDonorDetails && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40">
+        <div className="fixed inset-0 z-80 flex items-center justify-center bg-slate-900/40">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-slate-900">

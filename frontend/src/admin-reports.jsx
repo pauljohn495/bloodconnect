@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 function AdminReports() {
   const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'
+  const [componentFilter, setComponentFilter] = useState('all') // 'all' | 'whole_blood' | 'platelets' | 'plasma'
   const [inventory, setInventory] = useState([])
   const [requests, setRequests] = useState([])
   const [donors, setDonors] = useState([])
@@ -53,6 +54,20 @@ function AdminReports() {
     return h?.hospital_name || h?.hospitalName || `Hospital #${hospitalId}`
   }
 
+  const normalizeComponentType = (value) => {
+    const v = (value || '').toString().toLowerCase().trim()
+    if (v === 'platelets') return 'platelets'
+    if (v === 'plasma') return 'plasma'
+    return 'whole_blood'
+  }
+
+  const formatComponentType = (value) => {
+    const v = normalizeComponentType(value)
+    if (v === 'platelets') return 'Platelets'
+    if (v === 'plasma') return 'Plasma'
+    return 'Whole Blood'
+  }
+
   // ---------- PREDICTIVE ANALYTICS ----------
 
   // Blood Shortage Forecast
@@ -63,14 +78,18 @@ function AdminReports() {
     if (req.status !== 'fulfilled') return false
     if (!req.request_date) return false
     const d = new Date(req.request_date)
+    const ct = normalizeComponentType(req.component_type || req.componentType)
+    if (componentFilter !== 'all' && ct !== componentFilter) return false
     return d >= windowStart && d <= now
   })
 
   const usageByBloodType = fulfilledRequestsInWindow.reduce((acc, req) => {
     const bt = req.blood_type || req.bloodType
     if (!bt) return acc
+    const ct = normalizeComponentType(req.component_type || req.componentType)
+    const key = `${bt}|${ct}`
     const units = req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0
-    acc[bt] = (acc[bt] || 0) + Number(units || 0)
+    acc[key] = (acc[key] || 0) + Number(units || 0)
     return acc
   }, {})
 
@@ -79,13 +98,17 @@ function AdminReports() {
     .reduce((acc, item) => {
       const bt = item.blood_type || item.bloodType
       if (!bt) return acc
+      const ct = normalizeComponentType(item.component_type || item.componentType)
+      if (componentFilter !== 'all' && ct !== componentFilter) return acc
+      const key = `${bt}|${ct}`
       const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
-      acc[bt] = (acc[bt] || 0) + Number(units || 0)
+      acc[key] = (acc[key] || 0) + Number(units || 0)
       return acc
     }, {})
 
-  const bloodShortageForecast = Object.entries(stockByBloodType).map(([bloodType, currentStock]) => {
-    const usedInWindow = usageByBloodType[bloodType] || 0
+  const bloodShortageForecast = Object.entries(stockByBloodType).map(([key, currentStock]) => {
+    const [bloodType, componentType] = key.split('|')
+    const usedInWindow = usageByBloodType[key] || 0
     const averageDailyUsage =
       usedInWindow > 0 ? usedInWindow / Math.max(1, usageWindowDays) : 0
     const daysRemaining =
@@ -97,6 +120,7 @@ function AdminReports() {
 
     return {
       bloodType,
+      componentType,
       currentStock,
       estimatedDaysRemaining: daysRemaining === Infinity ? '—' : daysRemaining.toFixed(1),
       numericDaysRemaining: daysRemaining,
@@ -120,7 +144,15 @@ function AdminReports() {
 
   // Blood Usage Trends (fulfilled usage in window)
   const bloodUsageTrendsData = Object.entries(usageByBloodType)
-    .map(([bloodType, unitsUsed]) => ({ bloodType, unitsUsed }))
+    .map(([key, unitsUsed]) => {
+      const [bloodType, componentType] = key.split('|')
+      return {
+        label: `${bloodType} • ${formatComponentType(componentType)}`,
+        bloodType,
+        componentType,
+        unitsUsed,
+      }
+    })
     .sort((a, b) => b.unitsUsed - a.unitsUsed)
 
   // Donor Availability Forecast
@@ -167,6 +199,8 @@ function AdminReports() {
     if (item.status === 'expired') return acc
     const bt = item.blood_type || item.bloodType
     if (!bt) return acc
+    const ct = normalizeComponentType(item.component_type || item.componentType)
+    if (componentFilter !== 'all' && ct !== componentFilter) return acc
     const expDate = item.expiration_date || item.expirationDate
     if (!expDate) return acc
     const daysLeft = diffInDays(expDate, now)
@@ -174,86 +208,172 @@ function AdminReports() {
       item.available_units ?? item.availableUnits ?? item.units ?? 0,
     )
     if (daysLeft <= expiryThresholdDays && units > 0) {
-      if (!acc[bt]) acc[bt] = { units: 0, minDaysLeft: daysLeft }
-      acc[bt].units += units
-      acc[bt].minDaysLeft = Math.min(acc[bt].minDaysLeft, daysLeft)
+      const mapKey = `${bt}|${ct}`
+      if (!acc[mapKey]) acc[mapKey] = { units: 0, minDaysLeft: daysLeft, componentType: ct }
+      acc[mapKey].units += units
+      acc[mapKey].minDaysLeft = Math.min(acc[mapKey].minDaysLeft, daysLeft)
     }
     return acc
   }, {})
 
   const expiringBloodList = Object.entries(expiringSoonMap)
-    .map(([bloodType, info]) => ({
-      bloodType,
-      units: info.units,
-      minDaysLeft: info.minDaysLeft,
-    }))
+    .map(([key, info]) => {
+      const [bloodType] = key.split('|')
+      return {
+        bloodType,
+        componentType: info.componentType,
+        units: info.units,
+        minDaysLeft: info.minDaysLeft,
+      }
+    })
     .sort((a, b) => a.minDaysLeft - b.minDaysLeft)
 
   // ---------- PRESCRIPTIVE ANALYTICS ----------
 
-  // Transfer Recommendations between hospitals
-  const criticalThreshold = 10
-  const sufficientThreshold = 20
+  // Transfer Recommendations (generated per hospital blood request)
+  // Goal: For EVERY active request, suggest the best transfer source and rank by priority.
+  const reserveAtSourceUnits = 20
 
-  const hospitalStockByBlood = inventory
-    .filter((item) => item.hospital_id || item.hospitalId)
+  const normalizeRequestPriority = (req) => {
+    const raw = (req.priority || req.priority_level || req.priorityLevel || '').toString().trim()
+    const p = raw.toLowerCase()
+    if (p === 'critical') return 'critical'
+    if (p === 'urgent') return 'urgent'
+    if (p === 'normal') return 'normal'
+    // Basic heuristic fallbacks if the backend doesn't provide priority explicitly
+    const emergency =
+      req.is_emergency === true ||
+      req.isEmergency === true ||
+      req.emergency === true ||
+      (req.request_type || req.requestType || '').toString().toLowerCase() === 'emergency'
+    if (emergency) return 'critical'
+    return 'normal'
+  }
+
+  const getRequestHospitalId = (req) => {
+    const id = req.hospital_id ?? req.hospitalId ?? req.hospitalID
+    if (id) return Number(id)
+    const name = (req.hospital_name || req.hospitalName || '').toString().trim()
+    if (!name) return null
+    const h = hospitals.find((x) => (x.hospital_name || x.hospitalName || '').toString().trim() === name)
+    return h?.id ? Number(h.id) : null
+  }
+
+  // IMPORTANT: /admin/requests only shows "pending" requests (the visible list).
+  // Transfer Recommendations should only generate for requests that would be visible there.
+  const activeHospitalRequests = requests.filter((req) => {
+    const status = (req.status || '').toLowerCase()
+    if (status !== 'pending') return false
+    const bt = req.blood_type || req.bloodType
+    const hospitalName = req.hospital_name || req.hospitalName
+    const units = req.units_requested ?? req.unitsRequested
+    return Boolean(bt && hospitalName && Number(units || 0) > 0)
+  })
+
+  const stockByLocationAndBlood = inventory
+    .filter((item) => item.status !== 'expired')
     .reduce((acc, item) => {
-      const hospitalId = item.hospital_id || item.hospitalId
       const bt = item.blood_type || item.bloodType
-      if (!hospitalId || !bt) return acc
-      const key = `${hospitalId}|${bt}`
+      if (!bt) return acc
+      const ct = normalizeComponentType(item.component_type || item.componentType)
+      const hospitalId = item.hospital_id || item.hospitalId
+      const locationKey = hospitalId ? `h:${Number(hospitalId)}` : 'central'
+      const key = `${locationKey}|${bt}|${ct}`
       const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
       acc[key] = (acc[key] || 0) + Number(units || 0)
       return acc
     }, {})
 
-  const groupedByBloodType = {}
-  Object.entries(hospitalStockByBlood).forEach(([key, units]) => {
-    const [hospitalIdStr, bt] = key.split('|')
-    const hospitalId = Number(hospitalIdStr)
-    if (!groupedByBloodType[bt]) groupedByBloodType[bt] = []
-    let level = 'sufficient'
-    if (units < criticalThreshold) level = 'critical'
-    else if (units <= sufficientThreshold) level = 'low'
-    groupedByBloodType[bt].push({ hospitalId, units, level })
-  })
+  const getLocationName = (locationKey) => {
+    if (locationKey === 'central') return 'Central Inventory'
+    if (locationKey.startsWith('h:')) return getHospitalName(Number(locationKey.slice(2)))
+    return locationKey
+  }
 
-  const transferRecommendations = []
-  Object.entries(groupedByBloodType).forEach(([bloodType, hospitalsForType]) => {
-    const criticalHospitals = hospitalsForType.filter((h) => h.level === 'critical')
-    const sufficientHospitals = hospitalsForType.filter((h) => h.level === 'sufficient')
+  const requestTransferRecommendations = activeHospitalRequests
+    .map((req) => {
+      const bloodType = req.blood_type || req.bloodType
+      const componentType = normalizeComponentType(req.component_type || req.componentType)
+      const unitsRequested = Number(req.units_requested ?? req.unitsRequested ?? 0)
+      const hospitalId = getRequestHospitalId(req)
+      const destinationHospitalName = req.hospital_name || req.hospitalName || getHospitalName(hospitalId)
+      const destinationLocationKey = hospitalId ? `h:${hospitalId}` : null
 
-    criticalHospitals.forEach((criticalHospital) => {
-      sufficientHospitals.forEach((sourceHospital) => {
-        const maxSendable = sourceHospital.units - sufficientThreshold
-        if (maxSendable <= 0) return
-        const needed = criticalThreshold - criticalHospital.units
-        if (needed <= 0) return
-        const suggestedUnits = Math.min(maxSendable, needed)
-        if (suggestedUnits <= 0) return
-        transferRecommendations.push({
-          bloodType,
-          sourceHospitalId: sourceHospital.hospitalId,
-          destinationHospitalId: criticalHospital.hospitalId,
-          sourceHospitalName: getHospitalName(sourceHospital.hospitalId),
-          destinationHospitalName: getHospitalName(criticalHospital.hospitalId),
-          suggestedUnits,
-        })
+      const priority = normalizeRequestPriority(req)
+      const priorityScore = priority === 'critical' ? 3 : priority === 'urgent' ? 2 : 1
+
+      const requestedAt =
+        req.created_at ||
+        req.createdAt ||
+        req.requested_at ||
+        req.requestedAt ||
+        req.request_date ||
+        req.requestDate ||
+        null
+
+      const destinationOnHand =
+        destinationLocationKey
+          ? stockByLocationAndBlood[`${destinationLocationKey}|${bloodType}|${componentType}`] || 0
+          : 0
+      const unitsNeeded = Math.max(0, unitsRequested - destinationOnHand)
+
+      const candidateSources = []
+      Object.entries(stockByLocationAndBlood).forEach(([key, units]) => {
+        const [locationKey, bt, ct] = key.split('|')
+        if (bt !== bloodType) return
+        if (ct !== componentType) return
+        if (destinationLocationKey && locationKey === destinationLocationKey) return
+        const available = Number(units || 0)
+        const sendable = locationKey === 'central' ? available : Math.max(0, available - reserveAtSourceUnits)
+        if (sendable <= 0) return
+        candidateSources.push({ locationKey, available, sendable })
       })
-    })
-  })
 
-  transferRecommendations.sort((a, b) => b.suggestedUnits - a.suggestedUnits)
+      candidateSources.sort((a, b) => b.sendable - a.sendable)
+      const bestSource = candidateSources[0] || null
+
+      const suggestedUnits = bestSource ? Math.min(bestSource.sendable, Math.max(1, unitsNeeded || unitsRequested)) : 0
+
+      let recommendation = 'Contact donors / coordinate external supply'
+      if (unitsNeeded === 0) recommendation = 'Already covered by current on-hand stock'
+      else if (bestSource?.locationKey === 'central') recommendation = 'Dispatch from Central Inventory'
+      else if (bestSource) recommendation = 'Transfer from another hospital'
+
+      return {
+        requestId: req.id,
+        requestedAt,
+        bloodType,
+        componentType,
+        priority,
+        priorityScore,
+        destinationHospitalId: hospitalId,
+        destinationHospitalName,
+        destinationOnHand,
+        unitsRequested,
+        unitsNeeded,
+        sourceLocationKey: bestSource?.locationKey || null,
+        suggestedUnits,
+        recommendation,
+      }
+    })
+    .sort((a, b) => {
+      if (a.priorityScore !== b.priorityScore) return b.priorityScore - a.priorityScore
+      const da = a.requestedAt ? new Date(a.requestedAt) : new Date(0)
+      const db = b.requestedAt ? new Date(b.requestedAt) : new Date(0)
+      return da - db
+    })
 
   // Urgent or Critical Hospital Requests
   const urgentRequests = requests
     .filter((req) => {
       const status = (req.status || '').toLowerCase()
-      if (status === 'fulfilled' || status === 'completed' || status === 'cancelled') {
-        return false
-      }
+      // Align with /admin/requests visibility: only pending requests are shown there.
+      if (status !== 'pending') return false
       const priority = (req.priority || 'normal').toLowerCase()
-      return priority === 'urgent' || priority === 'critical'
+      if (!(priority === 'urgent' || priority === 'critical')) return false
+      const ct = normalizeComponentType(req.component_type || req.componentType)
+      if (componentFilter !== 'all' && ct !== componentFilter) return false
+      return true
     })
     .sort((a, b) => {
       const priOrder = { critical: 2, urgent: 1 }
@@ -398,7 +518,19 @@ function AdminReports() {
             Predictive Analytics
           </button>
         </div>
-        <div />
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-medium text-slate-600">Component:</span>
+          <select
+            value={componentFilter}
+            onChange={(e) => setComponentFilter(e.target.value)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+          >
+            <option value="all">All</option>
+            <option value="whole_blood">Whole Blood</option>
+            <option value="platelets">Platelets</option>
+            <option value="plasma">Plasma</option>
+          </select>
+        </div>
       </div>
 
       {isLoading && (
@@ -424,55 +556,92 @@ function AdminReports() {
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">Transfer Recommendations</h2>
                     <p className="mt-1 text-[11px] text-slate-500">
-                      Balance stocks by moving surplus units to hospitals with critical shortages.
+                      Automatically generated recommendations for every active hospital blood request.
                     </p>
                   </div>
                   <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
-                    {transferRecommendations.length} suggestions
+                    {requestTransferRecommendations.length} requests
                   </span>
                 </div>
-                {transferRecommendations.length === 0 ? (
+                {requestTransferRecommendations.length === 0 ? (
                   <p className="text-sm text-slate-500">
-                    No transfer recommendations at the moment.
+                    No active hospital requests at the moment.
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-100 text-xs">
                       <thead className="bg-slate-50">
                         <tr>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Priority</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Time Requested</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Hospital</th>
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-500">From</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-500">To</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-500">Units</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Requested</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">On-hand</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Needed</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Transfer</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-500">Recommendation</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white">
-                        {transferRecommendations.slice(0, 20).map((rec, idx) => (
+                        {requestTransferRecommendations.slice(0, 30).map((rec, idx) => {
+                          const priorityClasses =
+                            rec.priority === 'critical'
+                              ? 'bg-red-50 text-red-700 ring-red-100'
+                              : rec.priority === 'urgent'
+                                ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                                : 'bg-slate-100 text-slate-700 ring-slate-200'
+                          return (
                           <tr
-                            key={idx}
+                            key={rec.requestId || idx}
                             className={
                               'transition-colors hover:bg-slate-50 ' +
                               (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
                             }
                           >
                             <td className="px-3 py-2">
-                              <span className="inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${priorityClasses}`}
+                              >
+                                {rec.priority.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
+                              {rec.requestedAt
+                                ? new Date(rec.requestedAt).toLocaleString(undefined, {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: '2-digit',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                  })
+                                : '—'}
+                            </td>
+                            <td className="px-3 py-2 text-xs font-semibold text-slate-900">
+                              {rec.destinationHospitalName}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
                                 {rec.bloodType}
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-xs text-slate-700">
-                              {rec.sourceHospitalName}
+                            <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
+                              {formatComponentType(rec.componentType)}
                             </td>
-                            <td className="px-3 py-2 text-xs text-slate-700">
-                              {rec.destinationHospitalName}
-                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">{rec.unitsRequested}</td>
+                            <td className="px-3 py-2 text-xs text-slate-700">{rec.destinationOnHand}</td>
+                            <td className="px-3 py-2 text-xs text-slate-700">{rec.unitsNeeded}</td>
                             <td className="px-3 py-2 text-xs">
-                              <span className="inline-flex min-w-[2.5rem] items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
-                                {rec.suggestedUnits}
+                              <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
+                                {rec.suggestedUnits || 0}
                               </span>
                             </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">{rec.recommendation}</td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -500,6 +669,7 @@ function AdminReports() {
                       <tr>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Hospital</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Units</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Priority</th>
                       </tr>
@@ -507,7 +677,7 @@ function AdminReports() {
                     <tbody className="bg-white">
                       {urgentRequests.length === 0 ? (
                         <tr>
-                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
+                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={5}>
                             No urgent or critical requests.
                           </td>
                         </tr>
@@ -529,6 +699,9 @@ function AdminReports() {
                               </td>
                               <td className="px-3 py-2 text-xs font-semibold text-slate-900">
                                 {req.blood_type}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
+                                {formatComponentType(req.component_type || req.componentType)}
                               </td>
                               <td className="px-3 py-2 text-xs text-slate-700">
                                 {req.units_requested}
@@ -578,7 +751,7 @@ function AdminReports() {
                         <span className="font-semibold text-slate-900 truncate">
                           {d.donorName}
                         </span>
-                        <span className="ml-3 inline-flex min-w-[3rem] items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
+                        <span className="ml-3 inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
                           {d.bloodType}
                         </span>
                       </li>
@@ -651,6 +824,7 @@ function AdminReports() {
                     <thead className="bg-slate-50">
                       <tr>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Stock</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">
                           Est. Days Remaining
@@ -661,14 +835,14 @@ function AdminReports() {
                     <tbody className="bg-white">
                       {bloodShortageForecast.length === 0 ? (
                         <tr>
-                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
+                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={5}>
                             No active inventory to forecast.
                           </td>
                         </tr>
                       ) : (
                         bloodShortageForecast.map((row, idx) => (
                           <tr
-                            key={row.bloodType}
+                            key={`${row.bloodType}|${row.componentType}`}
                             className={
                               'transition-colors hover:bg-slate-50 ' +
                               (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
@@ -676,6 +850,9 @@ function AdminReports() {
                           >
                             <td className="px-3 py-2 text-xs font-semibold text-slate-900">
                               {row.bloodType}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
+                              {formatComponentType(row.componentType)}
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700">
                               {row.currentStock}
@@ -727,7 +904,7 @@ function AdminReports() {
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                         <XAxis
-                          dataKey="bloodType"
+                          dataKey="label"
                           tick={{ fontSize: 12, fill: '#475569' }}
                           stroke="#cbd5f5"
                         />
@@ -818,6 +995,7 @@ function AdminReports() {
                     <thead className="bg-slate-50">
                       <tr>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">
                           Units Expiring Soon
                         </th>
@@ -829,14 +1007,14 @@ function AdminReports() {
                     <tbody className="bg-white">
                       {expiringBloodList.length === 0 ? (
                         <tr>
-                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={3}>
+                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
                             No units within the expiry threshold.
                           </td>
                         </tr>
                       ) : (
                         expiringBloodList.map((row, idx) => (
                           <tr
-                            key={row.bloodType}
+                            key={`${row.bloodType}|${row.componentType}`}
                             className={
                               'transition-colors hover:bg-slate-50 ' +
                               (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
@@ -844,6 +1022,9 @@ function AdminReports() {
                           >
                             <td className="px-3 py-2 text-xs font-semibold text-slate-900">
                               {row.bloodType}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
+                              {formatComponentType(row.componentType)}
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700">
                               {row.units}
