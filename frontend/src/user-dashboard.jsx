@@ -102,23 +102,23 @@ function UserDashboard() {
           type: 'donation',
         }))
 
-        // Get approved schedule requests and add them to donation history
-        const approvedSchedules = (scheduleRequests || [])
-          .filter((req) => req.status === 'approved')
+        // Get completed schedule requests and add them to donation history
+        const completedScheduleEntries = (scheduleRequests || [])
+          .filter((req) => req.status === 'completed')
           .map((req) => ({
             id: `schedule-${req.id}`,
             date: req.preferred_date,
             bloodType: me.blood_type || me.bloodType || '—',
             componentType: req.component_type || 'whole_blood',
             location: 'Scheduled Donation',
-            status: 'Scheduled',
+            status: 'Completed',
             type: 'schedule',
             preferredTime: req.preferred_time,
             adminNotes: req.admin_notes,
           }))
 
-        // Combine donations and approved schedules, sort by date (newest first)
-        const combinedHistory = [...formattedDonations, ...approvedSchedules].sort(
+        // Combine donations and completed schedules, sort by date (newest first)
+        const combinedHistory = [...formattedDonations, ...completedScheduleEntries].sort(
           (a, b) => new Date(b.date) - new Date(a.date),
         )
 
