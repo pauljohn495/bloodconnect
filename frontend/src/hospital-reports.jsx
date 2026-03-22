@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import HospitalLayout from './HospitalLayout.jsx'
 import { apiRequest } from './api.js'
+import { adminReportSection } from './admin-ui.jsx'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 import {
   BarChart,
   Bar,
@@ -132,19 +134,20 @@ function HospitalReports() {
       pageDescription="Early detection for shortages and wastage risks."
     >
       <section className="space-y-6">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="p-4 space-y-6">
+        <div className={adminReportSection.slate}>
+          <div className="space-y-6">
             {isLoading ? (
               <div className="py-8 text-center text-sm text-slate-500">Loading analytics...</div>
             ) : (
               <>
                 {/* Predicted Wastage Forecast - same style as admin reports */}
-                <div className="mb-8">
-                  <h3 className="mb-4 text-sm font-semibold text-slate-900">Predicted Wastage Forecast</h3>
-                  <p className="mb-4 text-[11px] text-slate-500">
+                <div className="mb-8 min-w-0">
+                  <h3 className="mb-2 text-base font-semibold text-slate-900">Predicted wastage forecast</h3>
+                  <p className="mb-4 text-sm text-slate-500">
                     Units at risk of expiration (wastage) in the next 7, 14, and 30 days based on current inventory.
                   </p>
-                  <ResponsiveContainer width="100%" height={280}>
+                  <div className="h-[min(280px,55vh)] w-full min-w-0 sm:h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={wastageForecastData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
                       <XAxis
@@ -196,6 +199,7 @@ function HospitalReports() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  </div>
                 </div>
 
                 {/* Expiration / Wastage Alerts */}
@@ -233,8 +237,12 @@ function HospitalReports() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             </span>
-                            <span className={alert.isCritical ? 'font-semibold text-red-900' : 'font-medium text-slate-800'}>
-                              Expiration Alert: {alert.units} unit(s) of {alert.bloodType} {alert.componentLabel} will expire in {alert.daysLeft} day{alert.daysLeft !== 1 ? 's' : ''}
+                            <span className={`flex flex-wrap items-center gap-1.5 ${alert.isCritical ? 'font-semibold text-red-900' : 'font-medium text-slate-800'}`}>
+                              <span>Expiration Alert: {alert.units} unit(s) of</span>
+                              <BloodTypeBadge type={alert.bloodType} />
+                              <span>
+                                {alert.componentLabel} will expire in {alert.daysLeft} day{alert.daysLeft !== 1 ? 's' : ''}
+                              </span>
                             </span>
                             {alert.isCritical && (
                               <span className="ml-auto rounded-full bg-red-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-800">Critical</span>
@@ -251,12 +259,12 @@ function HospitalReports() {
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Stock by blood type & component</h3>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-100 text-xs">
-                      <thead className="bg-slate-50/60">
+                      <thead className="bg-slate-50/95">
                         <tr>
-                          <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">Blood Type</th>
-                          <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">Component</th>
-                          <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">Available Units</th>
-                          <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-500">Status</th>
+                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Blood Type</th>
+                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Component</th>
+                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Available Units</th>
+                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -274,7 +282,7 @@ function HospitalReports() {
                               className={isCritical ? 'bg-red-50/50' : ''}
                             >
                               <td className={`whitespace-nowrap px-3 py-2 font-semibold ${isCritical ? 'text-red-900' : 'text-slate-900'}`}>
-                                {row.bloodType}
+                                <BloodTypeBadge type={row.bloodType} />
                               </td>
                               <td className="whitespace-nowrap px-3 py-2 text-slate-700">
                                 {componentLabel(row.componentType)}

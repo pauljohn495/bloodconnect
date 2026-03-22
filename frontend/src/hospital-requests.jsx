@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import HospitalLayout from './HospitalLayout.jsx'
 import { apiRequest } from './api.js'
+import { adminPanel } from './admin-ui.jsx'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
 function HospitalRequests() {
   const [requests, setRequests] = useState([])
@@ -91,47 +93,47 @@ function HospitalRequests() {
       pageDescription="View and track your blood requests status."
     >
       <section className="mt-2">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className={adminPanel.amber.outer}>
+          <div className={adminPanel.amber.header}>
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Blood Requests</h2>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <h2 className={adminPanel.amber.title}>Blood requests</h2>
+              <p className={adminPanel.amber.subtitle}>
                 Track the status of your blood requests
               </p>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className={adminPanel.amber.tableScroll}>
             <table className="min-w-full divide-y divide-slate-100 text-xs">
-              <thead className="bg-slate-50/60">
+              <thead className={adminPanel.amber.thead}>
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Blood Type
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Component Type
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Units Requested
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Units Approved
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Request Date
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Priority
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Status
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left font-medium text-slate-500">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
                     Notes
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white">
+              <tbody className={adminPanel.amber.tbody}>
                 {isLoading && (
                   <tr>
                     <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={8}>
@@ -158,7 +160,7 @@ function HospitalRequests() {
                   requests.map((request) => (
                     <tr key={request.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-xs font-semibold text-slate-900">
-                        {request.blood_type}
+                        <BloodTypeBadge type={request.blood_type} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
                         {request.component_type === 'whole_blood' ? 'Whole Blood' : request.component_type === 'platelets' ? 'Platelets' : request.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
@@ -213,10 +215,10 @@ function HospitalRequests() {
                           <button
                             type="button"
                             onClick={() => handleOpenNotesModal(request)}
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-1"
                             title="View notes"
                           >
-                            <span className="text-sm font-bold leading-none">⋯</span>
+                            <span className="text-sm font-bold leading-none">â‹¯</span>
                           </button>
                         ) : (
                           '—'
@@ -232,10 +234,10 @@ function HospitalRequests() {
 
       {/* Notes Modal */}
       {isNotesModalOpen && selectedRequestNotes && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-900">Request Notes</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-900">Request notes</h3>
               <button
                 type="button"
                 onClick={handleCloseNotesModal}
@@ -251,8 +253,8 @@ function HospitalRequests() {
               <div className="text-xs text-slate-500 mb-2">
                 <strong>Hospital:</strong> {selectedRequestNotes.hospital_name}
               </div>
-              <div className="text-xs text-slate-500 mb-2">
-                <strong>Blood Type:</strong> {selectedRequestNotes.blood_type}
+              <div className="text-xs text-slate-500 mb-2 flex flex-wrap items-center gap-2">
+                <strong>Blood Type:</strong> <BloodTypeBadge type={selectedRequestNotes.blood_type} />
               </div>
               <div className="text-xs text-slate-500 mb-4">
                 <strong>Request Date:</strong> {selectedRequestNotes.request_date ? new Date(selectedRequestNotes.request_date).toLocaleDateString() : 'N/A'}
@@ -270,7 +272,7 @@ function HospitalRequests() {
               <button
                 type="button"
                 onClick={handleCloseNotesModal}
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 Close
               </button>

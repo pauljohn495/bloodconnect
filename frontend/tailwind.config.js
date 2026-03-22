@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['system-ui', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
         primary: {

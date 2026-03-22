@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
+import { adminPanel } from './admin-ui.jsx'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
 function AdminDonation() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -266,11 +268,11 @@ function AdminDonation() {
       pageDescription="View and manage registered blood donors."
     >
       <section className="mt-2">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className={adminPanel.emerald.outer}>
+          <div className={adminPanel.emerald.header}>
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">List of Donors</h2>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <h2 className={adminPanel.emerald.title}>List of Donors</h2>
+              <p className={adminPanel.emerald.subtitle}>
                 Overview of all registered donors
               </p>
             </div>
@@ -300,35 +302,35 @@ function AdminDonation() {
               <button
                 type="button"
                 onClick={handleOpenModal}
-                className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
               >
                 Add Donor
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className={adminPanel.emerald.tableScroll}>
             <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className="bg-slate-50/60">
+              <thead className={adminPanel.emerald.thead}>
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                     Donor Name
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                     Blood Type
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                     Contact
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                     Details
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white">
+              <tbody className={adminPanel.emerald.tbody}>
                 {isLoading && (
                   <tr>
                     <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
@@ -361,9 +363,7 @@ function AdminDonation() {
                         {donor.full_name || donor.fullName || donor.donor_name || donor.donorName || donor.username || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
-                          {donor.blood_type || donor.bloodType || '—'}
-                        </span>
+                        <BloodTypeBadge type={donor.blood_type || donor.bloodType} className="text-[13px]" />
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
                         {donor.phone || donor.contact_phone || donor.contactPhone || '—'}
@@ -470,7 +470,7 @@ function AdminDonation() {
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
                   Save Donor
                 </button>
@@ -619,9 +619,9 @@ function AdminDonation() {
                     <span className="text-slate-500">Phone:</span>
                     <span className="ml-2 font-medium text-slate-900">{selectedRequest.phone || '—'}</span>
                   </div>
-                  <div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-slate-500">Blood Type:</span>
-                    <span className="ml-2 font-medium text-slate-900">{selectedRequest.blood_type || '—'}</span>
+                    <BloodTypeBadge type={selectedRequest.blood_type} className="text-sm" />
                   </div>
                 </div>
               </div>
@@ -943,7 +943,7 @@ function AdminDonation() {
               <button
                 type="button"
                 onClick={() => setFeedbackModal({ open: false, message: '' })}
-                className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
               >
                 OK
               </button>
@@ -989,9 +989,9 @@ function AdminDonation() {
                   </div>
                   <div>
                     <p className="text-[11px] text-slate-500">Blood Type</p>
-                    <p className="font-medium text-slate-900">
-                      {selectedDonorDetails.donor.bloodType || '—'}
-                    </p>
+                    <div className="mt-0.5">
+                      <BloodTypeBadge type={selectedDonorDetails.donor.bloodType} className="text-sm" />
+                    </div>
                   </div>
                   <div>
                     <p className="text-[11px] text-slate-500">Contact</p>

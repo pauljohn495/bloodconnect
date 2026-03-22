@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
 function ProfileSettings() {
   const navigate = useNavigate()
@@ -119,29 +120,45 @@ function ProfileSettings() {
   }
 
   return (
-    <div className="min-h-screen bg-red-50">
+    <div className="min-h-screen bg-[#f0f4f8]">
       {/* Top Header */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
           {/* Left: Logo */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => navigate('/dashboard')}
-              className="text-xl font-bold text-red-600 transition hover:text-red-700"
+              className="flex items-center gap-3 rounded-lg text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
             >
-              BloodConnect
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm ring-1 ring-red-700/20">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span>
+                <span className="block text-lg font-bold tracking-tight text-slate-900">BloodConnect</span>
+                <span className="block text-[11px] font-medium uppercase tracking-wider text-red-700">
+                  Profile
+                </span>
+              </span>
             </button>
           </div>
 
           {/* Right: User profile and notifications */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Notifications */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative rounded-full p-2 text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
               >
                 <svg
                   className="h-5 w-5"
@@ -156,12 +173,12 @@ function ProfileSettings() {
                     d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                   />
                 </svg>
-                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-600"></span>
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500" aria-hidden="true" />
               </button>
 
               {/* Notifications Dropdown */}
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white shadow-lg ring-1 ring-slate-200">
+                <div className="fixed top-16 right-0 left-0 z-50 mx-auto mt-2 w-[min(100%,calc(100vw-2rem))] max-w-sm rounded-xl bg-white shadow-lg ring-1 ring-slate-200 sm:absolute sm:inset-auto sm:right-0 sm:left-auto sm:mt-2 sm:w-80 sm:max-w-none">
                   <div className="border-b border-slate-100 px-4 py-3">
                     <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
                   </div>
@@ -179,7 +196,7 @@ function ProfileSettings() {
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white transition hover:bg-red-700"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white ring-1 ring-red-700/20 transition hover:bg-red-700"
               >
                 {profileData.avatar ? (
                   <img
@@ -200,7 +217,7 @@ function ProfileSettings() {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
               title="Logout"
             >
               <svg
@@ -223,25 +240,25 @@ function ProfileSettings() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-4xl px-3 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:px-8">
         {/* Page Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Profile Settings</h1>
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Profile Settings</h1>
           <p className="mt-1 text-sm text-slate-500">
             Manage your personal information and account details
           </p>
         </div>
 
         {/* Profile Card */}
-        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="border-b border-slate-100 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Personal Information</h2>
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
+          <div className="border-b border-slate-100 bg-linear-to-r from-red-50/30 to-white px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Personal Information</h2>
               {!isEditing && (
                 <button
                   type="button"
                   onClick={handleEdit}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:min-h-0 sm:w-auto"
                 >
                   Edit Profile
                 </button>
@@ -249,7 +266,7 @@ function ProfileSettings() {
             </div>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {isLoading ? (
               <p className="text-sm text-slate-500">Loading profile...</p>
             ) : error ? (
@@ -260,7 +277,7 @@ function ProfileSettings() {
                   {/* Left: Avatar Section */}
                   <div className="flex flex-col items-center lg:items-start">
                     <div className="relative">
-                      <div className="flex h-32 w-32 items-center justify-center rounded-full bg-red-600 text-3xl font-semibold text-white ring-4 ring-white shadow-lg">
+                      <div className="flex h-32 w-32 items-center justify-center rounded-full bg-red-600 text-3xl font-semibold text-white shadow-lg ring-4 ring-white">
                         {editedData.avatar ? (
                           <img
                             src={editedData.avatar}
@@ -329,7 +346,7 @@ function ProfileSettings() {
                           type="text"
                           value={editedData.name}
                           onChange={(e) => handleInputChange('name', e.target.value)}
-                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                          className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/20 sm:min-h-0 sm:py-2 sm:text-sm"
                           placeholder="Enter your full name"
                         />
                       ) : (
@@ -349,7 +366,7 @@ function ProfileSettings() {
                           type="tel"
                           value={editedData.phone}
                           onChange={(e) => handleInputChange('phone', e.target.value)}
-                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                          className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/20 sm:min-h-0 sm:py-2 sm:text-sm"
                           placeholder="Enter your phone number"
                         />
                       ) : (
@@ -369,7 +386,7 @@ function ProfileSettings() {
                           type="email"
                           value={editedData.email}
                           onChange={(e) => handleInputChange('email', e.target.value)}
-                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                          className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/20 sm:min-h-0 sm:py-2 sm:text-sm"
                           placeholder="Enter your email address"
                         />
                       ) : (
@@ -388,7 +405,7 @@ function ProfileSettings() {
                         <select
                           value={editedData.bloodType}
                           onChange={(e) => handleInputChange('bloodType', e.target.value)}
-                          className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                          className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-base text-slate-900 shadow-sm outline-none transition focus:border-red-500 focus:bg-white focus:ring-2 focus:ring-red-500/20 sm:min-h-0 sm:py-2 sm:text-sm"
                         >
                           <option value="O+">O+</option>
                           <option value="O-">O-</option>
@@ -400,9 +417,9 @@ function ProfileSettings() {
                           <option value="AB-">AB-</option>
                         </select>
                       ) : (
-                        <p className="mt-1 text-sm font-medium text-slate-900">
-                          {profileData.bloodType}
-                        </p>
+                        <div className="mt-1">
+                          <BloodTypeBadge type={profileData.bloodType} className="text-sm" />
+                        </div>
                       )}
                     </div>
 
@@ -425,14 +442,14 @@ function ProfileSettings() {
                     <button
                       type="button"
                       onClick={handleCancel}
-                      className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleSave}
-                      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
                     >
                       Save Changes
                     </button>
