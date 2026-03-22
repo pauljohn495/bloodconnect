@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
+import { adminPanel } from './admin-ui.jsx'
 
 function AdminUsers() {
   const [admins, setAdmins] = useState([])
@@ -132,14 +133,14 @@ function AdminUsers() {
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Admin Users</h2>
-            <p className="text-slate-600">Manage administrator accounts</p>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Admin users</h2>
+            <p className="mt-1 text-sm text-slate-500">Manage administrator accounts and roles</p>
           </div>
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -149,32 +150,32 @@ function AdminUsers() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="overflow-x-auto">
+        <div className={adminPanel.violet.outer}>
+          <div className={adminPanel.violet.tableScroll}>
             <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className="bg-slate-50/60">
+              <thead className={adminPanel.violet.thead}>
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
                     Name
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
                     Email
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
                     Username
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
                     Role
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
                     Status
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white">
+              <tbody className={adminPanel.violet.tbody}>
                 {isLoading ? (
                   <tr>
                     <td colSpan="6" className="px-4 py-6 text-center text-sm text-slate-500">

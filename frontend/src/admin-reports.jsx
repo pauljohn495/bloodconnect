@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { adminReportLoading, adminReportSection, responsiveTableContainer } from './admin-ui.jsx'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { getBloodTypeChartColor } from './bloodTypeColors.js'
 
 function AdminReports() {
   const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'
@@ -68,6 +71,62 @@ function AdminReports() {
     return 'Whole Blood'
   }
 
+  const RecommendationIcon = ({ kind, className }) => {
+    // Simple inline SVGs so we don't rely on external icon libraries.
+    if (!kind) return null
+
+    const commonStroke = {
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    }
+
+    if (kind === 'ok') {
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          className={className}
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M20 6L9 17l-5-5" {...commonStroke} />
+        </svg>
+      )
+    }
+
+    if (kind === 'central') {
+      return (
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true" focusable="false">
+          <path d="M3 12h12" {...commonStroke} />
+          <path d="M13 6l6 6-6 6" {...commonStroke} />
+          <path d="M3 21h9" {...commonStroke} />
+        </svg>
+      )
+    }
+
+    if (kind === 'transfer') {
+      return (
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true" focusable="false">
+          <path d="M7 7l-4 5 4 5" {...commonStroke} />
+          <path d="M3 12h18" {...commonStroke} />
+          <path d="M17 7l4 5-4 5" {...commonStroke} />
+        </svg>
+      )
+    }
+
+    // phone / default
+    return (
+      <svg viewBox="0 0 24 24" className={className} aria-hidden="true" focusable="false">
+        <path
+          d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.51a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.81.24 1.65.42 2.51.54a2 2 0 0 1 1.72 2z"
+          {...commonStroke}
+        />
+      </svg>
+    )
+  }
+
   // ---------- PREDICTIVE ANALYTICS ----------
 
   // Blood Shortage Forecast
@@ -105,6 +164,18 @@ function AdminReports() {
       acc[key] = (acc[key] || 0) + Number(units || 0)
       return acc
     }, {})
+
+  // Expired units are excluded above, so a type that only exists as expired inventory
+  // would otherwise disappear from the forecast and Donor Contact Suggestions.
+  inventory.forEach((item) => {
+    if (item.status !== 'expired') return
+    const bt = item.blood_type || item.bloodType
+    if (!bt) return
+    const ct = normalizeComponentType(item.component_type || item.componentType)
+    if (componentFilter !== 'all' && ct !== componentFilter) return
+    const key = `${bt}|${ct}`
+    if (stockByBloodType[key] === undefined) stockByBloodType[key] = 0
+  })
 
   const bloodShortageForecast = Object.entries(stockByBloodType).map(([key, currentStock]) => {
     const [bloodType, componentType] = key.split('|')
@@ -393,8 +464,8 @@ function AdminReports() {
   const eligibleDonorSuggestions = shortageByBloodType.flatMap((shortage) => {
     const bt = shortage.bloodType
     const matchingDonors = donors.filter((donor) => {
-      const donorBt = donor.blood_type || donor.bloodType
-      if (donorBt !== bt) return false
+      const donorBt = (donor.blood_type || donor.bloodType || '').toString().trim()
+      if (donorBt !== (bt || '').toString().trim()) return false
       if (!donor.last_donation_date && !donor.lastDonationDate) return true
       const lastDate = donor.last_donation_date || donor.lastDonationDate
       const donationType =
@@ -429,6 +500,35 @@ function AdminReports() {
     return acc
   }, {})
 
+  // On-hand stock by hospital for a given blood type (ignoring component type),
+  // used to prioritize destinations with the lowest stock.
+  const stockByHospitalAndBloodType = inventory
+    .filter((item) => item.status !== 'expired')
+    .reduce((acc, item) => {
+      const bt = item.blood_type || item.bloodType
+      if (!bt) return acc
+      const hospitalId = item.hospital_id || item.hospitalId
+      const hospitalKey = hospitalId ? 'h:' + Number(hospitalId) : 'central'
+      const key = `${hospitalKey}|${bt}`
+      const units =
+        item.available_units ?? item.availableUnits ?? item.units ?? 0
+      acc[key] = (acc[key] || 0) + Number(units || 0)
+      return acc
+    }, {})
+
+  const resolveHospitalIdByName = (hospitalName) => {
+    const wanted = (hospitalName || '').toString().trim().toLowerCase()
+    if (!wanted) return null
+    const h = hospitals.find((x) => {
+      const name = (x.hospital_name || x.hospitalName || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+      return name === wanted
+    })
+    return h?.id ? Number(h.id) : null
+  }
+
   const expiringActionMap = inventory.reduce((acc, item) => {
     if (item.status === 'expired') return acc
     const bt = item.blood_type || item.bloodType
@@ -449,21 +549,38 @@ function AdminReports() {
 
   const expiringActionSuggestions = Object.entries(expiringActionMap).map(
     ([bloodType, info]) => {
-      let bestHospital = null
-      let bestUsage = 0
-      Object.entries(usageByHospitalAndBlood).forEach(([key, usage]) => {
-        const [hospitalName, bt] = key.split('|')
-        if (bt !== bloodType) return
-        if (usage > bestUsage) {
-          bestUsage = usage
-          bestHospital = hospitalName
-        }
-      })
+      const candidates = Object.entries(usageByHospitalAndBlood)
+        .map(([key, usage]) => {
+          const [hospitalName, bt] = key.split('|')
+          if (bt !== bloodType) return null
+          const hospitalId = resolveHospitalIdByName(hospitalName)
+          const hospitalKey = hospitalId ? 'h:' + hospitalId : 'central'
+          const stockKey = `${hospitalKey}|${bloodType}`
+          const stock = stockByHospitalAndBloodType[stockKey] || 0
+          return {
+            hospitalName,
+            usage: Number(usage || 0),
+            stock,
+          }
+        })
+        .filter(Boolean)
+
+      // First, pick the "most likely" destinations by historical usage.
+      const topUsageCandidates = candidates
+        .filter((c) => c.usage > 0)
+        .sort((a, b) => b.usage - a.usage)
+        .slice(0, 5)
+
+      // Then, prioritize lowest stock within those likely destinations.
+      const suggestedHospitals = topUsageCandidates
+        .sort((a, b) => a.stock - b.stock || b.usage - a.usage)
+        .slice(0, 3)
+
       return {
         bloodType,
         units: info.units,
         daysLeft: info.daysLeft,
-        suggestedHospital: bestHospital,
+        suggestedHospitals,
       }
     },
   )
@@ -493,37 +610,37 @@ function AdminReports() {
       pageDescription="View predictive and prescriptive analytics for inventory, donors, and hospital requests."
     >
       {/* Tabs */}
-      <div className="mb-4 flex items-center justify-between border-b border-slate-200">
-        <div className="flex gap-2">
+      <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm ring-1 ring-slate-100/90 sm:p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full flex-wrap gap-1 rounded-lg bg-slate-100/80 p-1 sm:w-auto">
           <button
             type="button"
             onClick={() => setActiveTab('prescriptive')}
-            className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
+            className={`min-h-11 flex-1 rounded-md px-3 py-2.5 text-xs font-semibold transition sm:min-h-0 sm:flex-none sm:py-2 ${
               activeTab === 'prescriptive'
-                ? 'border-red-600 text-red-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'bg-white text-red-900 shadow-sm ring-1 ring-slate-200/80'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Prescriptive Analytics
+            Prescriptive analytics
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('predictive')}
-            className={`px-3 py-2 text-xs font-medium border-b-2 transition ${
+            className={`min-h-11 flex-1 rounded-md px-3 py-2.5 text-xs font-semibold transition sm:min-h-0 sm:flex-none sm:py-2 ${
               activeTab === 'predictive'
-                ? 'border-red-600 text-red-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'bg-white text-red-900 shadow-sm ring-1 ring-slate-200/80'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Predictive Analytics
+            Predictive analytics
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-slate-600">Component:</span>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <span className="text-xs font-medium text-slate-600 sm:text-[11px]">Component:</span>
           <select
             value={componentFilter}
             onChange={(e) => setComponentFilter(e.target.value)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+            className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-[11px]"
           >
             <option value="all">All</option>
             <option value="whole_blood">Whole Blood</option>
@@ -534,8 +651,8 @@ function AdminReports() {
       </div>
 
       {isLoading && (
-        <div className="mt-6 rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-100">
-          <p className="text-sm text-slate-500">Loading reports and analytics...</p>
+        <div className={adminReportLoading}>
+          <p className="text-sm font-medium text-slate-600">Loading reports and analytics...</p>
         </div>
       )}
 
@@ -551,11 +668,11 @@ function AdminReports() {
           {activeTab === 'prescriptive' && (
             <div className="mt-6 space-y-6">
               {/* Transfer Recommendations */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <section className={adminReportSection.sky}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">Transfer Recommendations</h2>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-slate-600">
                       Automatically generated recommendations for every active hospital blood request.
                     </p>
                   </div>
@@ -568,7 +685,7 @@ function AdminReports() {
                     No active hospital requests at the moment.
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className={responsiveTableContainer}>
                     <table className="min-w-full divide-y divide-slate-100 text-xs">
                       <thead className="bg-slate-50">
                         <tr>
@@ -579,8 +696,6 @@ function AdminReports() {
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Requested</th>
                           <th className="px-3 py-2 text-left font-medium text-slate-500">On-hand</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-500">Needed</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-500">Transfer</th>
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Recommendation</th>
                         </tr>
                       </thead>
@@ -592,17 +707,44 @@ function AdminReports() {
                               : rec.priority === 'urgent'
                                 ? 'bg-orange-50 text-orange-700 ring-orange-100'
                                 : 'bg-slate-100 text-slate-700 ring-slate-200'
+
+                          const rowLeftBorderClasses =
+                            rec.priority === 'critical'
+                              ? 'border-l-4 border-red-300/80'
+                              : rec.priority === 'urgent'
+                                ? 'border-l-4 border-orange-300/80'
+                                : 'border-l-4 border-slate-200/80'
+
+                          const recommendationIconKind =
+                            rec.recommendation ===
+                            'Already covered by current on-hand stock'
+                              ? 'ok'
+                              : rec.recommendation ===
+                                'Dispatch from Central Inventory'
+                                ? 'central'
+                                : rec.recommendation ===
+                                  'Transfer from another hospital'
+                                  ? 'transfer'
+                                  : 'phone'
+
+                          const recommendationAccentClasses =
+                            rec.priority === 'critical'
+                              ? 'border-red-200 bg-red-50/40 text-red-900'
+                              : rec.priority === 'urgent'
+                                ? 'border-orange-200 bg-orange-50/50 text-orange-900'
+                                : 'border-slate-200 bg-slate-50 text-slate-800'
                           return (
                           <tr
                             key={rec.requestId || idx}
                             className={
                               'transition-colors hover:bg-slate-50 ' +
+                              rowLeftBorderClasses +
                               (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
                             }
                           >
                             <td className="px-3 py-2">
                               <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${priorityClasses}`}
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ring-1 ${priorityClasses}`}
                               >
                                 {rec.priority.toUpperCase()}
                               </span>
@@ -623,22 +765,35 @@ function AdminReports() {
                               {rec.destinationHospitalName}
                             </td>
                             <td className="px-3 py-2">
-                              <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
-                                {rec.bloodType}
-                              </span>
+                              <BloodTypeBadge type={rec.bloodType} />
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
                               {formatComponentType(rec.componentType)}
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700">{rec.unitsRequested}</td>
                             <td className="px-3 py-2 text-xs text-slate-700">{rec.destinationOnHand}</td>
-                            <td className="px-3 py-2 text-xs text-slate-700">{rec.unitsNeeded}</td>
-                            <td className="px-3 py-2 text-xs">
-                              <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-800 ring-1 ring-slate-200">
-                                {rec.suggestedUnits || 0}
-                              </span>
+                            <td className="px-3 py-2">
+                              <div
+                                className={
+                                  'rounded-lg border px-3 py-2 ' +
+                                  recommendationAccentClasses
+                                }
+                              >
+                                <div className="flex items-start gap-2">
+                                  <RecommendationIcon
+                                    kind={recommendationIconKind}
+                                    className="mt-0.5 h-4 w-4 text-current"
+                                  />
+                                  <span className="text-[12px] font-semibold leading-snug">
+                                    {rec.recommendation}
+                                  </span>
+                                </div>
+
+                                <div className="mt-1 text-[11px] text-slate-700">
+                                  Needed: {rec.unitsNeeded} • Suggested: {rec.suggestedUnits || 0}
+                                </div>
+                              </div>
                             </td>
-                            <td className="px-3 py-2 text-xs text-slate-700">{rec.recommendation}</td>
                           </tr>
                           )
                         })}
@@ -649,13 +804,13 @@ function AdminReports() {
               </section>
 
               {/* Urgent / Critical Requests */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <section className={adminReportSection.rose}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
                       Urgent &amp; Critical Requests
                     </h2>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-slate-600">
                       Prioritize hospitals with the most time-sensitive needs.
                     </p>
                   </div>
@@ -663,7 +818,7 @@ function AdminReports() {
                     {urgentRequests.length} active
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={responsiveTableContainer}>
                   <table className="min-w-full divide-y divide-slate-100 text-xs">
                     <thead className="bg-slate-50">
                       <tr>
@@ -698,7 +853,7 @@ function AdminReports() {
                                 {req.hospital_name}
                               </td>
                               <td className="px-3 py-2 text-xs font-semibold text-slate-900">
-                                {req.blood_type}
+                                <BloodTypeBadge type={req.blood_type} />
                               </td>
                               <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
                                 {formatComponentType(req.component_type || req.componentType)}
@@ -723,13 +878,13 @@ function AdminReports() {
               </section>
 
               {/* Donor Contact Suggestions */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <section className={adminReportSection.emerald}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
                       Donor Contact Suggestions
                     </h2>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-slate-600">
                       Top donors to reach out to for critically low or zero-stock blood types.
                     </p>
                   </div>
@@ -751,8 +906,8 @@ function AdminReports() {
                         <span className="font-semibold text-slate-900 truncate">
                           {d.donorName}
                         </span>
-                        <span className="ml-3 inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
-                          {d.bloodType}
+                        <span className="ml-3">
+                          <BloodTypeBadge type={d.bloodType} />
                         </span>
                       </li>
                     ))}
@@ -761,13 +916,13 @@ function AdminReports() {
               </section>
 
               {/* Expiring Blood Action Suggestions */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-amber-100/80">
+              <section className={adminReportSection.amber}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-amber-900">
+                    <h2 className="text-sm font-semibold text-slate-900">
                       Expiring Blood Action Suggestions
                     </h2>
-                    <p className="mt-1 text-[11px] text-amber-800">
+                    <p className="mt-1 text-[11px] text-slate-900">
                       Redirect near-expiry units to the hospitals most likely to use them.
                     </p>
                   </div>
@@ -781,20 +936,53 @@ function AdminReports() {
                   </p>
                 ) : (
                   <ul className="space-y-2 text-xs text-slate-700">
-                    {expiringActionSuggestions.slice(0, 15).map((item, idx) => (
-                      <li
-                        key={idx}
-                        className="flex flex-col rounded-lg bg-amber-50 px-3 py-2 ring-1 ring-amber-100"
-                      >
-                        <span className="font-semibold text-amber-900">
-                          {item.bloodType} – {item.units} unit(s), {item.daysLeft} day(s) left
-                        </span>
-                        <span className="text-amber-800">
-                          Suggested destination:{' '}
-                          {item.suggestedHospital || 'high-demand hospital not identified yet'}
-                        </span>
-                      </li>
-                    ))}
+                    {expiringActionSuggestions.slice(0, 15).map((item, idx) => {
+                      const suggested = item.suggestedHospitals || []
+                      const top = suggested[0]
+                      const others = suggested.slice(1)
+
+                      return (
+                        <li
+                          key={idx}
+                          className="flex flex-col rounded-lg bg-amber-50 px-3 py-2 ring-1 ring-amber-100"
+                        >
+                          <span className="flex flex-wrap items-center gap-2 font-semibold text-amber-900">
+                            <BloodTypeBadge type={item.bloodType} />
+                            <span>
+                              – {item.units} unit(s), {item.daysLeft} day(s) left
+                            </span>
+                          </span>
+
+                          {top ? (
+                            <span className="text-amber-800">
+                              Highest priority:{' '}
+                              <span className="font-semibold">
+                                {top.hospitalName}
+                              </span>{' '}
+                              <span className="text-amber-900/90">
+                                (lowest stock: {top.stock} unit(s))
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-amber-800">
+                              Suggested destination(s): high-demand hospital not identified yet
+                            </span>
+                          )}
+
+                          {others.length > 0 && (
+                            <span className="mt-1 text-amber-700">
+                              Other options:{' '}
+                              {others
+                                .map(
+                                  (h, i) =>
+                                    `${i + 2}. ${h.hospitalName} (${h.stock} unit(s))`,
+                                )
+                                .join(', ')}
+                            </span>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
               </section>
@@ -805,13 +993,13 @@ function AdminReports() {
           {activeTab === 'predictive' && (
             <div className="mt-6 space-y-6">
               {/* Blood Shortage Forecast */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <section className={adminReportSection.violet}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
                       Blood Shortage Forecast
                     </h2>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-slate-600">
                       Estimate how long each blood type will last based on the last 30 days of usage.
                     </p>
                   </div>
@@ -819,7 +1007,7 @@ function AdminReports() {
                     {bloodShortageForecast.length} blood types tracked
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={responsiveTableContainer}>
                   <table className="min-w-full divide-y divide-slate-100 text-xs">
                     <thead className="bg-slate-50">
                       <tr>
@@ -849,7 +1037,7 @@ function AdminReports() {
                             }
                           >
                             <td className="px-3 py-2 text-xs font-semibold text-slate-900">
-                              {row.bloodType}
+                              <BloodTypeBadge type={row.bloodType} />
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
                               {formatComponentType(row.componentType)}
@@ -880,13 +1068,13 @@ function AdminReports() {
               </section>
 
               {/* Blood Usage Trends */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <section className={adminReportSection.slate}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
                       Blood Usage Trends
                     </h2>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-slate-600">
                       Compare which blood types are most frequently requested over time.
                     </p>
                   </div>
@@ -896,7 +1084,7 @@ function AdminReports() {
                     Not enough fulfilled requests to show usage trends.
                   </p>
                 ) : (
-                  <div className="h-72">
+                  <div className="min-h-[200px] h-52 w-full min-w-0 sm:h-64 md:h-72">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={bloodUsageTrendsData}
@@ -921,7 +1109,11 @@ function AdminReports() {
                           }}
                           formatter={(value) => [`${value} units`, 'Units used']}
                         />
-                        <Bar dataKey="unitsUsed" fill="#ef4444" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="unitsUsed" radius={[6, 6, 0, 0]}>
+                          {bloodUsageTrendsData.map((entry, index) => (
+                            <Cell key={`usage-${entry.label}-${index}`} fill={getBloodTypeChartColor(entry.bloodType)} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -929,13 +1121,13 @@ function AdminReports() {
               </section>
 
               {/* Donor Availability Forecast */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <section className={adminReportSection.indigo}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
                       Donor Availability Forecast
                     </h2>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-slate-600">
                       Plan upcoming drives by seeing how soon existing donors can donate again.
                     </p>
                   </div>
@@ -976,13 +1168,13 @@ function AdminReports() {
               </section>
 
               {/* Blood Expiry Risk Detection */}
-              <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <section className={adminReportSection.orange}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
                       Blood Expiry Risk Detection
                     </h2>
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-[11px] text-slate-600">
                       Identify blood types at highest risk of wastage in the next 7 days.
                     </p>
                   </div>
@@ -990,7 +1182,7 @@ function AdminReports() {
                     {expiringBloodList.length} blood types at risk
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={responsiveTableContainer}>
                   <table className="min-w-full divide-y divide-slate-100 text-xs">
                     <thead className="bg-slate-50">
                       <tr>
@@ -1021,7 +1213,7 @@ function AdminReports() {
                             }
                           >
                             <td className="px-3 py-2 text-xs font-semibold text-slate-900">
-                              {row.bloodType}
+                              <BloodTypeBadge type={row.bloodType} />
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
                               {formatComponentType(row.componentType)}

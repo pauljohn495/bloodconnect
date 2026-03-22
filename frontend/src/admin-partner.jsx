@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import AdminLayout from './AdminLayout.jsx'
+import { adminPanel } from './admin-ui.jsx'
 import { apiRequest } from './api.js'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
 function AdminPartner() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -387,11 +389,11 @@ function AdminPartner() {
     >
       <React.Fragment>
       <section className="mt-2">
-        <div className="h-[600px] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="flex items-center justify-between px-4 py-3">
+        <div className={`h-[600px] overflow-hidden ${adminPanel.sky.outer}`}>
+          <div className={adminPanel.sky.header}>
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Partner Hospitals</h2>
-              <p className="mt-1 text-[11px] text-slate-500">
+              <h2 className={adminPanel.sky.title}>Partner Hospitals</h2>
+              <p className={adminPanel.sky.subtitle}>
                 List of all partnered hospitals
               </p>
             </div>
@@ -406,35 +408,35 @@ function AdminPartner() {
               <button
                 type="button"
                 onClick={handleOpenModal}
-                className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
               >
                 Add Hospital
               </button>
             </div>
           </div>
 
-          <div className="mt-2 overflow-x-auto">
+          <div className={adminPanel.sky.tableScroll}>
             <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className="bg-slate-50/60">
+              <thead className={adminPanel.sky.thead}>
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.sky.th}`}>
                     Hospital Name
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.sky.th}`}>
                     Total Available Blood Stock
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.sky.th}`}>
                     Total Blood Stock Donated
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.sky.th}`}>
                     Requested Blood
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-right text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-right text-[13px] ${adminPanel.sky.th}`}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white">
+              <tbody className={adminPanel.sky.tbody}>
                 {isLoading && (
                   <tr>
                     <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
@@ -487,8 +489,8 @@ function AdminPartner() {
                                 return (
                                   <div key={req.requestId} className="flex flex-col gap-1">
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100">
-                                        {req.bloodType}{' '}
+                                      <BloodTypeBadge type={req.bloodType} className="text-xs" />
+                                      <span className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/90">
                                         {req.componentType === 'platelets'
                                           ? '(Platelets)'
                                           : req.componentType === 'plasma'
@@ -724,7 +726,7 @@ function AdminPartner() {
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
                   Save Hospital
                 </button>
@@ -823,7 +825,7 @@ function AdminPartner() {
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
                   Update Hospital
                 </button>
@@ -867,8 +869,8 @@ function AdminPartner() {
                               />
                               <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-                                    {request.bloodType}{' '}
+                                  <BloodTypeBadge type={request.bloodType} className="text-xs" />
+                                  <span className="inline-flex flex-wrap items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/90">
                                     {request.componentType === 'platelets'
                                       ? '(Platelets)'
                                       : request.componentType === 'plasma'
@@ -1031,7 +1033,7 @@ function AdminPartner() {
                                       />
                                     </td>
                                     <td className="px-4 py-3 font-semibold text-slate-900">
-                                      {item.blood_type || item.bloodType}
+                                      <BloodTypeBadge type={item.blood_type || item.bloodType} className="text-xs" />
                                     </td>
                                     <td className="px-4 py-3 text-slate-700">
                                       {item.component_type === 'platelets'
@@ -1117,7 +1119,7 @@ function AdminPartner() {
                     type="button"
                     onClick={handleConfirmTransferClick}
                     disabled={Object.keys(selectedStocks).length === 0}
-                    className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Confirm Transfer
                   </button>
@@ -1158,10 +1160,12 @@ function AdminPartner() {
                           key={inventoryId}
                           className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
                         >
-                          <span className="font-semibold text-slate-900">
-                            {item.blood_type || item.bloodType}
-                            {(item.component_type || item.componentType) === 'platelets' && ' (Platelets)'}
-                            {(item.component_type || item.componentType) === 'plasma' && ' (Plasma)'}
+                          <span className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                            <BloodTypeBadge type={item.blood_type || item.bloodType} className="text-xs" />
+                            <span className="text-slate-700">
+                              {(item.component_type || item.componentType) === 'platelets' && ' (Platelets)'}
+                              {(item.component_type || item.componentType) === 'plasma' && ' (Plasma)'}
+                            </span>
                           </span>
                           <span className="text-slate-600">{units} unit(s)</span>
                         </div>
@@ -1182,7 +1186,7 @@ function AdminPartner() {
                     <button
                       type="button"
                       onClick={handleConfirmTransfer}
-                      className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition"
+                      className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
                     >
                       Confirm Transfer
                     </button>
@@ -1257,7 +1261,7 @@ function AdminPartner() {
                             {request.hospital_name}
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-900">
-                            {request.blood_type}
+                            <BloodTypeBadge type={request.blood_type} className="text-xs" />
                           </td>
                           <td className="px-4 py-3">
                             <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100">

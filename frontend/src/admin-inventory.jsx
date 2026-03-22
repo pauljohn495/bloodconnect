@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
+import { adminPanel } from './admin-ui.jsx'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
 function AdminInventory() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -92,12 +94,12 @@ function AdminInventory() {
       pageDescription="Monitor and manage system-wide blood inventory."
     >
       <section className="mt-2">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className={adminPanel.rose.outer}>
+          <div className={adminPanel.rose.header}>
             <div className="flex items-center gap-4">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Blood Inventory</h2>
-                <p className="mt-1 text-[11px] text-slate-500">
+                <h2 className={adminPanel.rose.title}>Blood Inventory</h2>
+                <p className={adminPanel.rose.subtitle}>
                   Complete inventory of all blood types and units
                 </p>
               </div>
@@ -105,7 +107,7 @@ function AdminInventory() {
                 <button
                   type="button"
                   onClick={() => setComponentFilter('whole_blood')}
-                  className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     componentFilter === 'whole_blood'
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
@@ -116,7 +118,7 @@ function AdminInventory() {
                 <button
                   type="button"
                   onClick={() => setComponentFilter('platelets')}
-                  className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     componentFilter === 'platelets'
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
@@ -127,7 +129,7 @@ function AdminInventory() {
                 <button
                   type="button"
                   onClick={() => setComponentFilter('plasma')}
-                  className={`inline-flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     componentFilter === 'plasma'
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
@@ -139,7 +141,7 @@ function AdminInventory() {
                   <button
                     type="button"
                     onClick={() => setComponentFilter('all')}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     Show All
                   </button>
@@ -150,7 +152,7 @@ function AdminInventory() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
               >
                 <option value="all">All</option>
                 <option value="available">Available</option>
@@ -160,32 +162,32 @@ function AdminInventory() {
               <button
                 type="button"
                 onClick={handleOpenModal}
-                className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
               >
                 Add Stock
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className={adminPanel.rose.tableScroll}>
             <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className="bg-slate-50/60">
+              <thead className={adminPanel.rose.thead}>
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
                     Blood Type
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
                     Available Units
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
                     Expiration Date
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
                     Status
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white">
+              <tbody className={adminPanel.rose.tbody}>
                 {isLoading && (
                   <tr>
                     <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={4}>
@@ -225,7 +227,7 @@ function AdminInventory() {
                   filteredInventory.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                        {item.blood_type || item.bloodType}
+                        <BloodTypeBadge type={item.blood_type || item.bloodType} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
@@ -288,7 +290,7 @@ function AdminInventory() {
                 <select
                   value={componentType}
                   onChange={(e) => setComponentType(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   required
                 >
                   <option value="whole_blood">Whole Blood</option>
@@ -304,7 +306,7 @@ function AdminInventory() {
                 <select
                   value={bloodType}
                   onChange={(e) => setBloodType(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   required
                 >
                   <option value="">Select blood type</option>
@@ -327,7 +329,7 @@ function AdminInventory() {
                   type="number"
                   value={units}
                   onChange={(e) => setUnits(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   placeholder="Enter number of units"
                   min="1"
                   required
@@ -342,7 +344,7 @@ function AdminInventory() {
                   type="date"
                   value={expirationDate}
                   onChange={(e) => setExpirationDate(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   required
                 />
               </div>
@@ -357,7 +359,7 @@ function AdminInventory() {
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
                   Add Stock
                 </button>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
+import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { responsiveTableContainer } from './admin-ui.jsx'
 
 function UserDashboard() {
   const navigate = useNavigate()
@@ -314,23 +316,37 @@ function UserDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-red-50">
+    <div className="min-h-screen bg-[#f0f4f8]">
       {/* Top Header */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
           {/* Left: Logo */}
-          <div className="flex items-center">
-            <h1 className="text-xl font-bold text-red-600">BloodConnect</h1>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm ring-1 ring-red-700/20">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+                <path
+                  d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">BloodConnect</h1>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-red-700">Donor portal</p>
+            </div>
           </div>
 
           {/* Right: User profile and notifications */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Notifications */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative rounded-full p-2 text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
               >
                 <svg
                   className="h-5 w-5"
@@ -350,7 +366,7 @@ function UserDashboard() {
 
               {/* Notifications Dropdown */}
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 rounded-xl bg-white shadow-lg ring-1 ring-slate-200">
+                <div className="fixed top-16 right-0 left-0 z-50 mx-auto mt-2 w-[min(100%,calc(100vw-2rem))] max-w-sm rounded-xl bg-white shadow-lg ring-1 ring-slate-200 sm:absolute sm:inset-auto sm:right-0 sm:left-auto sm:mt-2 sm:w-80 sm:max-w-none">
                   <div className="border-b border-slate-100 px-4 py-3">
                     <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
                   </div>
@@ -386,9 +402,9 @@ function UserDashboard() {
             <button
               type="button"
               onClick={() => navigate('/profile')}
-              className="flex items-center gap-2 transition hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-lg"
+              className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:px-0"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white ring-1 ring-red-700/20">
                 {userData.avatar ? (
                   <img
                     src={userData.avatar}
@@ -408,7 +424,7 @@ function UserDashboard() {
             <button
               type="button"
               onClick={handleLogout}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
               title="Logout"
             >
               <svg
@@ -431,27 +447,31 @@ function UserDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8">
         {error && (
           <p className="mb-4 text-sm text-red-600">
             {error}
           </p>
         )}
         {/* Hero Section - Statistic Cards */}
-        <section className="mb-8 grid gap-4 sm:grid-cols-2">
+        <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Blood Type Card */}
-          <div className="rounded-2xl bg-white/95 p-5 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90">
             <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Blood Type
             </p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">
-              {isLoading ? '—' : userData.bloodType || '—'}
-            </p>
+            <div className="mt-2">
+              {isLoading ? (
+                <span className="text-3xl font-semibold text-slate-400">—</span>
+              ) : (
+                <BloodTypeBadge type={userData.bloodType} className="!text-2xl !px-4 !py-1.5 !min-w-[4.5rem] font-semibold" />
+              )}
+            </div>
             <p className="mt-1 text-xs text-slate-500">Your registered blood group</p>
           </div>
 
           {/* Total Donations Card */}
-          <div className="rounded-2xl bg-white/95 p-5 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90">
             <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Total Donations
             </p>
@@ -466,7 +486,7 @@ function UserDashboard() {
 
         {/* Donation Eligibility Section (per component type) */}
         <section className="mb-8">
-          <div className="rounded-2xl bg-white/95 p-5 shadow-sm ring-1 ring-slate-100">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Donation eligibility</h3>
@@ -475,7 +495,7 @@ function UserDashboard() {
                 </p>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {['whole_blood', 'platelets', 'plasma'].map((type) => {
                 const info = eligibility?.[type]
                 const label =
@@ -525,10 +545,10 @@ function UserDashboard() {
         {/* Schedule Request Section */}
         {scheduleRequest && (
           <section className="mb-8">
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm ring-1 ring-slate-100/90">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Schedule Request Status</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Schedule request status</h3>
                   <p className="mt-1 text-xs text-slate-500">
                     Preferred Date: {new Date(scheduleRequest.preferred_date).toLocaleDateString()} at{' '}
                     {scheduleRequest.preferred_time}
@@ -566,10 +586,10 @@ function UserDashboard() {
             type="button"
             onClick={handleOpenScheduleModal}
             disabled={scheduleRequest && scheduleRequest.status === 'pending'}
-            className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm transition ${
+            className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition sm:w-auto sm:py-2 ${
               scheduleRequest && scheduleRequest.status === 'pending'
-                ? 'bg-slate-400 cursor-not-allowed'
-                : 'bg-red-600 hover:bg-red-500'
+                ? 'cursor-not-allowed bg-slate-400'
+                : 'bg-red-600 hover:bg-red-700'
             }`}
           >
             {scheduleRequest && scheduleRequest.status === 'pending'
@@ -580,28 +600,28 @@ function UserDashboard() {
 
         {/* Main Content Section - Donation History */}
         <section>
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-            <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">Donation History</h2>
+          <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
+            <div className="border-b border-slate-100 bg-linear-to-r from-red-50/30 to-white px-4 py-4 sm:px-6">
+              <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Donation history</h2>
               <p className="mt-1 text-sm text-slate-500">
                 View your past donation records
               </p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50/60">
+            <div className={`${responsiveTableContainer}`}>
+              <table className="min-w-[640px] divide-y divide-slate-100 sm:min-w-full">
+                <thead className="bg-slate-50/95">
                   <tr>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium text-slate-500">
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">
                       Donation Date
                     </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium text-slate-500">
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">
                       Blood Type
                     </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium text-slate-500">
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">
                       Admin Notes
                     </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium text-slate-500">
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">
                       Status
                     </th>
                   </tr>
@@ -622,7 +642,7 @@ function UserDashboard() {
                         key={donation.id}
                         className="transition hover:bg-slate-50/50"
                       >
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-900">
+                        <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-900 sm:px-6">
                           {donation.type === 'schedule' && donation.preferredTime
                             ? `${new Date(donation.date).toLocaleDateString('en-US', {
                                 year: 'numeric',
@@ -635,22 +655,22 @@ function UserDashboard() {
                                 day: 'numeric',
                               })}
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-900">
-                          {donation.bloodType}
+                        <td className="whitespace-nowrap px-4 py-4 text-sm font-medium text-slate-900 sm:px-6">
+                          <BloodTypeBadge type={donation.bloodType} className="text-sm" />
                           {donation.type === 'schedule' && donation.componentType && (
                             <span className="ml-2 text-xs text-slate-500">
                               ({donation.componentType === 'whole_blood' ? 'Whole Blood' : donation.componentType === 'platelets' ? 'Platelets' : donation.componentType === 'plasma' ? 'Plasma' : 'Whole Blood'})
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-600">
+                        <td className="px-4 py-4 text-sm text-slate-600 sm:px-6">
                           {donation.type === 'schedule' && donation.adminNotes
                             ? donation.adminNotes
                             : donation.type === 'donation'
                               ? '—'
                               : '—'}
                         </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm">
+                        <td className="whitespace-nowrap px-4 py-4 text-sm sm:px-6">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getStatusColor(donation.status)}`}
                           >
@@ -678,10 +698,10 @@ function UserDashboard() {
 
       {/* Schedule Request Modal */}
       {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Set Schedule</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Set schedule</h3>
               <button
                 type="button"
                 onClick={() => setIsScheduleModalOpen(false)}
@@ -694,9 +714,9 @@ function UserDashboard() {
             </div>
 
             {/* Eligibility Guidelines */}
-            <div className="mb-6 rounded-lg bg-blue-50 p-4">
-              <h4 className="text-sm font-semibold text-blue-900 mb-2">Requirements / Eligibility Guidelines</h4>
-              <ul className="space-y-1 text-xs text-blue-800 list-disc list-inside">
+            <div className="mb-6 rounded-xl border border-red-100 bg-red-50/60 p-4">
+              <h4 className="mb-2 text-sm font-semibold text-red-950">Requirements / eligibility guidelines</h4>
+              <ul className="list-inside list-disc space-y-1 text-xs text-red-900/90">
                 <li>Must meet minimum age requirement</li>
                 <li>Must meet minimum weight requirement</li>
                 <li>Must be feeling healthy</li>
@@ -707,16 +727,16 @@ function UserDashboard() {
               {/* Cooldown information & countdowns */}
               {eligibility && (
                 <div className="mt-3 space-y-1 text-xs">
-                  <p className="font-semibold text-blue-900">Donation cooldowns:</p>
-                  <p className="text-blue-800">
+                  <p className="font-semibold text-red-950">Donation cooldowns:</p>
+                  <p className="text-red-900/90">
                     Whole Blood: 90 days · Platelets: 14 days · Plasma: 28 days
                   </p>
                   {hasAnyCooldown() && (
-                    <div className="mt-2 rounded-md bg-blue-100/70 p-2">
-                      <p className="mb-1 text-[11px] font-semibold text-blue-900">
+                    <div className="mt-2 rounded-lg border border-red-100 bg-white/80 p-2">
+                      <p className="mb-1 text-[11px] font-semibold text-red-950">
                         Currently in cooldown:
                       </p>
-                      <ul className="space-y-0.5 text-[11px] text-blue-900">
+                      <ul className="space-y-0.5 text-[11px] text-red-900">
                         {['whole_blood', 'platelets', 'plasma'].map((t) => {
                           const info = eligibility[t]
                           if (!info || info.isEligible || !info.nextEligibleAt) return null
@@ -738,7 +758,7 @@ function UserDashboard() {
             </div>
 
             <form onSubmit={handleScheduleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
                     Preferred Date <span className="text-red-500">*</span>
@@ -751,7 +771,7 @@ function UserDashboard() {
                       setScheduleForm({ ...scheduleForm, preferredDate: e.target.value })
                     }
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   />
                 </div>
 
@@ -766,7 +786,7 @@ function UserDashboard() {
                     onChange={(e) =>
                       setScheduleForm({ ...scheduleForm, preferredTime: e.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   />
                 </div>
               </div>
@@ -781,7 +801,7 @@ function UserDashboard() {
                   onChange={(e) =>
                     setScheduleForm({ ...scheduleForm, componentType: e.target.value })
                   }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                 >
                   {getEligibleComponentOptions().map((option) => (
                     <option key={option.value} value={option.value}>
@@ -804,7 +824,7 @@ function UserDashboard() {
                   onChange={(e) =>
                     setScheduleForm({ ...scheduleForm, weight: e.target.value })
                   }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                 />
               </div>
 
@@ -828,7 +848,7 @@ function UserDashboard() {
                           },
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                     >
                       <option value="">Select</option>
                       <option value="yes">Yes</option>
@@ -852,7 +872,7 @@ function UserDashboard() {
                           },
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                     >
                       <option value="">Select</option>
                       <option value="yes">Yes</option>
@@ -876,7 +896,7 @@ function UserDashboard() {
                           },
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                     >
                       <option value="">Select</option>
                       <option value="yes">Yes</option>
@@ -900,7 +920,7 @@ function UserDashboard() {
                           },
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                     >
                       <option value="">Select</option>
                       <option value="yes">Yes</option>
@@ -924,7 +944,7 @@ function UserDashboard() {
                           },
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                     >
                       <option value="">Select</option>
                       <option value="yes">Yes</option>
@@ -944,7 +964,7 @@ function UserDashboard() {
                     setScheduleForm({ ...scheduleForm, notes: e.target.value })
                   }
                   rows={3}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   placeholder="Any additional information..."
                 />
               </div>
@@ -957,7 +977,7 @@ function UserDashboard() {
                   onChange={(e) =>
                     setScheduleForm({ ...scheduleForm, confirmation: e.target.checked })
                   }
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500/40"
                 />
                 <label className="text-xs text-slate-700">
                   I confirm all information is true <span className="text-red-500">*</span>
@@ -968,13 +988,13 @@ function UserDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsScheduleModalOpen(false)}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
                   Submit Request
                 </button>
@@ -985,8 +1005,8 @@ function UserDashboard() {
       )}
       {/* Cooldown Info Modal */}
       {cooldownModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
             <div className="flex items-start justify-between mb-3">
               <h3 className="text-base font-semibold text-slate-900">Donation Cooldown</h3>
               <button
@@ -1006,7 +1026,7 @@ function UserDashboard() {
               <button
                 type="button"
                 onClick={() => setCooldownModal({ open: false, message: '' })}
-                className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
               >
                 OK
               </button>
