@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -28,7 +28,7 @@ function getStatus(totalUnits) {
   return { key: 'red', label: 'Critical / Almost empty', color: '#ef4444' }
 }
 
-function createStatusIcon(color) {
+function createStatusIconWithSelection(color, isSelected) {
   return L.divIcon({
     className: '',
     iconSize: [26, 36],
@@ -42,8 +42,15 @@ function createStatusIcon(color) {
           </filter>
         </defs>
         <g filter="url(#shadow)">
-          <path d="M13 0C7.477 0 3 4.477 3 10c0 2.612 0.86 4.71 2.22 6.66 1.36 1.95 3.165 3.7 4.87 5.806C11.446 24.4 12.29 25.53 13 26.8c.71-1.27 1.554-2.4 2.91-4.334 1.705-2.106 3.51-3.856 4.87-5.806C22.14 14.71 23 12.612 23 10 23 4.477 18.523 0 13 0z" fill="${color}" />
-          <circle cx="13" cy="10" r="5" fill="white" fill-opacity="0.9" />
+          <path d="M13 0C7.477 0 3 4.477 3 10c0 2.612 0.86 4.71 2.22 6.66 1.36 1.95 3.165 3.7 4.87 5.806C11.446 24.4 12.29 25.53 13 26.8c.71-1.27 1.554-2.4 2.91-4.334 1.705-2.106 3.51-3.856 4.87-5.806C22.14 14.71 23 12.612 23 10 23 4.477 18.523 0 13 0z" fill="${color}" ${
+            isSelected ? 'stroke="#0f172a" stroke-opacity="0.55" stroke-width="1.5"' : ''
+          }/>
+          ${
+            isSelected
+              ? `<circle cx="13" cy="10" r="7" fill="none" stroke="#0f172a" stroke-opacity="0.65" stroke-width="2" />`
+              : ''
+          }
+          <circle cx="13" cy="10" r="${isSelected ? 6 : 5}" fill="white" fill-opacity="0.92" />
         </g>
       </svg>
     `,
@@ -67,11 +74,40 @@ function normalizeName(name) {
   return (name || '').trim().toUpperCase()
 }
 
+function FlyToSelectedHospital({ selectedHospital, selectedHospitalId, markerRefs }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!selectedHospital) return
+    if (!map) return
+
+    const targetLatLng = [selectedHospital.lat, selectedHospital.lng]
+
+    const openSelectedPopup = () => {
+      const marker = markerRefs.current[selectedHospitalId]
+      if (!marker) return
+      marker.openPopup()
+    }
+
+    // Smooth transition, then open the popup card at the focused marker.
+    map.once('moveend', openSelectedPopup)
+    map.flyTo(targetLatLng, 15, { duration: 1.2 })
+
+    return () => {
+      map.off('moveend', openSelectedPopup)
+    }
+  }, [map, markerRefs, selectedHospital, selectedHospitalId])
+
+  return null
+}
+
 function HospitalSupplyMap() {
   const [hospitals, setHospitals] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [selectedHospitalId, setSelectedHospitalId] = useState(null)
+  const markerRefs = useRef({})
 
   useEffect(() => {
     let isMounted = true
@@ -200,6 +236,11 @@ function HospitalSupplyMap() {
     [hospitals],
   )
 
+  const selectedHospital = useMemo(
+    () => markers.find((m) => m.id === selectedHospitalId) || null,
+    [markers, selectedHospitalId],
+  )
+
   const center = markers.length
     ? [markers[0].lat, markers[0].lng]
     : [14.5995, 120.9842]
@@ -256,9 +297,19 @@ function HospitalSupplyMap() {
             <Marker
               key={marker.id}
               position={[marker.lat, marker.lng]}
-              icon={createStatusIcon(marker.status.color)}
+              icon={createStatusIconWithSelection(marker.status.color, marker.id === selectedHospitalId)}
+              ref={(instance) => {
+                if (instance) {
+                  markerRefs.current[marker.id] = instance
+                } else {
+                  delete markerRefs.current[marker.id]
+                }
+              }}
+              eventHandlers={{
+                click: () => setSelectedHospitalId(marker.id),
+              }}
             >
-              <Popup>
+              <Popup autoPan={false}>
                 <div className="space-y-1 text-xs">
                   <p className="text-sm font-semibold text-slate-900">{marker.name}</p>
                   <p className="text-slate-700">
@@ -307,25 +358,77 @@ function HospitalSupplyMap() {
               </Popup>
             </Marker>
           ))}
+
+          <FlyToSelectedHospital
+            selectedHospital={selectedHospital}
+            selectedHospitalId={selectedHospitalId}
+            markerRefs={markerRefs}
+          />
         </MapContainer>
 
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm ring-1 ring-slate-200">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="pointer-events-none absolute bottom-3 left-3 z-1000 rounded-lg bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm ring-1 ring-slate-200">
+          <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-black">
             Supply Status
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              <span>Green: 50+ units</span>
+              <span>High : 50+ units</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
-              <span>Yellow: 20–49 units</span>
+              <span>Moderate : 20–49 units</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
-              <span>Red: 0–19 units</span>
+              <span>Low : 0–19 units</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Hospital quick-select buttons */}
+      <div className="flex-none border-t border-slate-100 bg-white px-3 py-3 sm:px-4">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Hospitals
+          </p>
+          {selectedHospital ? (
+            <span className="text-[11px] font-semibold text-slate-700">
+              Selected: <span style={{ color: selectedHospital.status.color }}>{selectedHospital.name}</span>
+            </span>
+          ) : (
+            <span className="text-[11px] text-slate-400">Click a hospital to focus the map</span>
+          )}
+        </div>
+
+        <div className="max-h-[140px] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+            {markers.map((marker) => {
+              const isSelected = marker.id === selectedHospitalId
+              return (
+                <button
+                  key={marker.id}
+                  type="button"
+                  onClick={() => setSelectedHospitalId(marker.id)}
+                  className={[
+                    'flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-semibold shadow-sm transition',
+                    'focus:outline-none focus:ring-2 focus:ring-red-500/25',
+                    'hover:bg-slate-50 active:bg-slate-100',
+                    isSelected ? 'bg-slate-50 border-slate-300' : 'bg-white border-slate-200',
+                  ].join(' ')}
+                  style={isSelected ? { borderColor: marker.status.color } : undefined}
+                  aria-pressed={isSelected}
+                >
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: marker.status.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 truncate">{marker.name}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
