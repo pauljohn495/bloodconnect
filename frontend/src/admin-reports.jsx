@@ -708,13 +708,6 @@ function AdminReports() {
                                 ? 'bg-orange-50 text-orange-700 ring-orange-100'
                                 : 'bg-slate-100 text-slate-700 ring-slate-200'
 
-                          const rowLeftBorderClasses =
-                            rec.priority === 'critical'
-                              ? 'border-l-4 border-red-300/80'
-                              : rec.priority === 'urgent'
-                                ? 'border-l-4 border-orange-300/80'
-                                : 'border-l-4 border-slate-200/80'
-
                           const recommendationIconKind =
                             rec.recommendation ===
                             'Already covered by current on-hand stock'
@@ -738,7 +731,6 @@ function AdminReports() {
                             key={rec.requestId || idx}
                             className={
                               'transition-colors hover:bg-slate-50 ' +
-                              rowLeftBorderClasses +
                               (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
                             }
                           >
