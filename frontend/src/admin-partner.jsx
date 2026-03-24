@@ -36,6 +36,9 @@ function AdminPartner() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [selectedRequestIds, setSelectedRequestIds] = useState(new Set())
   const [plannedRequestStatuses, setPlannedRequestStatuses] = useState({})
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [hospitalToDelete, setHospitalToDelete] = useState(null)
+  const [isDeletingHospital, setIsDeletingHospital] = useState(false)
 
   const selectedRequests = useMemo(() => hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId)), [hospitalApprovedRequests, selectedRequestIds])
 
@@ -156,19 +159,31 @@ function AdminPartner() {
     }
   }
 
-  const handleDeleteHospital = async (hospital) => {
-    const name = hospital.hospital_name || hospital.hospitalName || 'this hospital'
-    const confirmed = window.confirm(`Delete ${name}? This will remove its hospital login too.`)
-    if (!confirmed) return
+  const handleDeleteHospital = (hospital) => {
+    setHospitalToDelete(hospital)
+    setIsDeleteModalOpen(true)
+    setOpenMenuHospitalId(null)
+  }
 
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false)
+    setHospitalToDelete(null)
+    setIsDeletingHospital(false)
+  }
+
+  const handleConfirmDeleteHospital = async () => {
+    if (!hospitalToDelete) return
     try {
-      await apiRequest(`/api/admin/hospitals/${hospital.id}`, { method: 'DELETE' })
+      setIsDeletingHospital(true)
+      await apiRequest(`/api/admin/hospitals/${hospitalToDelete.id}`, { method: 'DELETE' })
       setOpenMenuHospitalId(null)
       await loadHospitals()
       showNotification('Hospital deleted successfully!', 'primary')
+      handleCloseDeleteModal()
     } catch (err) {
       console.error('Failed to delete hospital', err)
       showNotification(err.message || 'Failed to delete hospital', 'destructive')
+      setIsDeletingHospital(false)
     }
   }
 
@@ -315,7 +330,7 @@ function AdminPartner() {
     }))
 
     try {
-      await apiRequest('/api/admin/transfer', {
+      await apiRequest('/api/admin/transfers', {
         method: 'POST',
         body: JSON.stringify({
           hospitalId: hospitalId,
@@ -333,7 +348,7 @@ function AdminPartner() {
 
       for (const update of pendingStatusUpdates) {
         try {
-          await apiRequest(`/api/admin/requests/${update.requestId}/status`, {
+          await apiRequest(`/api/admin/requests/${update.requestId}`, {
             method: 'PATCH',
             body: JSON.stringify({
               status: update.status,
@@ -556,7 +571,7 @@ function AdminPartner() {
                               }
                               setOpenMenuHospitalId((prev) => (prev === hospital.id ? null : hospital.id))
                             }}
-                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm opacity-0 transition hover:bg-slate-50 hover:text-slate-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 group-hover:opacity-100"
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                             aria-haspopup="menu"
                             aria-expanded={openMenuHospitalId === hospital.id}
                             aria-label="Open hospital actions menu"
@@ -648,6 +663,63 @@ function AdminPartner() {
             </div>
           </div>
         </>
+      )}
+
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Delete Hospital</h3>
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                className="text-slate-400 hover:text-slate-600"
+                disabled={isDeletingHospital}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm text-slate-900">
+              Are you sure you want to delete this hospital account?
+            </p>
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Hospital:</span>{' '}
+                {hospitalToDelete?.hospital_name || hospitalToDelete?.hospitalName || '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Username:</span>{' '}
+                {hospitalToDelete?.username || '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Email:</span>{' '}
+                {hospitalToDelete?.email || '—'}
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                disabled={isDeletingHospital}
+                className="inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteHospital}
+                disabled={isDeletingHospital}
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isDeletingHospital ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {isModalOpen && (
@@ -1308,12 +1380,12 @@ function AdminPartner() {
 
       {/* Notification Container */}
       {notification && (
-        <div className="fixed top-4 right-4 z-200 transition-all duration-300 ease-in-out">
+        <div className="fixed right-4 top-4 z-60 transition-all duration-300 ease-in-out">
           <div
-            className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg min-w-[300px] max-w-md ${
+            className={`flex min-w-[300px] max-w-md items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${
               notification.type === 'destructive'
                 ? 'border-red-200 bg-red-50 text-red-800'
-                : 'border-red-200 bg-red-50 text-red-800'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
             }`}
           >
             {notification.type === 'destructive' ? (
@@ -1328,7 +1400,11 @@ function AdminPartner() {
             <p className="text-sm font-medium flex-1">{notification.message}</p>
             <button
               onClick={() => setNotification(null)}
-              className="shrink-0 rounded p-1 transition hover:opacity-70 text-red-600 hover:bg-red-100"
+              className={`shrink-0 rounded p-1 transition hover:opacity-70 ${
+                notification.type === 'destructive'
+                  ? 'text-red-600 hover:bg-red-100'
+                  : 'text-emerald-700 hover:bg-emerald-100'
+              }`}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
