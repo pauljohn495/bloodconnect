@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 import { adminPanel } from './admin-ui.jsx'
@@ -27,6 +27,26 @@ function AdminDonation() {
   const [isDonorDetailsOpen, setIsDonorDetailsOpen] = useState(false)
   const [selectedDonorDetails, setSelectedDonorDetails] = useState(null)
   const [donorSearch, setDonorSearch] = useState('')
+  const [notification, setNotification] = useState(null)
+  const [openMenuDonorId, setOpenMenuDonorId] = useState(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const buttonRefs = useRef({})
+  const [isEditDonorModalOpen, setIsEditDonorModalOpen] = useState(false)
+  const [editingDonor, setEditingDonor] = useState(null)
+  const [editDonorName, setEditDonorName] = useState('')
+  const [editBloodType, setEditBloodType] = useState('')
+  const [editContactDonor, setEditContactDonor] = useState('')
+  const [editStatus, setEditStatus] = useState('active')
+  const [isDeleteDonorModalOpen, setIsDeleteDonorModalOpen] = useState(false)
+  const [donorToDelete, setDonorToDelete] = useState(null)
+  const [isDeletingDonor, setIsDeletingDonor] = useState(false)
+
+  const showNotification = (message, type = 'primary') => {
+    setNotification({ message, type })
+    setTimeout(() => {
+      setNotification(null)
+    }, 5000)
+  }
 
   const loadDonors = async () => {
     try {
@@ -44,6 +64,14 @@ function AdminDonation() {
   useEffect(() => {
     loadDonors()
   }, [])
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (openMenuDonorId) setOpenMenuDonorId(null)
+    }
+    window.addEventListener('scroll', handleScroll, true)
+    return () => window.removeEventListener('scroll', handleScroll, true)
+  }, [openMenuDonorId])
 
   const donorNameForSearch = (donor) =>
     (
@@ -88,8 +116,10 @@ function AdminDonation() {
       // Refresh table so new donor appears immediately
       await loadDonors()
       handleCloseModal()
+      showNotification('Donor added successfully!', 'primary')
     } catch (err) {
       console.error('Failed to add donor', err)
+      showNotification(err.message || 'Failed to add donor', 'destructive')
     }
   }
 
@@ -262,6 +292,74 @@ function AdminDonation() {
     }
   }
 
+  const handleOpenEditDonorModal = (donor) => {
+    setOpenMenuDonorId(null)
+    setEditingDonor(donor)
+    setEditDonorName(donor.full_name || donor.fullName || donor.donor_name || donor.donorName || '')
+    setEditBloodType(donor.blood_type || donor.bloodType || '')
+    setEditContactDonor(donor.phone || donor.contact_phone || donor.contactPhone || '')
+    setEditStatus(donor.status || 'active')
+    setIsEditDonorModalOpen(true)
+  }
+
+  const handleCloseEditDonorModal = () => {
+    setIsEditDonorModalOpen(false)
+    setEditingDonor(null)
+    setEditDonorName('')
+    setEditBloodType('')
+    setEditContactDonor('')
+    setEditStatus('active')
+  }
+
+  const handleUpdateDonor = async (e) => {
+    e.preventDefault()
+    if (!editingDonor) return
+    try {
+      await apiRequest(`/api/admin/donors/${editingDonor.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          donorName: editDonorName,
+          bloodType: editBloodType,
+          contactPhone: editContactDonor,
+          status: editStatus,
+        }),
+      })
+      await loadDonors()
+      handleCloseEditDonorModal()
+      showNotification('Donor updated successfully', 'primary')
+    } catch (err) {
+      console.error('Failed to update donor', err)
+      showNotification(err.message || 'Failed to update donor', 'destructive')
+    }
+  }
+
+  const handleOpenDeleteDonorModal = (donor) => {
+    setOpenMenuDonorId(null)
+    setDonorToDelete(donor)
+    setIsDeleteDonorModalOpen(true)
+  }
+
+  const handleCloseDeleteDonorModal = () => {
+    setIsDeleteDonorModalOpen(false)
+    setDonorToDelete(null)
+    setIsDeletingDonor(false)
+  }
+
+  const handleConfirmDeleteDonor = async () => {
+    if (!donorToDelete) return
+    try {
+      setIsDeletingDonor(true)
+      await apiRequest(`/api/admin/donors/${donorToDelete.id}`, { method: 'DELETE' })
+      await loadDonors()
+      handleCloseDeleteDonorModal()
+      showNotification('Donor deleted successfully', 'primary')
+    } catch (err) {
+      console.error('Failed to delete donor', err)
+      showNotification(err.message || 'Failed to delete donor', 'destructive')
+      setIsDeletingDonor(false)
+    }
+  }
+
   return (
     <AdminLayout
       pageTitle="Donors"
@@ -323,10 +421,10 @@ function AdminDonation() {
                     Contact
                   </th>
                   <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                    Details
-                  </th>
-                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                     Status
+                  </th>
+                  <th className={`whitespace-nowrap px-4 py-2 text-right text-[13px] ${adminPanel.emerald.th}`}>
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -368,15 +466,6 @@ function AdminDonation() {
                       <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
                         {donor.phone || donor.contact_phone || donor.contactPhone || '—'}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                        <button
-                          type="button"
-                          onClick={() => loadDonorDetails(donor.id)}
-                          className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                        >
-                          View Details
-                        </button>
-                      </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm">
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 ${donor.status === 'active'
@@ -388,6 +477,43 @@ function AdminDonation() {
                         >
                           {donor.status ? donor.status.charAt(0).toUpperCase() + donor.status.slice(1) : 'Active'}
                         </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-right text-sm">
+                        <div className="relative inline-block text-left">
+                          <button
+                            ref={(el) => (buttonRefs.current[donor.id] = el)}
+                            type="button"
+                            onClick={() => {
+                              const button = buttonRefs.current[donor.id]
+                              if (button) {
+                                const rect = button.getBoundingClientRect()
+                                setMenuPosition({
+                                  top: rect.bottom + 8,
+                                  right: window.innerWidth - rect.right,
+                                })
+                              }
+                              setOpenMenuDonorId((prev) => (prev === donor.id ? null : donor.id))
+                            }}
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            aria-haspopup="menu"
+                            aria-expanded={openMenuDonorId === donor.id}
+                            aria-label="Open donor actions menu"
+                          >
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 6.5h.01M12 12h.01M12 17.5h.01"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -480,6 +606,59 @@ function AdminDonation() {
         </div>
       )}
 
+      {openMenuDonorId && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpenMenuDonorId(null)} />
+          <div
+            className="fixed z-50 w-44 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-slate-200 focus:outline-none"
+            style={{
+              top: `${menuPosition.top}px`,
+              right: `${menuPosition.right}px`,
+            }}
+            role="menu"
+            aria-label="Donor actions"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-1">
+              <button
+                type="button"
+                className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                role="menuitem"
+                onClick={() => {
+                  const selectedDonor = donors.find((entry) => entry.id === openMenuDonorId)
+                  if (selectedDonor) loadDonorDetails(selectedDonor.id)
+                  setOpenMenuDonorId(null)
+                }}
+              >
+                View Details
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                role="menuitem"
+                onClick={() => {
+                  const selectedDonor = donors.find((entry) => entry.id === openMenuDonorId)
+                  if (selectedDonor) handleOpenEditDonorModal(selectedDonor)
+                }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                role="menuitem"
+                onClick={() => {
+                  const selectedDonor = donors.find((entry) => entry.id === openMenuDonorId)
+                  if (selectedDonor) handleOpenDeleteDonorModal(selectedDonor)
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Schedule Requests Modal */}
       {isScheduleRequestsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
@@ -568,6 +747,146 @@ function AdminDonation() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {isEditDonorModalOpen && editingDonor && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Edit Donor</h3>
+              <button
+                type="button"
+                onClick={handleCloseEditDonorModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateDonor} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Donor Name</label>
+                <input
+                  type="text"
+                  value={editDonorName}
+                  onChange={(e) => setEditDonorName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Blood Type</label>
+                <select
+                  value={editBloodType}
+                  onChange={(e) => setEditBloodType(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                >
+                  <option value="">Select blood type</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Contact Number</label>
+                <input
+                  type="text"
+                  value={editContactDonor}
+                  onChange={(e) => setEditContactDonor(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Status</label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseEditDonorModal}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isDeleteDonorModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Delete Donor</h3>
+              <button
+                type="button"
+                onClick={handleCloseDeleteDonorModal}
+                className="text-slate-400 hover:text-slate-600"
+                disabled={isDeletingDonor}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-slate-900">Are you sure you want to delete this donor account?</p>
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Name:</span>{' '}
+                {donorToDelete?.full_name || donorToDelete?.fullName || donorToDelete?.donor_name || donorToDelete?.donorName || '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Contact:</span>{' '}
+                {donorToDelete?.phone || donorToDelete?.contact_phone || donorToDelete?.contactPhone || '—'}
+              </p>
+            </div>
+            <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={handleCloseDeleteDonorModal}
+                disabled={isDeletingDonor}
+                className="inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteDonor}
+                disabled={isDeletingDonor}
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isDeletingDonor ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1070,6 +1389,52 @@ function AdminDonation() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {notification && (
+        <div className="fixed right-4 top-4 z-60 transition-all duration-300 ease-in-out">
+          <div
+            className={`flex min-w-[300px] max-w-md items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${
+              notification.type === 'destructive'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            }`}
+          >
+            {notification.type === 'destructive' ? (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            )}
+            <p className="flex-1 text-sm font-medium">{notification.message}</p>
+            <button
+              type="button"
+              onClick={() => setNotification(null)}
+              className={`shrink-0 rounded p-1 transition hover:opacity-70 ${
+                notification.type === 'destructive'
+                  ? 'text-red-600 hover:bg-red-100'
+                  : 'text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}

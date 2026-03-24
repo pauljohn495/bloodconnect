@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 import { adminPanel } from './admin-ui.jsx'
@@ -8,6 +8,12 @@ function AdminUsers() {
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [adminToDelete, setAdminToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [openMenuAdminId, setOpenMenuAdminId] = useState(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const buttonRefs = useRef({})
   const [selectedAdmin, setSelectedAdmin] = useState(null)
   const [notification, setNotification] = useState(null)
   const [formData, setFormData] = useState({
@@ -24,19 +30,27 @@ function AdminUsers() {
     loadAdmins()
   }, [])
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (openMenuAdminId) setOpenMenuAdminId(null)
+    }
+    window.addEventListener('scroll', handleScroll, true)
+    return () => window.removeEventListener('scroll', handleScroll, true)
+  }, [openMenuAdminId])
+
   const loadAdmins = async () => {
     try {
       setIsLoading(true)
       const data = await apiRequest('/api/admin/admins')
       setAdmins(data)
     } catch (err) {
-      showNotification('Failed to load admins', 'error')
+      showNotification('Failed to load admins', 'destructive')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const showNotification = (message, type = 'success') => {
+  const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
     setTimeout(() => setNotification(null), 5000)
   }
@@ -53,7 +67,7 @@ function AdminUsers() {
       resetForm()
       loadAdmins()
     } catch (err) {
-      showNotification(err.message || 'Failed to create admin', 'error')
+      showNotification(err.message || 'Failed to create admin', 'destructive')
     }
   }
 
@@ -75,24 +89,41 @@ function AdminUsers() {
       resetForm()
       loadAdmins()
     } catch (err) {
-      showNotification(err.message || 'Failed to update admin', 'error')
+      showNotification(err.message || 'Failed to update admin', 'destructive')
     }
   }
 
-  const handleDeleteAdmin = async (adminId) => {
-    if (!confirm('Are you sure you want to delete this admin?')) return
+  const handleDeleteAdmin = (admin) => {
+    setOpenMenuAdminId(null)
+    setAdminToDelete(admin)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false)
+    setAdminToDelete(null)
+    setIsDeleting(false)
+  }
+
+  const handleConfirmDeleteAdmin = async () => {
+    if (!adminToDelete) return
+
     try {
-      await apiRequest(`/api/admin/admins/${adminId}`, {
+      setIsDeleting(true)
+      await apiRequest(`/api/admin/admins/${adminToDelete.id}`, {
         method: 'DELETE',
       })
       showNotification('Admin deleted successfully')
-      loadAdmins()
+      await loadAdmins()
+      handleCloseDeleteModal()
     } catch (err) {
-      showNotification(err.message || 'Failed to delete admin', 'error')
+      showNotification(err.message || 'Failed to delete admin', 'destructive')
+      setIsDeleting(false)
     }
   }
 
   const openEditModal = (admin) => {
+    setOpenMenuAdminId(null)
     setSelectedAdmin(admin)
     setFormData({
       fullName: admin.full_name,
@@ -123,15 +154,6 @@ function AdminUsers() {
   return (
     <AdminLayout pageTitle="Manage Users" pageDescription="Manage admin accounts">
       <div className="space-y-6">
-        {/* Notification */}
-        {notification && (
-          <div className={`rounded-lg p-4 ${
-            notification.type === 'error' ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'
-          }`}>
-            {notification.message}
-          </div>
-        )}
-
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -140,7 +162,7 @@ function AdminUsers() {
           </div>
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -170,7 +192,7 @@ function AdminUsers() {
                   <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
                     Status
                   </th>
-                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.violet.th}`}>
+                  <th className={`whitespace-nowrap px-4 py-2 text-right text-[13px] ${adminPanel.violet.th}`}>
                     Actions
                   </th>
                 </tr>
@@ -218,19 +240,42 @@ function AdminUsers() {
                           {admin.status ? admin.status.charAt(0).toUpperCase() + admin.status.slice(1) : ''}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-sm font-medium">
-                        <button
-                          onClick={() => openEditModal(admin)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-4"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAdmin(admin.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
+                      <td className="whitespace-nowrap px-4 py-2 text-right text-sm">
+                        <div className="relative inline-block text-right">
+                          <button
+                            ref={(el) => (buttonRefs.current[admin.id] = el)}
+                            type="button"
+                            onClick={() => {
+                              const button = buttonRefs.current[admin.id]
+                              if (button) {
+                                const rect = button.getBoundingClientRect()
+                                setMenuPosition({
+                                  top: rect.bottom + 8,
+                                  right: window.innerWidth - rect.right,
+                                })
+                              }
+                              setOpenMenuAdminId((prev) => (prev === admin.id ? null : admin.id))
+                            }}
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            aria-haspopup="menu"
+                            aria-expanded={openMenuAdminId === admin.id}
+                            aria-label="Open admin actions menu"
+                          >
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 6.5h.01M12 12h.01M12 17.5h.01"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -411,7 +456,166 @@ function AdminUsers() {
             </div>
           </div>
         )}
+
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-700 ring-1 ring-red-100">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v3m0 3h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"
+                      />
+                    </svg>
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">Delete Admin Account</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">This action cannot be undone.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseDeleteModal}
+                  className="text-slate-400 hover:text-slate-600"
+                  disabled={isDeleting}
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <p className="mt-4 text-sm text-slate-700">
+                Are you sure you want to remove this admin from the system?
+              </p>
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs text-slate-600">
+                  <span className="font-semibold text-slate-800">Name:</span>{' '}
+                  {adminToDelete?.full_name || '—'}
+                </p>
+                <p className="mt-1 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-800">Username:</span>{' '}
+                  {adminToDelete?.username || '—'}
+                </p>
+                <p className="mt-1 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-800">Email:</span>{' '}
+                  {adminToDelete?.email || '—'}
+                </p>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCloseDeleteModal}
+                  disabled={isDeleting}
+                  className="inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteAdmin}
+                  disabled={isDeleting}
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {openMenuAdminId && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpenMenuAdminId(null)} />
+          <div
+            className="fixed z-50 w-40 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-slate-200 focus:outline-none"
+            style={{
+              top: `${menuPosition.top}px`,
+              right: `${menuPosition.right}px`,
+            }}
+            role="menu"
+            aria-label="Admin actions"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-1">
+              <button
+                type="button"
+                className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                role="menuitem"
+                onClick={() => {
+                  const selectedAdminRecord = admins.find((entry) => entry.id === openMenuAdminId)
+                  if (selectedAdminRecord) openEditModal(selectedAdminRecord)
+                }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                role="menuitem"
+                onClick={() => {
+                  const selectedAdminRecord = admins.find((entry) => entry.id === openMenuAdminId)
+                  if (selectedAdminRecord) handleDeleteAdmin(selectedAdminRecord)
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {notification && (
+        <div className="fixed right-4 top-4 z-60 transition-all duration-300 ease-in-out">
+          <div
+            className={`flex min-w-[300px] max-w-md items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${
+              notification.type === 'destructive'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            }`}
+          >
+            {notification.type === 'destructive' ? (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            )}
+            <p className="flex-1 text-sm font-medium">{notification.message}</p>
+            <button
+              type="button"
+              onClick={() => setNotification(null)}
+              className={`shrink-0 rounded p-1 transition hover:opacity-70 ${
+                notification.type === 'destructive'
+                  ? 'text-red-600 hover:bg-red-100'
+                  : 'text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }

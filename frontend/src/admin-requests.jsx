@@ -90,7 +90,7 @@ function AdminRequests() {
 
   const handleUpdateStatus = async (requestId, status, unitsApproved = null, notes = null) => {
     try {
-      await apiRequest(`/api/admin/requests/${requestId}/status`, {
+      await apiRequest(`/api/admin/requests/${requestId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           status,

@@ -589,7 +589,7 @@ function AdminReports() {
 
   const handleFulfillRequest = async (requestId) => {
     try {
-      await apiRequest(`/api/admin/requests/${requestId}/status`, {
+      await apiRequest(`/api/admin/requests/${requestId}`, {
         method: 'PATCH',
         body: JSON.stringify({
           status: 'fulfilled',

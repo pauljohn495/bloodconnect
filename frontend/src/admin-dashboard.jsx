@@ -80,7 +80,7 @@ function AdminDashboard() {
       try {
         setIsLoading(true)
         const [summaryData, inventoryData, transfersData] = await Promise.all([
-          apiRequest('/api/admin/dashboard-summary'),
+          apiRequest('/api/admin/dashboard/summary'),
           apiRequest('/api/admin/inventory'),
           apiRequest('/api/admin/transfers?limit=10'),
         ])
