@@ -5,6 +5,7 @@ import { adminPanel } from './admin-ui.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
 function AdminDonation() {
+  const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations'
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [donorName, setDonorName] = useState('')
   const [bloodType, setBloodType] = useState('')
@@ -40,6 +41,30 @@ function AdminDonation() {
   const [isDeleteDonorModalOpen, setIsDeleteDonorModalOpen] = useState(false)
   const [donorToDelete, setDonorToDelete] = useState(null)
   const [isDeletingDonor, setIsDeletingDonor] = useState(false)
+  const [organizations, setOrganizations] = useState([])
+  const [isOrganizationsLoading, setIsOrganizationsLoading] = useState(false)
+  const [organizationsError, setOrganizationsError] = useState('')
+  const [isAddOrganizationModalOpen, setIsAddOrganizationModalOpen] = useState(false)
+  const [organizationName, setOrganizationName] = useState('')
+  const [organizationContactNumber, setOrganizationContactNumber] = useState('')
+  const [organizationEmailAddress, setOrganizationEmailAddress] = useState('')
+  const [organizationAddress, setOrganizationAddress] = useState('')
+  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false)
+
+  const [isOrgDonationModalOpen, setIsOrgDonationModalOpen] = useState(false)
+  const [orgDonationOrganizationId, setOrgDonationOrganizationId] = useState('')
+  const [orgDonationDate, setOrgDonationDate] = useState('')
+  const [orgDonationItems, setOrgDonationItems] = useState([
+    { componentType: 'whole_blood', bloodType: '', units: '', expirationDate: '' },
+  ])
+  const [isSavingOrgDonation, setIsSavingOrgDonation] = useState(false)
+
+  const [isDonationRankingModalOpen, setIsDonationRankingModalOpen] = useState(false)
+  const [rankingTab, setRankingTab] = useState('organizations') // 'organizations' | 'donors'
+  const [orgRanking, setOrgRanking] = useState([])
+  const [donorRanking, setDonorRanking] = useState([])
+  const [isRankingLoading, setIsRankingLoading] = useState(false)
+  const [rankingError, setRankingError] = useState('')
 
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
@@ -61,9 +86,28 @@ function AdminDonation() {
     }
   }
 
+  const loadOrganizations = async () => {
+    try {
+      setIsOrganizationsLoading(true)
+      setOrganizationsError('')
+      const data = await apiRequest('/api/admin/organizations')
+      setOrganizations(data || [])
+    } catch (err) {
+      setOrganizationsError(err.message || 'Failed to load organizations')
+    } finally {
+      setIsOrganizationsLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadDonors()
   }, [])
+
+  useEffect(() => {
+    if (activeSection === 'organizations') {
+      loadOrganizations()
+    }
+  }, [activeSection])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -100,6 +144,139 @@ function AdminDonation() {
     setDonorName('')
     setBloodType('')
     setContactDonor('')
+  }
+
+  const handleOpenAddOrganizationModal = () => {
+    setIsAddOrganizationModalOpen(true)
+    setOrganizationName('')
+    setOrganizationContactNumber('')
+    setOrganizationEmailAddress('')
+    setOrganizationAddress('')
+    setIsCreatingOrganization(false)
+  }
+
+  const handleOpenOrgDonationModal = () => {
+    setIsOrgDonationModalOpen(true)
+    setIsSavingOrgDonation(false)
+
+    const todayIso = new Date().toISOString().split('T')[0]
+    setOrgDonationDate(todayIso)
+    setOrgDonationItems([{ componentType: 'whole_blood', bloodType: '', units: '', expirationDate: '' }])
+
+    // Default to first org if available (convenience)
+    if (organizations && organizations.length > 0) {
+      setOrgDonationOrganizationId(String(organizations[0].id))
+    } else {
+      setOrgDonationOrganizationId('')
+      // Ensure we have the latest organizations list
+      loadOrganizations()
+    }
+  }
+
+  const handleCloseOrgDonationModal = () => {
+    setIsOrgDonationModalOpen(false)
+    setOrgDonationOrganizationId('')
+    setOrgDonationDate('')
+    setOrgDonationItems([{ componentType: 'whole_blood', bloodType: '', units: '', expirationDate: '' }])
+    setIsSavingOrgDonation(false)
+  }
+
+  const updateOrgDonationItem = (index, patch) => {
+    setOrgDonationItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  }
+
+  const removeOrgDonationItem = (index) => {
+    setOrgDonationItems((prev) => {
+      if (prev.length <= 1) return prev
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  const addOrgDonationItem = () => {
+    setOrgDonationItems((prev) => [
+      ...prev,
+      { componentType: 'whole_blood', bloodType: '', units: '', expirationDate: '' },
+    ])
+  }
+
+  const handleSubmitOrgDonation = async (e) => {
+    e.preventDefault()
+    try {
+      setIsSavingOrgDonation(true)
+      await apiRequest('/api/admin/organization-donations', {
+        method: 'POST',
+        body: JSON.stringify({
+          organizationId: Number(orgDonationOrganizationId),
+          donationDate: orgDonationDate,
+          items: orgDonationItems.map((row) => ({
+            componentType: row.componentType,
+            bloodType: row.bloodType,
+            units: Number(row.units),
+            expirationDate: row.expirationDate,
+          })),
+        }),
+      })
+      handleCloseOrgDonationModal()
+      showNotification('Donation entry saved and inventory updated.', 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Failed to save donation entry', 'destructive')
+      setIsSavingOrgDonation(false)
+    }
+  }
+
+  const handleOpenDonationRankingModal = async () => {
+    setIsDonationRankingModalOpen(true)
+    setRankingError('')
+    setIsRankingLoading(true)
+    try {
+      const [orgs, donors] = await Promise.all([
+        apiRequest('/api/admin/donation-rankings/organizations?limit=50'),
+        apiRequest('/api/admin/donation-rankings/donors?limit=50'),
+      ])
+      setOrgRanking(orgs || [])
+      setDonorRanking(donors || [])
+    } catch (err) {
+      setRankingError(err.message || 'Failed to load donation rankings')
+    } finally {
+      setIsRankingLoading(false)
+    }
+  }
+
+  const handleCloseDonationRankingModal = () => {
+    setIsDonationRankingModalOpen(false)
+    setRankingError('')
+    setIsRankingLoading(false)
+  }
+
+  const handleCloseAddOrganizationModal = () => {
+    setIsAddOrganizationModalOpen(false)
+    setOrganizationName('')
+    setOrganizationContactNumber('')
+    setOrganizationEmailAddress('')
+    setOrganizationAddress('')
+    setIsCreatingOrganization(false)
+  }
+
+  const handleCreateOrganization = async (e) => {
+    e.preventDefault()
+    try {
+      setIsCreatingOrganization(true)
+      await apiRequest('/api/admin/organizations', {
+        method: 'POST',
+        body: JSON.stringify({
+          organizationName,
+          contactNumber: organizationContactNumber,
+          emailAddress: organizationEmailAddress,
+          address: organizationAddress,
+        }),
+      })
+      await loadOrganizations()
+      handleCloseAddOrganizationModal()
+      showNotification('Organization added successfully!', 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Failed to add organization', 'destructive')
+      setIsCreatingOrganization(false)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -362,48 +539,118 @@ function AdminDonation() {
 
   return (
     <AdminLayout
-      pageTitle="Donors"
-      pageDescription="View and manage registered blood donors."
+      pageTitle={activeSection === 'organizations' ? 'Organizations' : 'Donors'}
+      pageDescription={
+        activeSection === 'organizations'
+          ? 'View and manage registered organizations.'
+          : 'View and manage registered blood donors.'
+      }
     >
       <section className="mt-2">
+        <div className="mb-3 flex items-center justify-start">
+          <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setActiveSection('donors')}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                activeSection === 'donors'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Donors
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSection('organizations')}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                activeSection === 'organizations'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              Organizations
+            </button>
+          </div>
+        </div>
         <div className={adminPanel.emerald.outer}>
           <div className={adminPanel.emerald.header}>
             <div>
-              <h2 className={adminPanel.emerald.title}>List of Donors</h2>
+              <h2 className={adminPanel.emerald.title}>
+                {activeSection === 'organizations' ? 'Organizations' : 'List of Donors'}
+              </h2>
               <p className={adminPanel.emerald.subtitle}>
-                Overview of all registered donors
+                {activeSection === 'organizations'
+                  ? 'Overview of all registered organizations'
+                  : 'Overview of all registered donors'}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <div className="hidden sm:block">
                 <input
-                  value={donorSearch}
+                  value={activeSection === 'organizations' ? '' : donorSearch}
                   onChange={(e) => setDonorSearch(e.target.value)}
-                  placeholder="Search donor name..."
+                  placeholder={activeSection === 'organizations' ? 'Search (coming soon)...' : 'Search donor name...'}
                   className="w-56 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  disabled={activeSection === 'organizations'}
                 />
               </div>
-              <button
-                type="button"
-                onClick={handleOpenScheduleRequests}
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-              >
-                Schedule Requests
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenScheduleHistory}
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-              >
-                Schedule History
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenModal}
-                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
-              >
-                Add Donor
-              </button>
+              {activeSection === 'donors' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenDonationRankingModal}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Donation Ranking
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenScheduleRequests}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Schedule Requests
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenScheduleHistory}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Schedule History
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenModal}
+                    className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+                  >
+                    Add Donor
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleOpenDonationRankingModal}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Donation Ranking
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenOrgDonationModal}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Donation Entry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddOrganizationModal}
+                    className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+                  >
+                    Add Organization
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -411,25 +658,44 @@ function AdminDonation() {
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className={adminPanel.emerald.thead}>
                 <tr>
-                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                    Donor Name
-                  </th>
-                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                    Blood Type
-                  </th>
-                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                    Contact
-                  </th>
-                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                    Status
-                  </th>
-                  <th className={`whitespace-nowrap px-4 py-2 text-right text-[13px] ${adminPanel.emerald.th}`}>
-                    Actions
-                  </th>
+                  {activeSection === 'donors' ? (
+                    <>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Donor Name
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Blood Type
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Contact
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Status
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-right text-[13px] ${adminPanel.emerald.th}`}>
+                        Actions
+                      </th>
+                    </>
+                  ) : (
+                    <>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Organization Name
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Contact
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Email
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Address / Location
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className={adminPanel.emerald.tbody}>
-                {isLoading && (
+                {activeSection === 'donors' && isLoading && (
                   <tr>
                     <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
                       Loading donors...
@@ -437,7 +703,7 @@ function AdminDonation() {
                   </tr>
                 )}
 
-                {!isLoading && error && (
+                {activeSection === 'donors' && !isLoading && error && (
                   <tr>
                     <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={5}>
                       {error}
@@ -445,7 +711,7 @@ function AdminDonation() {
                   </tr>
                 )}
 
-                {!isLoading && !error && donors.length === 0 && (
+                {activeSection === 'donors' && !isLoading && !error && donors.length === 0 && (
                   <tr>
                     <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={5}>
                       No donors added yet.
@@ -453,7 +719,8 @@ function AdminDonation() {
                   </tr>
                 )}
 
-                {!isLoading &&
+                {activeSection === 'donors' &&
+                  !isLoading &&
                   !error &&
                   filteredDonors.map((donor) => (
                     <tr key={donor.id} className="hover:bg-slate-50/60">
@@ -514,6 +781,53 @@ function AdminDonation() {
                             </svg>
                           </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+
+                {activeSection === 'organizations' && isOrganizationsLoading && (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={4}>
+                      Loading organizations...
+                    </td>
+                  </tr>
+                )}
+
+                {activeSection === 'organizations' && !isOrganizationsLoading && organizationsError && (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={4}>
+                      {organizationsError}
+                    </td>
+                  </tr>
+                )}
+
+                {activeSection === 'organizations' &&
+                  !isOrganizationsLoading &&
+                  !organizationsError &&
+                  organizations.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                        No organizations added yet.
+                      </td>
+                    </tr>
+                  )}
+
+                {activeSection === 'organizations' &&
+                  !isOrganizationsLoading &&
+                  !organizationsError &&
+                  organizations.map((org) => (
+                    <tr key={org.id} className="hover:bg-slate-50/60">
+                      <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                        {org.name}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                        {org.contact_number || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                        {org.email || '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-slate-700">
+                        {org.address || '—'}
                       </td>
                     </tr>
                   ))}
@@ -606,6 +920,371 @@ function AdminDonation() {
         </div>
       )}
 
+      {isAddOrganizationModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Add Organization</h3>
+              <button
+                type="button"
+                onClick={handleCloseAddOrganizationModal}
+                className="text-slate-400 hover:text-slate-600"
+                disabled={isCreatingOrganization}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateOrganization} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Organization Name</label>
+                <input
+                  type="text"
+                  value={organizationName}
+                  onChange={(e) => setOrganizationName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Contact Number</label>
+                <input
+                  type="text"
+                  value={organizationContactNumber}
+                  onChange={(e) => setOrganizationContactNumber(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Email Address</label>
+                <input
+                  type="email"
+                  value={organizationEmailAddress}
+                  onChange={(e) => setOrganizationEmailAddress(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Address / Location</label>
+                <textarea
+                  rows={3}
+                  value={organizationAddress}
+                  onChange={(e) => setOrganizationAddress(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  required
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseAddOrganizationModal}
+                  disabled={isCreatingOrganization}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingOrganization}
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isCreatingOrganization ? 'Saving...' : 'Save Organization'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isOrgDonationModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Create Donation Entry</h3>
+              <button
+                type="button"
+                onClick={handleCloseOrgDonationModal}
+                className="text-slate-400 hover:text-slate-600"
+                disabled={isSavingOrgDonation}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitOrgDonation} className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Organization</label>
+                  <select
+                    value={orgDonationOrganizationId}
+                    onChange={(e) => setOrgDonationOrganizationId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    required
+                  >
+                    <option value="" disabled>
+                      Select organization...
+                    </option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={String(org.id)}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                  {organizations.length === 0 && (
+                    <p className="mt-1 text-[11px] font-medium text-amber-700">
+                      No organizations yet. Add an organization first.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Donation Date</label>
+                  <input
+                    type="date"
+                    value={orgDonationDate}
+                    onChange={(e) => setOrgDonationDate(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-900">Blood Types & Units</p>
+                  <button
+                    type="button"
+                    onClick={addOrgDonationItem}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    Add blood type
+                  </button>
+                </div>
+
+                <div className="mt-3 max-h-[45vh] space-y-2 overflow-y-auto pr-1">
+                  {orgDonationItems.map((row, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-1 items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-12"
+                    >
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-semibold text-slate-600">Component</label>
+                        <select
+                          value={row.componentType || 'whole_blood'}
+                          onChange={(e) => updateOrgDonationItem(idx, { componentType: e.target.value })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          required
+                        >
+                          <option value="whole_blood">Whole Blood</option>
+                          <option value="platelets">Platelets</option>
+                          <option value="plasma">Plasma</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-semibold text-slate-600">Blood Type</label>
+                        <select
+                          value={row.bloodType}
+                          onChange={(e) => updateOrgDonationItem(idx, { bloodType: e.target.value })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          required
+                        >
+                          <option value="">Select...</option>
+                          <option value="A+">A+</option>
+                          <option value="A-">A-</option>
+                          <option value="B+">B+</option>
+                          <option value="B-">B-</option>
+                          <option value="AB+">AB+</option>
+                          <option value="AB-">AB-</option>
+                          <option value="O+">O+</option>
+                          <option value="O-">O-</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-semibold text-slate-600">Units</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={row.units}
+                          onChange={(e) => updateOrgDonationItem(idx, { units: e.target.value })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          placeholder="0"
+                          required
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-semibold text-slate-600">Expiry Date</label>
+                        <input
+                          type="date"
+                          value={row.expirationDate}
+                          onChange={(e) => updateOrgDonationItem(idx, { expirationDate: e.target.value })}
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          required
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <button
+                          type="button"
+                          onClick={() => removeOrgDonationItem(idx)}
+                          className="inline-flex w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={orgDonationItems.length <= 1}
+                          aria-label="Remove blood type row"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCloseOrgDonationModal}
+                  disabled={isSavingOrgDonation}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingOrgDonation || organizations.length === 0}
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSavingOrgDonation ? 'Saving...' : 'Save Donation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isDonationRankingModalOpen && (
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Donation Ranking</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Total units donated leaderboard.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseDonationRankingModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-5 pt-4">
+              <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setRankingTab('organizations')}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    rankingTab === 'organizations'
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Organizations
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRankingTab('donors')}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    rankingTab === 'donors'
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  Donors
+                </button>
+              </div>
+            </div>
+
+            <div className="px-5 pb-5 pt-4">
+              {isRankingLoading ? (
+                <div className="py-10 text-center text-sm text-slate-500">Loading rankings...</div>
+              ) : rankingError ? (
+                <div className="py-10 text-center text-sm text-red-600">{rankingError}</div>
+              ) : (
+                <div className="max-h-[65vh] overflow-y-auto rounded-xl border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead className="bg-slate-50/60">
+                      <tr>
+                        <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                          Rank
+                        </th>
+                        <th className="px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                          {rankingTab === 'organizations' ? 'Organization' : 'Donor'}
+                        </th>
+                        {rankingTab === 'donors' && (
+                          <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                            Blood Type
+                          </th>
+                        )}
+                        <th className="whitespace-nowrap px-4 py-2 text-right text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                          Total Units
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {(rankingTab === 'organizations' ? orgRanking : donorRanking).map((row, index) => (
+                        <tr key={(row.organizationId || row.donorId || index) + '_' + index} className="hover:bg-slate-50/60">
+                          <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                            #{index + 1}
+                          </td>
+                          <td className="px-4 py-2 text-sm font-semibold text-slate-900">
+                            {rankingTab === 'organizations' ? row.organizationName : row.donorName}
+                          </td>
+                          {rankingTab === 'donors' && (
+                            <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                              <BloodTypeBadge type={row.bloodType} className="text-[13px]" />
+                            </td>
+                          )}
+                          <td className="whitespace-nowrap px-4 py-2 text-right text-sm font-semibold text-slate-900">
+                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
+                              {row.totalUnitsDonated ?? 0}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {(rankingTab === 'organizations' ? orgRanking : donorRanking).length === 0 && (
+                        <tr>
+                          <td
+                            className="px-4 py-10 text-center text-sm text-slate-500"
+                            colSpan={rankingTab === 'donors' ? 4 : 3}
+                          >
+                            No ranking data yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {openMenuDonorId && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpenMenuDonorId(null)} />
@@ -689,9 +1368,6 @@ function AdminDonation() {
                         Donor Name
                       </th>
                       <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                        Preferred Date & Time
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                         Component Type
                       </th>
                       <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
@@ -712,9 +1388,6 @@ function AdminDonation() {
                           {request.donor_name || '—'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                          {new Date(request.preferred_date).toLocaleDateString()} at {request.preferred_time}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
                           {request.component_type === 'whole_blood' ? 'Whole Blood' : request.component_type === 'platelets' ? 'Platelets' : request.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm">
@@ -730,7 +1403,14 @@ function AdminDonation() {
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                          {new Date(request.created_at).toLocaleString()}
+                          {new Date(request.created_at).toLocaleString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                          })}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm">
                           <button
