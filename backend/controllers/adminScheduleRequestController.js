@@ -201,6 +201,33 @@ const completeScheduleRequestController = async (req, res) => {
       [userId],
     )
 
+    // Record donation history for rankings and donor views (1 unit default)
+    try {
+      const [userRows] = await pool.query('SELECT blood_type FROM users WHERE id = ? LIMIT 1', [userId])
+      const bloodType = userRows?.[0]?.blood_type || null
+      if (bloodType) {
+        await pool.query(
+          `
+            INSERT INTO donations (user_id, blood_type, donation_date, location, hospital_id, status, units_donated)
+            VALUES (?, ?, NOW(), NULL, NULL, 'completed', 1)
+          `,
+          [userId, bloodType],
+        )
+      }
+    } catch (donationError) {
+      // Non-blocking if donation history table/columns are missing
+      if (
+        donationError &&
+        (donationError.code === 'ER_NO_SUCH_TABLE' ||
+          donationError.errno === 1146 ||
+          donationError.code === 'ER_BAD_FIELD_ERROR')
+      ) {
+        // ignore
+      } else {
+        throw donationError
+      }
+    }
+
     await pool.query(
       `
       INSERT INTO notifications (user_id, title, message, type)

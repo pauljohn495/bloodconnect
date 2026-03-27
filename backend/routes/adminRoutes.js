@@ -44,6 +44,17 @@ const {
   rejectScheduleRequestController,
   completeScheduleRequestController,
 } = require('../controllers/adminScheduleRequestController')
+const {
+  getOrganizationsController,
+  createOrganizationController,
+} = require('../controllers/adminOrganizationController')
+const {
+  createOrganizationDonationController,
+} = require('../controllers/adminOrganizationDonationController')
+const {
+  getOrganizationDonationRankingController,
+  getDonorDonationRankingController,
+} = require('../controllers/adminDonationRankingController')
 
 const router = express.Router()
 
@@ -85,6 +96,24 @@ router.put('/donors/:id', updateDonorController)
 
 // DELETE /api/admin/donors/:id - delete donor user (admin side)
 router.delete('/donors/:id', deleteDonorController)
+
+// ===== Organizations =====
+
+// GET /api/admin/organizations - list organizations
+router.get('/organizations', getOrganizationsController)
+
+// POST /api/admin/organizations - create organization
+router.post('/organizations', createOrganizationController)
+
+// ===== Organization Donations =====
+// POST /api/admin/organization-donations - create donation entry + add inventory batches
+router.post('/organization-donations', createOrganizationDonationController)
+
+// ===== Donation Rankings =====
+// GET /api/admin/donation-rankings/organizations
+router.get('/donation-rankings/organizations', getOrganizationDonationRankingController)
+// GET /api/admin/donation-rankings/donors
+router.get('/donation-rankings/donors', getDonorDonationRankingController)
 
 // ===== Blood Inventory =====
 
