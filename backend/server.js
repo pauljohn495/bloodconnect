@@ -3,6 +3,7 @@ const cors = require('cors')
 const dotenv = require('dotenv')
 
 const { pool, testConnection } = require('./db')
+const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const authRoutes = require('./routes/authRoutes')
 const adminRoutes = require('./routes/adminRoutes')
 const hospitalRoutes = require('./routes/hospitalRoutes')
@@ -37,6 +38,9 @@ app.get('/api/health', async (req, res) => {
     })
   }
 })
+
+// Public announcements (donors / landing — no auth)
+app.get('/api/announcements', getPublicAnnouncementsController)
 
 // Route mounting
 app.use('/api/auth', authRoutes)

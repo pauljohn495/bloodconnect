@@ -9,6 +9,7 @@ const sidebarItems = [
   { name: 'Hospitals', path: '/admin/partners' },
   { name: 'Manage Users', path: '/admin/users' },
   { name: 'Reports & Analytics', path: '/admin/reports' },
+  { name: 'Announcements', path: '/admin/announcements' },
 ]
 
 function NavLinks({ onNavigate }) {

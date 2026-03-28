@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 import { responsiveTableContainer } from './admin-ui.jsx'
+import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
 
 function UserDashboard() {
   const navigate = useNavigate()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [announcementsPanelOpen, setAnnouncementsPanelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
@@ -339,8 +341,31 @@ function UserDashboard() {
             </div>
           </div>
 
-          {/* Right: User profile and notifications */}
+          {/* Right: Announcements panel, notifications, profile, logout */}
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setAnnouncementsPanelOpen((o) => !o)}
+              className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:gap-2 sm:px-3 sm:pr-4 ${
+                announcementsPanelOpen
+                  ? 'border-red-200 bg-red-50 text-red-800'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+              aria-expanded={announcementsPanelOpen}
+              aria-controls="announcements-side-panel"
+              title="Announcements"
+            >
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5.882V19.24a1.76 1.76 0 001.759 1.759h.282a1.76 1.76 0 001.759-1.759V5.882M12 5.882V4.5M9.5 9h5"
+                />
+              </svg>
+              <span className="hidden text-xs font-semibold sm:inline">Announcements</span>
+            </button>
+
             {/* Notifications */}
             <div className="relative">
               <button
@@ -446,15 +471,16 @@ function UserDashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8">
+      {/* Main Content — single centered column; announcements live in slide-out panel */}
+      <main className="w-full py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:py-6">
         {error && (
-          <p className="mb-4 text-sm text-red-600">
+          <p className="mb-4 px-3 text-sm text-red-600 sm:px-6 lg:px-8">
             {error}
           </p>
         )}
+        <div className="mx-auto w-full max-w-4xl space-y-8 px-3 sm:px-6 lg:px-8">
         {/* Hero Section - Statistic Cards */}
-        <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Blood Type Card */}
           <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90">
             <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -694,7 +720,10 @@ function UserDashboard() {
             </div>
           </div>
         </section>
+        </div>
       </main>
+
+      <DashboardAnnouncementsPanel open={announcementsPanelOpen} onClose={() => setAnnouncementsPanelOpen(false)} />
 
       {/* Schedule Request Modal */}
       {isScheduleModalOpen && (
