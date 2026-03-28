@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { BrandLogo } from './BrandLogo.jsx'
 
 function ProfileSettings() {
   const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -27,8 +29,13 @@ function ProfileSettings() {
       setIsLoading(true)
       setError('')
       try {
-        const data = await apiRequest('/api/user/me')
+        const [data, notificationsData] = await Promise.all([
+          apiRequest('/api/user/me'),
+          apiRequest('/api/notifications').catch(() => []),
+        ])
         const savedAvatar = localStorage.getItem('profileAvatar')
+
+        setNotifications(Array.isArray(notificationsData) ? notificationsData : [])
 
         setProfileData({
           name: data.full_name || '',
@@ -131,17 +138,7 @@ function ProfileSettings() {
               onClick={() => navigate('/dashboard')}
               className="flex items-center gap-3 rounded-lg text-left transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm ring-1 ring-red-700/20">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
+              <BrandLogo />
               <span>
                 <span className="block text-lg font-bold tracking-tight text-slate-900">BloodConnect</span>
                 <span className="block text-[11px] font-medium uppercase tracking-wider text-red-700">
@@ -173,7 +170,9 @@ function ProfileSettings() {
                     d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                   />
                 </svg>
-                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500" aria-hidden="true" />
+                {notifications.some((n) => !n.is_read) && (
+                  <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-600" aria-hidden="true" />
+                )}
               </button>
 
               {/* Notifications Dropdown */}
@@ -183,9 +182,24 @@ function ProfileSettings() {
                     <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
                   </div>
                   <div className="max-h-96 overflow-y-auto p-2">
-                    <div className="rounded-lg px-3 py-2 text-sm text-slate-500">
-                      No new notifications
-                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="rounded-lg px-3 py-2 text-sm text-slate-500">No new notifications</div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`mb-2 rounded-lg px-3 py-2 text-sm ${
+                            notif.is_read ? 'bg-slate-50 text-slate-600' : 'bg-blue-50 text-blue-900'
+                          }`}
+                        >
+                          <div className="font-semibold">{notif.title}</div>
+                          <div className="mt-1 text-xs">{notif.message}</div>
+                          <div className="mt-1 text-xs text-slate-400">
+                            {new Date(notif.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}

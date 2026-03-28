@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { BrandLogo } from './BrandLogo.jsx'
 import { responsiveTableContainer } from './admin-ui.jsx'
 import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
 
@@ -324,17 +325,7 @@ function UserDashboard() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
           {/* Left: Logo */}
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm ring-1 ring-red-700/20">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-                <path
-                  d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
+            <BrandLogo />
             <div>
               <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">BloodConnect</h1>
               <p className="text-[11px] font-medium uppercase tracking-wider text-red-700">Donor portal</p>
