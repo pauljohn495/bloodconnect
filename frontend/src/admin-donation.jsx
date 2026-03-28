@@ -28,6 +28,7 @@ function AdminDonation() {
   const [isDonorDetailsOpen, setIsDonorDetailsOpen] = useState(false)
   const [selectedDonorDetails, setSelectedDonorDetails] = useState(null)
   const [donorSearch, setDonorSearch] = useState('')
+  const [organizationSearch, setOrganizationSearch] = useState('')
   const [notification, setNotification] = useState(null)
   const [openMenuDonorId, setOpenMenuDonorId] = useState(null)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
@@ -133,6 +134,21 @@ function AdminDonation() {
     const q = donorSearch.trim().toLowerCase()
     if (!q) return true
     return donorNameForSearch(donor).includes(q)
+  })
+
+  const filteredOrganizations = organizations.filter((org) => {
+    const q = organizationSearch.trim().toLowerCase()
+    if (!q) return true
+    const name = (org.name || '').toString().toLowerCase()
+    const contact = (org.contact_number || '').toString().toLowerCase()
+    const email = (org.email || '').toString().toLowerCase()
+    const address = (org.address || '').toString().toLowerCase()
+    return (
+      name.includes(q) ||
+      contact.includes(q) ||
+      email.includes(q) ||
+      address.includes(q)
+    )
   })
 
   const handleOpenModal = () => {
@@ -588,11 +604,18 @@ function AdminDonation() {
             <div className="flex items-center gap-2">
               <div className="hidden sm:block">
                 <input
-                  value={activeSection === 'organizations' ? '' : donorSearch}
-                  onChange={(e) => setDonorSearch(e.target.value)}
-                  placeholder={activeSection === 'organizations' ? 'Search (coming soon)...' : 'Search donor name...'}
+                  value={activeSection === 'organizations' ? organizationSearch : donorSearch}
+                  onChange={(e) =>
+                    activeSection === 'organizations'
+                      ? setOrganizationSearch(e.target.value)
+                      : setDonorSearch(e.target.value)
+                  }
+                  placeholder={
+                    activeSection === 'organizations'
+                      ? 'Search name, contact, email...'
+                      : 'Search donor name...'
+                  }
                   className="w-56 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  disabled={activeSection === 'organizations'}
                 />
               </div>
               {activeSection === 'donors' ? (
@@ -815,7 +838,19 @@ function AdminDonation() {
                 {activeSection === 'organizations' &&
                   !isOrganizationsLoading &&
                   !organizationsError &&
-                  organizations.map((org) => (
+                  organizations.length > 0 &&
+                  filteredOrganizations.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={4}>
+                        No organizations match your search.
+                      </td>
+                    </tr>
+                  )}
+
+                {activeSection === 'organizations' &&
+                  !isOrganizationsLoading &&
+                  !organizationsError &&
+                  filteredOrganizations.map((org) => (
                     <tr key={org.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         {org.name}
