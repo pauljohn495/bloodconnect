@@ -5,7 +5,7 @@ import { adminPanel } from './admin-ui.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
 function AdminDonation() {
-  const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations'
+  const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations' | 'rc143'
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [donorName, setDonorName] = useState('')
   const [bloodType, setBloodType] = useState('')
@@ -67,6 +67,47 @@ function AdminDonation() {
   const [isRankingLoading, setIsRankingLoading] = useState(false)
   const [rankingError, setRankingError] = useState('')
 
+  const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
+  const RC143_ACTIVITIES_KEY = 'bloodconnect_rc143_activities'
+
+  const [rc143Volunteers, setRc143Volunteers] = useState(() => {
+    try {
+      const raw = localStorage.getItem(RC143_VOLUNTEERS_KEY)
+      if (raw) {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      }
+    } catch {
+      /* ignore */
+    }
+    return []
+  })
+  const [rc143Activities, setRc143Activities] = useState(() => {
+    try {
+      const raw = localStorage.getItem(RC143_ACTIVITIES_KEY)
+      if (raw) {
+        const p = JSON.parse(raw)
+        if (Array.isArray(p)) return p
+      }
+    } catch {
+      /* ignore */
+    }
+    return []
+  })
+  const [isRc143VolunteerModalOpen, setIsRc143VolunteerModalOpen] = useState(false)
+  const [isRc143ActivityModalOpen, setIsRc143ActivityModalOpen] = useState(false)
+  const [rc143VolFullName, setRc143VolFullName] = useState('')
+  const [rc143VolOrganization, setRc143VolOrganization] = useState('')
+  const [rc143VolOccupation, setRc143VolOccupation] = useState('')
+  const [rc143VolContact, setRc143VolContact] = useState('')
+  const [rc143VolAddress, setRc143VolAddress] = useState('')
+  const [rc143VolContactNumber, setRc143VolContactNumber] = useState('')
+  const [rc143ActTitle, setRc143ActTitle] = useState('')
+  const [rc143ActDescription, setRc143ActDescription] = useState('')
+  const [rc143ActDate, setRc143ActDate] = useState('')
+  const [rc143ActLocation, setRc143ActLocation] = useState('')
+  const [rc143ActPriority, setRc143ActPriority] = useState('Normal')
+
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
     setTimeout(() => {
@@ -109,6 +150,22 @@ function AdminDonation() {
       loadOrganizations()
     }
   }, [activeSection])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RC143_VOLUNTEERS_KEY, JSON.stringify(rc143Volunteers))
+    } catch {
+      /* quota / private mode */
+    }
+  }, [rc143Volunteers])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RC143_ACTIVITIES_KEY, JSON.stringify(rc143Activities))
+    } catch {
+      /* quota / private mode */
+    }
+  }, [rc143Activities])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -553,42 +610,298 @@ function AdminDonation() {
     }
   }
 
+  const openRc143VolunteerModal = () => {
+    setRc143VolFullName('')
+    setRc143VolOrganization('')
+    setRc143VolOccupation('')
+    setRc143VolContact('')
+    setRc143VolAddress('')
+    setRc143VolContactNumber('')
+    setIsRc143VolunteerModalOpen(true)
+  }
+
+  const closeRc143VolunteerModal = () => {
+    setIsRc143VolunteerModalOpen(false)
+  }
+
+  const handleSubmitRc143Volunteer = (e) => {
+    e.preventDefault()
+    const fullName = rc143VolFullName.trim()
+    if (!fullName) {
+      showNotification('Please enter full name.', 'destructive')
+      return
+    }
+    const rid =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `v-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    setRc143Volunteers((prev) => [
+      {
+        id: rid,
+        fullName,
+        organization: rc143VolOrganization.trim(),
+        occupation: rc143VolOccupation.trim(),
+        contact: rc143VolContact.trim(),
+        address: rc143VolAddress.trim(),
+        contactNumber: rc143VolContactNumber.trim(),
+        registeredAt: new Date().toISOString(),
+      },
+      ...prev,
+    ])
+    closeRc143VolunteerModal()
+    showNotification('Volunteer registered.', 'primary')
+  }
+
+  const openRc143ActivityModal = () => {
+    const today = new Date().toISOString().split('T')[0]
+    setRc143ActTitle('')
+    setRc143ActDescription('')
+    setRc143ActDate(today)
+    setRc143ActLocation('')
+    setRc143ActPriority('Normal')
+    setIsRc143ActivityModalOpen(true)
+  }
+
+  const closeRc143ActivityModal = () => {
+    setIsRc143ActivityModalOpen(false)
+  }
+
+  const handleSubmitRc143Activity = (e) => {
+    e.preventDefault()
+    const title = rc143ActTitle.trim()
+    if (!title) {
+      showNotification('Please enter activity title.', 'destructive')
+      return
+    }
+    const aid =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `a-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    setRc143Activities((prev) => [
+      {
+        id: aid,
+        title,
+        description: rc143ActDescription.trim(),
+        date: rc143ActDate,
+        location: rc143ActLocation.trim(),
+        priority: rc143ActPriority,
+        requestedAt: new Date().toISOString(),
+      },
+      ...prev,
+    ])
+    closeRc143ActivityModal()
+    showNotification('Activity request recorded.', 'primary')
+  }
+
+  const rc143PriorityClass = (p) => {
+    if (p === 'Critical') return 'bg-red-100 text-red-800 ring-red-200'
+    if (p === 'Urgent') return 'bg-amber-100 text-amber-900 ring-amber-200'
+    return 'bg-slate-100 text-slate-700 ring-slate-200'
+  }
+
   return (
     <AdminLayout
-      pageTitle={activeSection === 'organizations' ? 'Organizations' : 'Donors'}
+      pageTitle={
+        activeSection === 'organizations'
+          ? 'Organizations'
+          : activeSection === 'rc143'
+            ? 'RC143'
+            : 'Donors'
+      }
       pageDescription={
         activeSection === 'organizations'
           ? 'View and manage registered organizations.'
-          : 'View and manage registered blood donors.'
+          : activeSection === 'rc143'
+            ? 'Register volunteers and coordinate blood-drive activities.'
+            : 'View and manage registered blood donors.'
       }
     >
       <section className="mt-2">
         <div className="mb-3 flex items-center justify-start">
-          <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+          <div
+            className="inline-flex items-center gap-0.5 rounded-lg bg-slate-100/95 p-1 ring-1 ring-slate-200/70"
+            role="tablist"
+            aria-label="Donations section"
+          >
             <button
               type="button"
+              role="tab"
+              aria-selected={activeSection === 'donors'}
               onClick={() => setActiveSection('donors')}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              className={`rounded-md px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 ${
                 activeSection === 'donors'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-50'
+                  ? 'border border-slate-200/90 bg-white text-red-900 shadow-sm shadow-slate-200/80'
+                  : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'
               }`}
             >
               Donors
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={activeSection === 'organizations'}
               onClick={() => setActiveSection('organizations')}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              className={`rounded-md px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 ${
                 activeSection === 'organizations'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-50'
+                  ? 'border border-slate-200/90 bg-white text-red-900 shadow-sm shadow-slate-200/80'
+                  : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'
               }`}
             >
               Organizations
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSection === 'rc143'}
+              onClick={() => setActiveSection('rc143')}
+              className={`rounded-md px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 ${
+                activeSection === 'rc143'
+                  ? 'border border-slate-200/90 bg-white text-red-900 shadow-sm shadow-slate-200/80'
+                  : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              RC143
+            </button>
           </div>
         </div>
+        {activeSection === 'rc143' ? (
+          <div className={adminPanel.emerald.outer}>
+            <div className={adminPanel.emerald.header}>
+              <div>
+                <h2 className={adminPanel.emerald.title}>RC143 — Volunteers and activities</h2>
+                <p className={adminPanel.emerald.subtitle}>
+                  Register outreach volunteers and log activity requests for blood donation programs.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openRc143VolunteerModal}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-0"
+                >
+                  Register New Volunteer
+                </button>
+                <button
+                  type="button"
+                  onClick={openRc143ActivityModal}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 sm:min-h-0"
+                >
+                  Request Activity
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-8 px-4 py-6 sm:px-5">
+              <div>
+                <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                  Volunteers
+                </h3>
+                <div className={adminPanel.emerald.tableScroll}>
+                  <table className="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead className={adminPanel.emerald.thead}>
+                      <tr>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Full name
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Organization
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Occupation
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Contact
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Address
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Contact number
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className={adminPanel.emerald.tbody}>
+                      {rc143Volunteers.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                            No volunteers registered yet. Use &quot;Register New Volunteer&quot; to add one.
+                          </td>
+                        </tr>
+                      ) : (
+                        rc143Volunteers.map((v) => (
+                          <tr key={v.id} className="hover:bg-slate-50/60">
+                            <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">{v.fullName}</td>
+                            <td className="px-4 py-2 text-sm text-slate-700">{v.organization || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-slate-700">{v.occupation || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-slate-700">{v.contact || '—'}</td>
+                            <td className="max-w-xs px-4 py-2 text-sm text-slate-700">{v.address || '—'}</td>
+                            <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">{v.contactNumber || '—'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                  Activities
+                </h3>
+                <div className={adminPanel.emerald.tableScroll}>
+                  <table className="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead className={adminPanel.emerald.thead}>
+                      <tr>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Title
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Description
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Date
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Location
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Priority
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className={adminPanel.emerald.tbody}>
+                      {rc143Activities.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                            No activity requests yet. Use &quot;Request Activity&quot; to create one.
+                          </td>
+                        </tr>
+                      ) : (
+                        rc143Activities.map((a) => (
+                          <tr key={a.id} className="hover:bg-slate-50/60">
+                            <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">{a.title}</td>
+                            <td className="max-w-md px-4 py-2 text-sm text-slate-700">{a.description || '—'}</td>
+                            <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">{a.date || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-slate-700">{a.location || '—'}</td>
+                            <td className="whitespace-nowrap px-4 py-2 text-sm">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${rc143PriorityClass(a.priority)}`}
+                              >
+                                {a.priority}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className={adminPanel.emerald.outer}>
           <div className={adminPanel.emerald.header}>
             <div>
@@ -870,6 +1183,7 @@ function AdminDonation() {
             </table>
           </div>
         </div>
+        )}
       </section>
 
       {isModalOpen && (
@@ -1032,6 +1346,218 @@ function AdminDonation() {
                   className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isCreatingOrganization ? 'Saving...' : 'Save Organization'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isRc143VolunteerModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div
+            className="w-full max-w-lg rounded-2xl border border-red-100 bg-white p-5 shadow-xl ring-1 ring-red-100/80"
+            role="dialog"
+            aria-labelledby="rc143-volunteer-title"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-red-100 pb-3">
+              <div>
+                <h3 id="rc143-volunteer-title" className="text-base font-semibold text-red-950">
+                  Register New Volunteer
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-600">RC143 outreach — blood donation programs</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeRc143VolunteerModal}
+                className="shrink-0 text-slate-400 hover:text-slate-600"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRc143Volunteer} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Full name</label>
+                <input
+                  type="text"
+                  value={rc143VolFullName}
+                  onChange={(e) => setRc143VolFullName(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Full legal name"
+                  autoComplete="name"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Organization</label>
+                <input
+                  type="text"
+                  value={rc143VolOrganization}
+                  onChange={(e) => setRc143VolOrganization(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Company, school, or chapter"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Occupation</label>
+                <input
+                  type="text"
+                  value={rc143VolOccupation}
+                  onChange={(e) => setRc143VolOccupation(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Job title or role"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Contact</label>
+                <input
+                  type="text"
+                  value={rc143VolContact}
+                  onChange={(e) => setRc143VolContact(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Email or preferred contact"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Address</label>
+                <textarea
+                  rows={2}
+                  value={rc143VolAddress}
+                  onChange={(e) => setRc143VolAddress(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Street, city, region"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Contact number</label>
+                <input
+                  type="tel"
+                  value={rc143VolContactNumber}
+                  onChange={(e) => setRc143VolContactNumber(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Mobile or landline"
+                  autoComplete="tel"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRc143VolunteerModal}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+                >
+                  Save volunteer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isRc143ActivityModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div
+            className="w-full max-w-lg rounded-2xl border border-red-100 bg-white p-5 shadow-xl ring-1 ring-red-100/80"
+            role="dialog"
+            aria-labelledby="rc143-activity-title"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-red-100 pb-3">
+              <div>
+                <h3 id="rc143-activity-title" className="text-base font-semibold text-red-950">
+                  Request Activity
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-600">Schedule or propose a blood donation activity</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeRc143ActivityModal}
+                className="shrink-0 text-slate-400 hover:text-slate-600"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRc143Activity} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Title</label>
+                <input
+                  type="text"
+                  value={rc143ActTitle}
+                  onChange={(e) => setRc143ActTitle(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Activity name"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Description</label>
+                <textarea
+                  rows={3}
+                  value={rc143ActDescription}
+                  onChange={(e) => setRc143ActDescription(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Goals, audience, resources needed..."
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Date</label>
+                  <input
+                    type="date"
+                    value={rc143ActDate}
+                    onChange={(e) => setRc143ActDate(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Priority</label>
+                  <select
+                    value={rc143ActPriority}
+                    onChange={(e) => setRc143ActPriority(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Location</label>
+                <input
+                  type="text"
+                  value={rc143ActLocation}
+                  onChange={(e) => setRc143ActLocation(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  placeholder="Venue or address"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRc143ActivityModal}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+                >
+                  Submit request
                 </button>
               </div>
             </form>

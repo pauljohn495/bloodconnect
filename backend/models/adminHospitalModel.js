@@ -301,7 +301,40 @@ async function deleteHospital(hospitalId) {
     throw error
   }
 
-  await pool.query('DELETE FROM users WHERE id = ?', [hospital.user_id])
+  const userId = hospital.user_id
+  const conn = await pool.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    // Remove dependent rows that reference this hospital, then the hospital row, then the login user.
+    // Deleting the user first fails while hospitals.user_id still references users.id.
+    await conn.query('DELETE FROM hospital_donations WHERE hospital_id = ?', [hospitalId])
+    await conn.query('DELETE FROM blood_transfers WHERE hospital_id = ?', [hospitalId])
+    await conn.query('DELETE FROM blood_requests WHERE hospital_id = ?', [hospitalId])
+    await conn.query('DELETE FROM blood_inventory WHERE hospital_id = ?', [hospitalId])
+
+    try {
+      await conn.query('UPDATE donations SET hospital_id = NULL WHERE hospital_id = ?', [hospitalId])
+    } catch (err) {
+      if (err.code === 'ER_BAD_FIELD_ERROR') {
+        /* column missing in older schemas */
+      } else if (err.code === 'ER_BAD_NULL_ERROR') {
+        await conn.query('UPDATE donations SET hospital_id = 0 WHERE hospital_id = ?', [hospitalId])
+      } else {
+        throw err
+      }
+    }
+
+    await conn.query('DELETE FROM hospitals WHERE id = ?', [hospitalId])
+    await conn.query('DELETE FROM users WHERE id = ?', [userId])
+
+    await conn.commit()
+  } catch (err) {
+    await conn.rollback()
+    throw err
+  } finally {
+    conn.release()
+  }
 }
 
 module.exports = {
