@@ -7,6 +7,7 @@ import AdminPartner from './admin-partner.jsx'
 import AdminReports from './admin-reports.jsx'
 import AdminInventory from './admin-inventory.jsx'
 import AdminUsers from './admin-users.jsx'
+import AdminAnnouncements from './admin-announcements.jsx'
 import UserDashboard from './user-dashboard.jsx'
 import ProfileSettings from './profile-settings.jsx'
 import HospitalInventory from './hospital-inventory.jsx'
@@ -30,6 +31,7 @@ function App() {
         <Route path="/admin/partner" element={<Navigate to="/admin/partners" replace />} />
         <Route path="/admin/users" element={<AdminUsers />} />
         <Route path="/admin/reports" element={<AdminReports />} />
+        <Route path="/admin/announcements" element={<AdminAnnouncements />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/hospital/inventory" element={<HospitalInventory />} />
         <Route path="/hospital/requests" element={<HospitalRequests />} />

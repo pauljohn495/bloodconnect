@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
+import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
 
 function Home() {
   const [activeRole, setActiveRole] = useState('donor') // 'donor' | 'hospital' | 'admin'
@@ -8,8 +9,69 @@ function Home() {
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState('')
+  const [announcementsPanelOpen, setAnnouncementsPanelOpen] = useState(false)
 
   const navigate = useNavigate()
+
+  const openAnnouncementsPanel = useCallback(() => {
+    setAnnouncementsPanelOpen(true)
+    setMobileNavOpen(false)
+  }, [])
+
+  const scrollToSection = useCallback((id) => {
+    const el = document.getElementById(id)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    setMobileNavOpen(false)
+  }, [])
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setMobileNavOpen(false)
+  }, [])
+
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMobileNavOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileNavOpen])
+
+  /** Nav "active" follows a viewport reading line — avoids highlighting Donate while still on the hero (large sections can intersect incorrectly with IntersectionObserver). */
+  useEffect(() => {
+    const updateActiveFromScroll = () => {
+      const donate = document.getElementById('donate')
+      const about = document.getElementById('about')
+      if (!donate || !about) return
+
+      const line = window.innerHeight * 0.22
+      const donateRect = donate.getBoundingClientRect()
+      const aboutRect = about.getBoundingClientRect()
+
+      if (line < donateRect.top) {
+        setActiveSection('')
+        return
+      }
+      if (line >= aboutRect.top) {
+        setActiveSection('about')
+        return
+      }
+      setActiveSection('donate')
+    }
+
+    updateActiveFromScroll()
+    window.addEventListener('scroll', updateActiveFromScroll, { passive: true })
+    window.addEventListener('resize', updateActiveFromScroll)
+    return () => {
+      window.removeEventListener('scroll', updateActiveFromScroll)
+      window.removeEventListener('resize', updateActiveFromScroll)
+    }
+  }, [])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -46,156 +108,294 @@ function Home() {
     }
   }
 
+  const navLinkClass = (id, options = {}) => {
+    const { forceActive } = options
+    const active = forceActive != null ? forceActive : activeSection === id
+    return `rounded-lg px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-red-700 ${
+      active
+        ? 'bg-red-900/50 text-white underline decoration-white/90 decoration-2 underline-offset-4'
+        : 'text-white/95 hover:bg-red-600/40 hover:text-white hover:underline hover:decoration-white/70 hover:underline-offset-4'
+    }`
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-red-150 via-white to-red-300">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-4 py-12 sm:px-6 lg:flex-row lg:gap-12 lg:px-8">
-        {/* Left: Messaging */}
-        <div className="w-full max-w-xl space-y-6 text-center lg:w-1/2 lg:text-left">
+      {/* Sticky header */}
+      <header className="sticky top-0 z-50 border-b border-red-800/30 bg-red-700 shadow-md">
+        <div className="mx-auto flex min-h-12 max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:min-h-14 sm:px-6 lg:px-8">
+          <button
+            type="button"
+            onClick={scrollToTop}
+            className="flex min-h-10 min-w-0 shrink-0 items-center gap-2 rounded-lg py-1 text-left text-white transition hover:bg-red-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" aria-hidden="true">
+                <path
+                  d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <span className="leading-tight">
+              <span className="block text-sm font-bold tracking-tight sm:text-base">BloodConnect</span>
+              <span className="hidden text-[10px] font-medium uppercase tracking-wider text-red-100 sm:block">
+                Blood management
+              </span>
+            </span>
+          </button>
 
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
-            Connecting Lives
-            <span className="block text-red-600">Through Blood Donation</span>
-          </h1>
+          <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
+            <button
+              type="button"
+              className={navLinkClass('announcements', {
+                forceActive: announcementsPanelOpen,
+              })}
+              onClick={openAnnouncementsPanel}
+              aria-expanded={announcementsPanelOpen}
+              aria-controls="announcements-side-panel"
+            >
+              Announcements
+            </button>
+            <button type="button" className={navLinkClass('donate')} onClick={() => scrollToSection('donate')}>
+              Donate
+            </button>
+            <button type="button" className={navLinkClass('about')} onClick={() => scrollToSection('about')}>
+              About
+            </button>
+          </nav>
 
-          <p className="max-w-md text-sm text-slate-600 sm:text-base">
-            BloodConnect links volunteer donors, patients, and accredited hospitals
-            to ensure safe and rapid access to blood when every second counts.
-          </p>
+          <button
+            type="button"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white hover:bg-red-600/50 md:hidden"
+            aria-expanded={mobileNavOpen}
+            aria-controls="home-mobile-nav"
+            aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setMobileNavOpen((o) => !o)}
+          >
+            {mobileNavOpen ? (
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
 
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-start">
+        {mobileNavOpen && (
+          <div
+            id="home-mobile-nav"
+            className="border-t border-red-600/40 bg-red-800/95 px-4 py-3 shadow-inner md:hidden"
+          >
+            <nav className="flex flex-col gap-1" aria-label="Mobile primary">
+              <button
+                type="button"
+                className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                  announcementsPanelOpen ? 'bg-red-900/60 text-white' : 'text-white/95 hover:bg-red-600/40'
+                }`}
+                onClick={openAnnouncementsPanel}
+                aria-expanded={announcementsPanelOpen}
+              >
+                Announcements
+              </button>
+              <button
+                type="button"
+                className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                  activeSection === 'donate' ? 'bg-red-900/60 text-white' : 'text-white/95 hover:bg-red-600/40'
+                }`}
+                onClick={() => scrollToSection('donate')}
+              >
+                Donate
+              </button>
+              <button
+                type="button"
+                className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                  activeSection === 'about' ? 'bg-red-900/60 text-white' : 'text-white/95 hover:bg-red-600/40'
+                }`}
+                onClick={() => scrollToSection('about')}
+              >
+                About Us
+              </button>
+            </nav>
+          </div>
+        )}
+      </header>
+
+      <main>
+        <div className="mx-auto flex min-h-[calc(100vh-3.25rem)] max-w-6xl flex-col items-center justify-center px-4 py-10 sm:px-6 lg:flex-row lg:gap-12 lg:px-8 lg:py-12">
+          {/* Left: Messaging */}
+          <div className="w-full max-w-xl space-y-6 text-center lg:w-1/2 lg:text-left">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+              Connecting Lives
+              <span className="block text-red-600">Through Blood Donation</span>
+            </h1>
+
+            <p className="mx-auto max-w-md text-sm text-slate-600 sm:text-base lg:mx-0">
+              BloodConnect links volunteer donors, patients, and accredited hospitals to ensure safe and rapid access to
+              blood when every second counts.
+            </p>
+          </div>
+
+          {/* Right: Authentication Panel + announcements */}
+          <div className="mt-10 flex w-full max-w-md flex-col gap-5 lg:mt-0 lg:w-1/2">
+            <div className="mx-auto w-full rounded-2xl bg-white/90 p-6 shadow-xl shadow-red-100 ring-1 ring-red-100 backdrop-blur-sm sm:p-8">
+              <div className="mb-6 flex rounded-full bg-slate-100 p-1 text-xs font-medium text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setActiveRole('donor')}
+                  className={`flex-1 rounded-full px-3 py-2 transition ${
+                    activeRole === 'donor'
+                      ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                      : 'hover:text-red-600'
+                  }`}
+                >
+                  Donor/Recipient
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveRole('hospital')}
+                  className={`flex-1 rounded-full px-3 py-2 transition ${
+                    activeRole === 'hospital'
+                      ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                      : 'hover:text-red-600'
+                  }`}
+                >
+                  Hospital
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveRole('admin')}
+                  className={`flex-1 rounded-full px-3 py-2 transition ${
+                    activeRole === 'admin'
+                      ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                      : 'hover:text-red-600'
+                  }`}
+                >
+                  Admin
+                </button>
+              </div>
+
+              <div className="mb-6 space-y-1">
+                <h2 className="text-lg font-semibold text-slate-900">Login to BloodConnect</h2>
+              </div>
+
+              <form className="space-y-4" onSubmit={handleLogin}>
+                <div className="space-y-1">
+                  <label htmlFor="identifier" className="block text-xs font-medium text-slate-700">
+                    Username or Email
+                  </label>
+                  <input
+                    id="identifier"
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
+                    placeholder="Enter your username or email"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="block text-xs font-medium text-slate-700">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      className="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
+                  />
+                </div>
+
+                {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                >
+                  {isSubmitting ? 'Logging in...' : 'Login'}
+                </button>
+
+                <p className="text-center text-xs text-slate-500">
+                  New to BloodConnect?{' '}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/register')}
+                    className="cursor-pointer font-semibold text-red-600 hover:text-red-700"
+                  >
+                    Create an account
+                  </button>
+                </p>
+              </form>
+
+              <div className="mt-6 border-t border-slate-100 pt-4 text-[11px] text-slate-400">
+                Your information is encrypted and shared only with verified medical partners.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Donate */}
+        <section
+          id="donate"
+          className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-red-100/80 bg-white/90 py-28 shadow-sm sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
+        >
+          <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Give blood, save lives</h2>
+            <p className="mx-auto mt-6 max-w-xl text-sm text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
+              Register as a donor to help hospitals maintain a safe blood supply. It only takes a few minutes to get
+              started.
+            </p>
             <button
               type="button"
               onClick={() => navigate('/register')}
-              className="inline-flex w-full cursor-pointer items-center justify-center rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:w-auto"
+              className="mt-12 inline-flex min-h-12 items-center justify-center rounded-full bg-red-600 px-10 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:mt-16"
             >
-              Donate Blood – Sign Up
+              Start donating
             </button>
           </div>
+        </section>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500 lg:justify-start" />
-        </div>
-
-        {/* Right: Authentication Panel */}
-        <div className="mt-10 w-full max-w-md lg:mt-0 lg:w-1/2">
-          <div className="mx-auto rounded-2xl bg-white/90 p-6 shadow-xl shadow-red-100 ring-1 ring-red-100 backdrop-blur-sm sm:p-8">
-            {/* Role Toggle */}
-            <div className="mb-6 flex rounded-full bg-slate-100 p-1 text-xs font-medium text-slate-600">
-              <button
-                type="button"
-                onClick={() => setActiveRole('donor')}
-                className={`flex-1 rounded-full px-3 py-2 transition ${
-                  activeRole === 'donor'
-                    ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
-                    : 'hover:text-red-600'
-                }`}
-              >
-                Donor/Recipient
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveRole('hospital')}
-                className={`flex-1 rounded-full px-3 py-2 transition ${
-                  activeRole === 'hospital'
-                    ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
-                    : 'hover:text-red-600'
-                }`}
-              >
-                Hospital
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveRole('admin')}
-                className={`flex-1 rounded-full px-3 py-2 transition ${
-                  activeRole === 'admin'
-                    ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
-                    : 'hover:text-red-600'
-                }`}
-              >
-                Admin
-              </button>
-            </div>
-
-            <div className="mb-6 space-y-1">
-              <h2 className="text-lg font-semibold text-slate-900">Login to BloodConnect</h2>
-            </div>
-
-            <form
-              className="space-y-4"
-              onSubmit={handleLogin}
-            >
-              <div className="space-y-1">
-                <label
-                  htmlFor="identifier"
-                  className="block text-xs font-medium text-slate-700"
-                >
-                  Username or Email
-                </label>
-                <input
-                  id="identifier"
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                  placeholder="Enter your username or email"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="password"
-                    className="block text-xs font-medium text-slate-700"
-                  >
-                    Password
-                  </label>
-                <button
-                  type="button"
-                  className="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700"
-                >
-                    Forgot password?
-                  </button>
-                </div>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                />
-              </div>
-
-              {error && (
-                <p className="text-xs font-medium text-red-600">
-                  {error}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-              >
-                {isSubmitting ? 'Logging in...' : 'Login'}
-              </button>
-
-              <p className="text-center text-xs text-slate-500">
-                New to BloodConnect?{' '}
-                <button
-                  type="button"
-                  onClick={() => navigate('/register')}
-                  className="cursor-pointer font-semibold text-red-600 hover:text-red-700"
-                >
-                  Create an account
-                </button>
-              </p>
-            </form>
-
-            <div className="mt-6 border-t border-slate-100 pt-4 text-[11px] text-slate-400">
-              Your information is encrypted and shared only with verified medical partners.
-            </div>
+        {/* About */}
+        <section
+          id="about"
+          className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-slate-200/80 bg-slate-50/90 py-28 sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
+        >
+          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+            <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+              About BloodConnect
+            </h2>
+            <p className="mt-8 text-sm leading-relaxed text-slate-600 sm:mt-10 sm:text-base lg:mt-12 lg:text-lg">
+              BloodConnect is built for hospitals, donors, and administrators to coordinate blood requests, inventory,
+              and donation activity in one place. Our goal is to reduce delays in emergencies and keep the community
+              informed about drives and urgent needs—safely and transparently.
+            </p>
+            <p className="mt-6 text-sm leading-relaxed text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
+              Whether you are logging in to donate, manage hospital supply, or oversee the network, BloodConnect keeps
+              critical workflows clear and connected.
+            </p>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
+
+      <DashboardAnnouncementsPanel
+        open={announcementsPanelOpen}
+        onClose={() => setAnnouncementsPanelOpen(false)}
+      />
     </div>
   )
 }

@@ -55,6 +55,12 @@ const {
   getOrganizationDonationRankingController,
   getDonorDonationRankingController,
 } = require('../controllers/adminDonationRankingController')
+const {
+  getAnnouncementsController,
+  createAnnouncementController,
+  updateAnnouncementController,
+  deleteAnnouncementController,
+} = require('../controllers/adminAnnouncementController')
 
 const router = express.Router()
 
@@ -195,6 +201,20 @@ router.put('/admins/:id', updateAdminController)
 
 // DELETE /api/admin/admins/:id
 router.delete('/admins/:id', deleteAdminController)
+
+// ===== Announcements =====
+
+// GET /api/admin/announcements
+router.get('/announcements', getAnnouncementsController)
+
+// POST /api/admin/announcements
+router.post('/announcements', createAnnouncementController)
+
+// PUT /api/admin/announcements/:id
+router.put('/announcements/:id', updateAnnouncementController)
+
+// DELETE /api/admin/announcements/:id
+router.delete('/announcements/:id', deleteAnnouncementController)
 
 module.exports = router
 
