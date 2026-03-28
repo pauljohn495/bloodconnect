@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 import { adminPanel } from './admin-ui.jsx'
@@ -195,13 +195,13 @@ function AdminAnnouncements() {
           method: 'PUT',
           body: JSON.stringify(body),
         })
-        showNotification('Announcement updated')
+        showNotification('Announcement updated successfully!', 'primary')
       } else {
         await apiRequest('/api/admin/announcements', {
           method: 'POST',
           body: JSON.stringify(body),
         })
-        showNotification('Announcement created')
+        showNotification('Announcement created successfully!', 'primary')
       }
       setModalOpen(false)
       setEditing(null)
@@ -219,7 +219,7 @@ function AdminAnnouncements() {
     setDeleting(true)
     try {
       await apiRequest(`/api/admin/announcements/${deleteTarget.id}`, { method: 'DELETE' })
-      showNotification('Announcement deleted')
+      showNotification('Announcement deleted successfully!', 'primary')
       setDeleteTarget(null)
       await load()
     } catch (err) {
@@ -237,20 +237,8 @@ function AdminAnnouncements() {
       pageTitle="Announcements"
       pageDescription="Post and manage blood drives, urgent needs, and general updates."
     >
+      <React.Fragment>
       <div className="space-y-6">
-        {notification && (
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm font-medium shadow-sm ${
-              notification.type === 'destructive'
-                ? 'border-red-200 bg-red-50 text-red-800'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
-            }`}
-            role="status"
-          >
-            {notification.message}
-          </div>
-        )}
-
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Announcements</h2>
@@ -290,28 +278,24 @@ function AdminAnnouncements() {
         )}
 
         {!isLoading && !error && items.length > 0 && (
-          <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             {items.map((a) => {
               const urgent = a.announcement_type === 'urgent_need'
               return (
                 <li
                   key={a.id}
-                  className={`flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm ring-1 transition hover:shadow-md ${
-                    urgent
-                      ? 'border-red-200 ring-red-100/80'
-                      : 'border-slate-200/90 ring-slate-100/90'
-                  }`}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90 transition hover:shadow-lg hover:ring-slate-200/90"
                 >
                   <div
-                    className={`flex flex-1 flex-col px-4 pb-4 pt-4 sm:px-5 ${
-                      urgent ? 'bg-gradient-to-br from-red-50/90 via-white to-white' : ''
+                    className={`relative flex flex-1 flex-col px-5 pb-5 pt-5 ${
+                      urgent ? 'bg-gradient-to-br from-red-50/50 via-white to-white' : 'bg-white'
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ${typeBadgeClasses(
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide shadow-sm ring-1 ${typeBadgeClasses(
                               a.announcement_type,
                             )}`}
                           >
@@ -319,7 +303,7 @@ function AdminAnnouncements() {
                             {typeLabel(a.announcement_type)}
                           </span>
                           <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ${statusBadgeClasses(
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1 ${statusBadgeClasses(
                               a.status,
                             )}`}
                           >
@@ -327,25 +311,25 @@ function AdminAnnouncements() {
                           </span>
                         </div>
                         <h3
-                          className={`mt-2 text-base font-semibold leading-snug sm:text-lg ${
+                          className={`mt-3 text-lg font-bold leading-snug tracking-tight ${
                             urgent ? 'text-red-950' : 'text-slate-900'
                           }`}
                         >
                           {a.title}
                         </h3>
                       </div>
-                      <div className="flex shrink-0 gap-1.5">
+                      <div className="flex shrink-0 gap-2">
                         <button
                           type="button"
                           onClick={() => openEdit(a)}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                          className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => setDeleteTarget(a)}
-                          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm hover:bg-red-50"
+                          className="rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
                         >
                           Delete
                         </button>
@@ -358,50 +342,54 @@ function AdminAnnouncements() {
                       <p className="mt-3 text-sm italic text-slate-400">No description</p>
                     )}
 
-                    <dl className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm">
-                      <div className="flex gap-2">
-                        <dt className="flex shrink-0 items-center gap-1.5 font-medium text-slate-500">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <div className="mt-5 grid gap-3 border-t border-slate-100/90 pt-4 sm:grid-cols-2">
+                      <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/90 p-3 ring-1 ring-slate-100/80">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200/60">
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              strokeWidth={2}
+                              strokeWidth={1.75}
                               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                             />
                           </svg>
-                          When
-                        </dt>
-                        <dd className="text-slate-800">{formatEventDisplay(a.event_starts_at)}</dd>
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">When</p>
+                          <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatEventDisplay(a.event_starts_at)}</p>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <dt className="flex shrink-0 items-center gap-1.5 font-medium text-slate-500">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/90 p-3 ring-1 ring-slate-100/80 sm:col-span-1">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200/60">
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              strokeWidth={2}
+                              strokeWidth={1.75}
                               d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
                             />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
-                          Where
-                        </dt>
-                        <dd className="min-w-0 flex-1 text-slate-800">
-                          {a.location ? (
-                            <a
-                              href={mapsUrl(a.location)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-medium text-red-700 underline decoration-red-200 underline-offset-2 hover:text-red-800"
-                            >
-                              {a.location}
-                            </a>
-                          ) : (
-                            '—'
-                          )}
-                        </dd>
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Where</p>
+                          <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                            {a.location ? (
+                              <a
+                                href={mapsUrl(a.location)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-red-700 underline decoration-red-200 underline-offset-2 transition hover:text-red-800"
+                              >
+                                {a.location}
+                              </a>
+                            ) : (
+                              <span className="font-medium text-slate-400">—</span>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </dl>
+                    </div>
                   </div>
                 </li>
               )
@@ -412,7 +400,7 @@ function AdminAnnouncements() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
           <button
             type="button"
             className="absolute inset-0 cursor-default"
@@ -420,133 +408,167 @@ function AdminAnnouncements() {
             onClick={closeModal}
           />
           <div
-            className="relative z-10 flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:rounded-2xl"
+            className="relative z-10 flex max-h-[min(94vh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.25rem] bg-white shadow-2xl shadow-slate-900/20 ring-1 ring-slate-200/90 sm:max-h-[min(90vh,720px)] sm:rounded-3xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="announcement-modal-title"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
-              <h3 id="announcement-modal-title" className="text-base font-semibold text-slate-900">
-                {editing ? 'Edit announcement' : 'Add announcement'}
-              </h3>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                disabled={saving}
-              >
-                <span className="sr-only">Close</span>
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            <div className="flex justify-center pt-3 sm:hidden" aria-hidden="true">
+              <span className="h-1 w-10 rounded-full bg-slate-200" />
             </div>
-            <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-              <div className="space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-                <div>
-                  <label htmlFor="ann-title" className="block text-xs font-medium text-slate-700">
-                    Title
-                  </label>
-                  <input
-                    id="ann-title"
-                    required
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    placeholder="e.g. City Hall Blood Drive"
-                  />
+            <div className="relative overflow-hidden bg-gradient-to-br from-red-600 via-red-600 to-rose-800 px-5 pb-6 pt-4 sm:rounded-t-3xl sm:pt-5">
+              <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.06\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/svg%3E')] opacity-90" />
+              <div className="relative flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-red-100">
+                    {editing ? 'Update listing' : 'New announcement'}
+                  </p>
+                  <h3 id="announcement-modal-title" className="mt-1 text-xl font-bold tracking-tight text-white sm:text-2xl">
+                    {editing ? 'Edit announcement' : 'Create announcement'}
+                  </h3>
+                  <p className="mt-1 max-w-sm text-sm text-red-100/95">
+                    {editing ? 'Changes apply immediately for donors on the home page and dashboard.' : 'Visible to donors on the landing page and in the announcements panel.'}
+                  </p>
                 </div>
-                <div>
-                  <label htmlFor="ann-desc" className="block text-xs font-medium text-slate-700">
-                    Description
-                  </label>
-                  <textarea
-                    id="ann-desc"
-                    rows={4}
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    className="mt-1 w-full resize-y rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    placeholder="Details for donors…"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="ann-type" className="block text-xs font-medium text-slate-700">
-                      Type
-                    </label>
-                    <select
-                      id="ann-type"
-                      value={form.announcementType}
-                      onChange={(e) => setForm((f) => ({ ...f, announcementType: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    >
-                      {TYPE_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="ann-status" className="block text-xs font-medium text-slate-700">
-                      Status
-                    </label>
-                    <select
-                      id="ann-status"
-                      value={form.status}
-                      onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    >
-                      {STATUS_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="shrink-0 rounded-xl bg-white/15 p-2 text-white ring-1 ring-white/25 transition hover:bg-white/25 disabled:opacity-50"
+                  disabled={saving}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-slate-50/40">
+              <div className="space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ring-1 ring-slate-100/80">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Content</p>
+                  <div className="mt-3 space-y-4">
+                    <div>
+                      <label htmlFor="ann-title" className="block text-sm font-semibold text-slate-800">
+                        Title <span className="font-normal text-red-600">*</span>
+                      </label>
+                      <input
+                        id="ann-title"
+                        required
+                        value={form.title}
+                        onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                        placeholder="e.g. City Hall Blood Drive"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="ann-desc" className="block text-sm font-semibold text-slate-800">
+                        Description
+                      </label>
+                      <textarea
+                        id="ann-desc"
+                        rows={4}
+                        value={form.description}
+                        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                        className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                        placeholder="What donors should know — schedule, who can donate, what to bring…"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label htmlFor="ann-when" className="block text-xs font-medium text-slate-700">
-                    Date &amp; time
-                  </label>
-                  <input
-                    id="ann-when"
-                    type="datetime-local"
-                    required
-                    value={form.eventStartsAt}
-                    onChange={(e) => setForm((f) => ({ ...f, eventStartsAt: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
+
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ring-1 ring-slate-100/80">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Classification</p>
+                  <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="ann-type" className="block text-sm font-semibold text-slate-800">
+                        Type
+                      </label>
+                      <select
+                        id="ann-type"
+                        value={form.announcementType}
+                        onChange={(e) => setForm((f) => ({ ...f, announcementType: e.target.value }))}
+                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                      >
+                        {TYPE_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="ann-status" className="block text-sm font-semibold text-slate-800">
+                        Status
+                      </label>
+                      <select
+                        id="ann-status"
+                        value={form.status}
+                        onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                      >
+                        {STATUS_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="ann-loc" className="block text-xs font-medium text-slate-700">
-                    Location
-                  </label>
-                  <input
-                    id="ann-loc"
-                    value={form.location}
-                    onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                    placeholder="Address or venue name"
-                  />
-                  <p className="mt-1 text-[11px] text-slate-500">Shown as a link to open in Google Maps.</p>
+
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ring-1 ring-slate-100/80">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Schedule &amp; place</p>
+                  <div className="mt-3 space-y-4">
+                    <div>
+                      <label htmlFor="ann-when" className="block text-sm font-semibold text-slate-800">
+                        Date &amp; time <span className="font-normal text-red-600">*</span>
+                      </label>
+                      <input
+                        id="ann-when"
+                        type="datetime-local"
+                        required
+                        value={form.eventStartsAt}
+                        onChange={(e) => setForm((f) => ({ ...f, eventStartsAt: e.target.value }))}
+                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="ann-loc" className="block text-sm font-semibold text-slate-800">
+                        Location
+                      </label>
+                      <input
+                        id="ann-loc"
+                        value={form.location}
+                        onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                        placeholder="Address or venue name"
+                      />
+                      <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-slate-500">
+                        <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Donors get a button to open this address in Google Maps.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/80 px-4 py-3 sm:flex-row sm:justify-end sm:px-5">
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-white px-4 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  className="min-h-11 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                  className="min-h-11 rounded-2xl bg-red-600 px-5 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:opacity-60"
                 >
-                  {saving ? 'Saving…' : editing ? 'Save changes' : 'Create announcement'}
+                  {saving ? 'Saving…' : editing ? 'Save changes' : 'Publish announcement'}
                 </button>
               </div>
             </form>
@@ -555,33 +577,90 @@ function AdminAnnouncements() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" role="alertdialog">
-            <h4 className="text-base font-semibold text-slate-900">Delete announcement?</h4>
-            <p className="mt-2 text-sm text-slate-600">
-              &ldquo;{deleteTarget.title}&rdquo; will be removed permanently.
-            </p>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]">
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20 ring-1 ring-slate-100"
+            role="alertdialog"
+            aria-labelledby="delete-ann-title"
+            aria-describedby="delete-ann-desc"
+          >
+            <div className="border-b border-red-100 bg-gradient-to-br from-red-50 to-white px-6 pb-5 pt-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-700 ring-2 ring-red-200/60">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.75}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              </div>
+              <h4 id="delete-ann-title" className="mt-4 text-lg font-bold text-slate-900">
+                Delete this announcement?
+              </h4>
+              <p id="delete-ann-desc" className="mt-2 text-sm leading-relaxed text-slate-600">
+                <span className="font-semibold text-slate-800">&ldquo;{deleteTarget.title}&rdquo;</span> will be removed for all donors. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex flex-col-reverse gap-2 px-6 py-4 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 type="button"
                 onClick={() => !deleting && setDeleteTarget(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="min-h-11 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
                 disabled={deleting}
               >
-                Cancel
+                Keep announcement
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                className="min-h-11 rounded-2xl bg-red-600 px-5 text-sm font-semibold text-white shadow-lg shadow-red-600/25 transition hover:bg-red-700 disabled:opacity-60"
               >
-                {deleting ? 'Deleting…' : 'Delete'}
+                {deleting ? 'Deleting…' : 'Delete permanently'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Notification Container — same pattern as /admin/partners */}
+      {notification && (
+        <div className="fixed right-4 top-4 z-60 transition-all duration-300 ease-in-out">
+          <div
+            className={`flex min-w-[300px] max-w-md items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${
+              notification.type === 'destructive'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            }`}
+          >
+            {notification.type === 'destructive' ? (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            <p className="flex-1 text-sm font-medium">{notification.message}</p>
+            <button
+              type="button"
+              onClick={() => setNotification(null)}
+              className={`shrink-0 rounded p-1 transition hover:opacity-70 ${
+                notification.type === 'destructive'
+                  ? 'text-red-600 hover:bg-red-100'
+                  : 'text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+      </React.Fragment>
     </AdminLayout>
   )
 }

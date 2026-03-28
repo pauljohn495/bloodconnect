@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { BrandLogo } from './BrandLogo.jsx'
 
 const sidebarItems = [
   { name: 'Dashboard', path: '/admin/dashboard' },
@@ -85,17 +86,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
         <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/90 bg-white md:flex">
           <div className="border-b border-slate-100 px-5 py-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-white shadow-sm ring-1 ring-red-700/20">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
+              <BrandLogo className="h-10 w-10" />
               <div>
                 <p className="text-sm font-semibold tracking-tight text-slate-900">BloodConnect</p>
                 <p className="text-[11px] font-medium uppercase tracking-wider text-red-700">
@@ -134,17 +125,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-600 text-white">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
+              <BrandLogo className="h-9 w-9 rounded-lg" roundedClass="rounded-lg" />
               <span className="text-sm font-semibold text-slate-900">BloodConnect</span>
             </div>
             <button

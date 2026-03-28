@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
+import { BrandLogo } from './BrandLogo.jsx'
 
 function Home() {
   const [activeRole, setActiveRole] = useState('donor') // 'donor' | 'hospital' | 'admin'
@@ -128,17 +129,7 @@ function Home() {
             onClick={scrollToTop}
             className="flex min-h-10 min-w-0 shrink-0 items-center gap-2 rounded-lg py-1 text-left text-white transition hover:bg-red-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" aria-hidden="true">
-                <path
-                  d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69Z"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
+            <BrandLogo tone="hero" className="h-9 w-9 shrink-0 rounded-lg" roundedClass="rounded-lg" />
             <span className="leading-tight">
               <span className="block text-sm font-bold tracking-tight sm:text-base">BloodConnect</span>
               <span className="hidden text-[10px] font-medium uppercase tracking-wider text-red-100 sm:block">
