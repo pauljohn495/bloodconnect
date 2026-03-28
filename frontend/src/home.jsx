@@ -112,22 +112,22 @@ function Home() {
   const navLinkClass = (id, options = {}) => {
     const { forceActive } = options
     const active = forceActive != null ? forceActive : activeSection === id
-    return `rounded-lg px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-red-700 ${
+    return `rounded-lg px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-red-900 ${
       active
-        ? 'bg-red-900/50 text-white underline decoration-white/90 decoration-2 underline-offset-4'
-        : 'text-white/95 hover:bg-red-600/40 hover:text-white hover:underline hover:decoration-white/70 hover:underline-offset-4'
+        ? 'bg-red-950/55 text-white underline decoration-white/90 decoration-2 underline-offset-4'
+        : 'text-white/95 hover:bg-red-800/45 hover:text-white hover:underline hover:decoration-white/70 hover:underline-offset-4'
     }`
   }
 
   return (
     <div className="min-h-screen bg-linear-to-br from-red-150 via-white to-red-300">
       {/* Sticky header */}
-      <header className="sticky top-0 z-50 border-b border-red-800/30 bg-red-700 shadow-md">
+      <header className="sticky top-0 z-50 border-b border-red-950/35 bg-red-900 shadow-md">
         <div className="mx-auto flex min-h-12 max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:min-h-14 sm:px-6 lg:px-8">
           <button
             type="button"
             onClick={scrollToTop}
-            className="flex min-h-10 min-w-0 shrink-0 items-center gap-2 rounded-lg py-1 text-left text-white transition hover:bg-red-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            className="flex min-h-10 min-w-0 shrink-0 items-center gap-2 rounded-lg py-1 text-left text-white transition hover:bg-red-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           >
             <BrandLogo tone="hero" className="h-9 w-9 shrink-0 rounded-lg" roundedClass="rounded-lg" />
             <span className="leading-tight">
@@ -160,7 +160,7 @@ function Home() {
 
           <button
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white hover:bg-red-600/50 md:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white hover:bg-red-800/50 md:hidden"
             aria-expanded={mobileNavOpen}
             aria-controls="home-mobile-nav"
             aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
@@ -181,13 +181,13 @@ function Home() {
         {mobileNavOpen && (
           <div
             id="home-mobile-nav"
-            className="border-t border-red-600/40 bg-red-800/95 px-4 py-3 shadow-inner md:hidden"
+            className="border-t border-red-950/40 bg-red-950/98 px-4 py-3 shadow-inner md:hidden"
           >
             <nav className="flex flex-col gap-1" aria-label="Mobile primary">
               <button
                 type="button"
                 className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                  announcementsPanelOpen ? 'bg-red-900/60 text-white' : 'text-white/95 hover:bg-red-600/40'
+                  announcementsPanelOpen ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
                 }`}
                 onClick={openAnnouncementsPanel}
                 aria-expanded={announcementsPanelOpen}
@@ -197,7 +197,7 @@ function Home() {
               <button
                 type="button"
                 className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                  activeSection === 'donate' ? 'bg-red-900/60 text-white' : 'text-white/95 hover:bg-red-600/40'
+                  activeSection === 'donate' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
                 }`}
                 onClick={() => scrollToSection('donate')}
               >
@@ -206,7 +206,7 @@ function Home() {
               <button
                 type="button"
                 className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                  activeSection === 'about' ? 'bg-red-900/60 text-white' : 'text-white/95 hover:bg-red-600/40'
+                  activeSection === 'about' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
                 }`}
                 onClick={() => scrollToSection('about')}
               >

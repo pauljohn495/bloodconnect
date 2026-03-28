@@ -242,9 +242,6 @@ function AdminAnnouncements() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Announcements</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Shown in chronological order (soonest event first). Urgent needs are highlighted in red.
-            </p>
           </div>
           <button
             type="button"
