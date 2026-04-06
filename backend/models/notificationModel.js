@@ -25,8 +25,19 @@ async function markNotificationRead(userId, notificationId) {
   return result.affectedRows > 0
 }
 
+async function createNotification(userId, title, message, type = 'info') {
+  await pool.query(
+    `
+    INSERT INTO notifications (user_id, title, message, type)
+    VALUES (?, ?, ?, ?)
+  `,
+    [userId, title, message, type],
+  )
+}
+
 module.exports = {
   getUserNotifications,
   markNotificationRead,
+  createNotification,
 }
 

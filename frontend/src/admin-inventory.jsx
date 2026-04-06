@@ -4,6 +4,19 @@ import { apiRequest } from './api.js'
 import { adminPanel } from './admin-ui.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
+function normalizeInventoryStatus(status) {
+  return (status || 'available').toString().toLowerCase().replace(/\s+/g, '_')
+}
+
+function isExpiredStatus(status) {
+  return normalizeInventoryStatus(status) === 'expired'
+}
+
+function isAvailableOrNearExpiry(status) {
+  const s = normalizeInventoryStatus(status)
+  return s === 'available' || s === 'near_expiry'
+}
+
 function AdminInventory() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -18,6 +31,8 @@ function AdminInventory() {
   const [expirationDate, setExpirationDate] = useState('')
   const [componentType, setComponentType] = useState('whole_blood')
   const [inventory, setInventory] = useState([])
+  const [expiredStocks, setExpiredStocks] = useState([])
+  const [isExpiredStocksModalOpen, setIsExpiredStocksModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -37,12 +52,16 @@ function AdminInventory() {
     try {
       setIsLoading(true)
       setError('')
-      const data = await apiRequest('/api/admin/inventory')
-      // Filter out items with 0 available units to keep the table clean
-      const filteredData = data.filter(
-        (item) => (item.available_units || item.availableUnits || 0) > 0,
-      )
-      setInventory(filteredData)
+      const data = (await apiRequest('/api/admin/inventory')) || []
+      const expired = data.filter((item) => isExpiredStatus(item.status))
+      const active = data.filter((item) => {
+        if (isExpiredStatus(item.status)) return false
+        const u = Number(item.available_units ?? item.availableUnits ?? item.units ?? 0)
+        if (u <= 0) return false
+        return isAvailableOrNearExpiry(item.status)
+      })
+      setExpiredStocks(expired)
+      setInventory(active)
     } catch (err) {
       setError(err.message || 'Failed to load inventory')
     } finally {
@@ -158,12 +177,27 @@ function AdminInventory() {
       if (componentFilter === 'plasma' && componentType !== 'plasma') return false
     }
     
-    // Filter by status
+    // Filter by status (main table is only available + near expiry)
     if (statusFilter === 'all') return true
     if (statusFilter === 'available') return item.status === 'available'
     if (statusFilter === 'near_expiry') return item.status === 'near_expiry' || item.status === 'Near Expiry'
-    if (statusFilter === 'expired') return item.status === 'expired'
     return true
+  })
+
+  const filteredExpiredStocks = expiredStocks.filter((item) => {
+    if (componentFilter !== 'all') {
+      const ct = item.component_type || item.componentType || 'whole_blood'
+      if (componentFilter === 'whole_blood' && ct !== 'whole_blood') return false
+      if (componentFilter === 'platelets' && ct !== 'platelets') return false
+      if (componentFilter === 'plasma' && ct !== 'plasma') return false
+    }
+    return true
+  })
+
+  const expiredStocksSortedByExpiration = [...filteredExpiredStocks].sort((a, b) => {
+    const ta = new Date(a.expiration_date || a.expirationDate || 0).getTime()
+    const tb = new Date(b.expiration_date || b.expirationDate || 0).getTime()
+    return tb - ta
   })
 
   return (
@@ -226,16 +260,28 @@ function AdminInventory() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setIsExpiredStocksModalOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+              >
+                Expired Stocks
+                {expiredStocks.length > 0 && (
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-100 px-1.5 text-[10px] font-bold text-red-800">
+                    {expiredStocks.length}
+                  </span>
+                )}
+              </button>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                aria-label="Filter by status"
               >
                 <option value="all">All</option>
                 <option value="available">Available</option>
                 <option value="near_expiry">Near Expiry</option>
-                <option value="expired">Expired</option>
               </select>
               <button
                 type="button"
@@ -288,7 +334,9 @@ function AdminInventory() {
                 {!isLoading && !error && inventory.length === 0 && (
                   <tr>
                     <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={5}>
-                      No inventory data available yet.
+                      {expiredStocks.length > 0
+                        ? 'No available or near-expiry units on hand. Use Expired Stocks to review expired units.'
+                        : 'No inventory data available yet.'}
                     </td>
                   </tr>
                 )}
@@ -525,6 +573,94 @@ function AdminInventory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isExpiredStocksModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="flex max-h-[min(90vh,800px)] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Expired Stocks</h3>
+                <p className="mt-0.5 text-[11px] text-slate-600">
+                  Expired units are not shown in the main Blood Inventory table. Component filter above applies
+                  here too. Rows are ordered by expiration date (most recent first).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsExpiredStocksModalOpen(false)
+                  setOpenMenuItemId(null)
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 sm:px-4">
+              {expiredStocksSortedByExpiration.length === 0 ? (
+                <p className="px-3 py-10 text-center text-sm text-slate-500">
+                  {expiredStocks.length === 0
+                    ? 'No expired units.'
+                    : 'No expired units for the selected component filter.'}
+                </p>
+              ) : (
+                <table className="min-w-full divide-y divide-slate-100 text-sm">
+                  <thead className={adminPanel.rose.thead}>
+                    <tr>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
+                        Blood Type
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
+                        Units
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
+                        Expiration Date
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
+                        Component
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className={adminPanel.rose.tbody}>
+                    {expiredStocksSortedByExpiration.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/60">
+                        <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                          <BloodTypeBadge type={item.blood_type || item.bloodType} />
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                          <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
+                            {item.available_units ?? item.availableUnits ?? item.units ?? 0}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                          {item.expiration_date
+                            ? new Date(item.expiration_date).toLocaleDateString()
+                            : item.expirationDate
+                              ? new Date(item.expirationDate).toLocaleDateString()
+                              : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700 capitalize">
+                          {(item.component_type || item.componentType || 'whole_blood').replace(/_/g, ' ')}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm">
+                          <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold capitalize text-red-700 ring-1 ring-red-100">
+                            Expired
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}

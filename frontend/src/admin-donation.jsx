@@ -4,6 +4,15 @@ import { apiRequest } from './api.js'
 import { adminPanel } from './admin-ui.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 
+function parseDonorPendingProfile(donor) {
+  if (!donor?.pending_profile_json) return null
+  try {
+    return JSON.parse(donor.pending_profile_json)
+  } catch {
+    return null
+  }
+}
+
 function AdminDonation() {
   const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations' | 'rc143'
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -27,12 +36,15 @@ function AdminDonation() {
   const [feedbackModal, setFeedbackModal] = useState({ open: false, message: '' })
   const [isDonorDetailsOpen, setIsDonorDetailsOpen] = useState(false)
   const [selectedDonorDetails, setSelectedDonorDetails] = useState(null)
+  const [donorDetailAvatarFailed, setDonorDetailAvatarFailed] = useState(false)
   const [donorSearch, setDonorSearch] = useState('')
   const [organizationSearch, setOrganizationSearch] = useState('')
   const [notification, setNotification] = useState(null)
   const [openMenuDonorId, setOpenMenuDonorId] = useState(null)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
   const buttonRefs = useRef({})
+  const [profileReviewLoadingId, setProfileReviewLoadingId] = useState(null)
+  const [profileDiffDonor, setProfileDiffDonor] = useState(null)
   const [isEditDonorModalOpen, setIsEditDonorModalOpen] = useState(false)
   const [editingDonor, setEditingDonor] = useState(null)
   const [editDonorName, setEditDonorName] = useState('')
@@ -123,8 +135,41 @@ function AdminDonation() {
       setDonors(data)
     } catch (err) {
       setError(err.message || 'Failed to load donors')
-    } finally {
+} finally {
       setIsLoading(false)
+    }
+  }
+
+  const donorHasPendingProfile = (donor) => Boolean(donor.pending_profile_json)
+
+  const handleApproveDonorProfile = async (donorId) => {
+    try {
+      setProfileReviewLoadingId(donorId)
+      await apiRequest(`/api/admin/donors/${donorId}/profile-update/approve`, { method: 'POST' })
+      showNotification('Profile update approved.', 'primary')
+      setProfileDiffDonor((prev) => (prev && prev.id === donorId ? null : prev))
+      await loadDonors()
+    } catch (err) {
+      alert(err.message || 'Failed to approve profile update')
+    } finally {
+      setProfileReviewLoadingId(null)
+    }
+  }
+
+  const handleRejectDonorProfile = async (donorId) => {
+    if (!window.confirm('Reject this donor’s profile changes? Their current profile will stay as-is.')) {
+      return
+    }
+    try {
+      setProfileReviewLoadingId(donorId)
+      await apiRequest(`/api/admin/donors/${donorId}/profile-update/reject`, { method: 'POST' })
+      showNotification('Profile update rejected.', 'primary')
+      setProfileDiffDonor((prev) => (prev && prev.id === donorId ? null : prev))
+      await loadDonors()
+    } catch (err) {
+      alert(err.message || 'Failed to reject profile update')
+    } finally {
+      setProfileReviewLoadingId(null)
     }
   }
 
@@ -174,6 +219,10 @@ function AdminDonation() {
     window.addEventListener('scroll', handleScroll, true)
     return () => window.removeEventListener('scroll', handleScroll, true)
   }, [openMenuDonorId])
+
+  useEffect(() => {
+    if (selectedDonorDetails) setDonorDetailAvatarFailed(false)
+  }, [selectedDonorDetails])
 
   const donorNameForSearch = (donor) =>
     (
@@ -1008,6 +1057,9 @@ function AdminDonation() {
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                         Status
                       </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Profile update
+                      </th>
                       <th className={`whitespace-nowrap px-4 py-2 text-right text-[13px] ${adminPanel.emerald.th}`}>
                         Actions
                       </th>
@@ -1033,7 +1085,7 @@ function AdminDonation() {
               <tbody className={adminPanel.emerald.tbody}>
                 {activeSection === 'donors' && isLoading && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={6}>
                       Loading donors...
                     </td>
                   </tr>
@@ -1041,7 +1093,7 @@ function AdminDonation() {
 
                 {activeSection === 'donors' && !isLoading && error && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={5}>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={6}>
                       {error}
                     </td>
                   </tr>
@@ -1049,7 +1101,7 @@ function AdminDonation() {
 
                 {activeSection === 'donors' && !isLoading && !error && donors.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
                       No donors added yet.
                     </td>
                   </tr>
@@ -1080,6 +1132,32 @@ function AdminDonation() {
                         >
                           {donor.status ? donor.status.charAt(0).toUpperCase() + donor.status.slice(1) : 'Active'}
                         </span>
+                      </td>
+                      <td className="px-4 py-2 align-top text-sm">
+                        {donorHasPendingProfile(donor) ? (
+                          <div className="flex max-w-[220px] flex-col gap-2">
+                            <div>
+                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                                Awaiting review
+                              </span>
+                              {donor.profile_update_requested_at && (
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                  {new Date(donor.profile_update_requested_at).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              disabled={profileReviewLoadingId === donor.id}
+                              onClick={() => setProfileDiffDonor(donor)}
+                              className="w-fit rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-50"
+                            >
+                              Review changes
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-right text-sm">
                         <div className="relative inline-block text-left">
@@ -2132,6 +2210,133 @@ function AdminDonation() {
         </div>
       )}
 
+      {profileDiffDonor && (() => {
+        const pending = parseDonorPendingProfile(profileDiffDonor)
+        const currentName = profileDiffDonor.full_name || profileDiffDonor.fullName || '—'
+        const currentPhone = profileDiffDonor.phone || '—'
+        const currentBlood = profileDiffDonor.blood_type || profileDiffDonor.bloodType || '—'
+        const currentAvatar = profileDiffDonor.profile_image_url || null
+        return (
+          <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Review profile changes</h3>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Compare what is on file with what the donor requested. Approve to apply, or reject to keep the
+                    current profile.
+                  </p>
+                  {profileDiffDonor.profile_update_requested_at && (
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      Submitted {new Date(profileDiffDonor.profile_update_requested_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileDiffDonor(null)}
+                  disabled={profileReviewLoadingId === profileDiffDonor.id}
+                  className="shrink-0 text-slate-400 hover:text-slate-600 disabled:opacity-50"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {!pending ? (
+                <p className="mt-4 text-sm text-red-600">Could not read pending profile data.</p>
+              ) : (
+                <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                      <tr>
+                        <th className="px-3 py-2">Field</th>
+                        <th className="px-3 py-2">On file</th>
+                        <th className="px-3 py-2">Requested</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white text-sm text-slate-900">
+                      <tr>
+                        <td className="px-3 py-2.5 font-medium text-slate-600">Full name</td>
+                        <td className="px-3 py-2.5">{currentName}</td>
+                        <td className="px-3 py-2.5">{pending.fullName ?? '—'}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2.5 font-medium text-slate-600">Phone</td>
+                        <td className="px-3 py-2.5">{currentPhone}</td>
+                        <td className="px-3 py-2.5">{pending.phone ?? '—'}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2.5 font-medium text-slate-600">Blood type</td>
+                        <td className="px-3 py-2.5">
+                          <BloodTypeBadge type={currentBlood} className="text-[11px]" />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <BloodTypeBadge type={pending.bloodType || '—'} className="text-[11px]" />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="align-top px-3 py-2.5 font-medium text-slate-600">Photo</td>
+                        <td className="px-3 py-2.5">
+                          {currentAvatar ? (
+                            <img
+                              src={currentAvatar}
+                              alt=""
+                              className="h-14 w-14 rounded-full border border-slate-200 object-cover"
+                            />
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {pending.profileImageUrl ? (
+                            <img
+                              src={pending.profileImageUrl}
+                              alt=""
+                              className="h-14 w-14 rounded-full border border-slate-200 object-cover"
+                            />
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setProfileDiffDonor(null)}
+                  disabled={profileReviewLoadingId === profileDiffDonor.id}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  disabled={profileReviewLoadingId === profileDiffDonor.id || !pending}
+                  onClick={() => handleRejectDonorProfile(profileDiffDonor.id)}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {profileReviewLoadingId === profileDiffDonor.id ? '…' : 'Reject'}
+                </button>
+                <button
+                  type="button"
+                  disabled={profileReviewLoadingId === profileDiffDonor.id || !pending}
+                  onClick={() => handleApproveDonorProfile(profileDiffDonor.id)}
+                  className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {profileReviewLoadingId === profileDiffDonor.id ? '…' : 'Approve'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Request Details Modal */}
       {isDetailsModalOpen && selectedRequest && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40">
@@ -2532,6 +2737,23 @@ function AdminDonation() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+
+            <div className="flex justify-center border-b border-slate-200 pb-4">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-600 text-2xl font-semibold text-white shadow-md ring-2 ring-slate-100">
+                {selectedDonorDetails.donor.profileImageUrl &&
+                !selectedDonorDetails.donor.isManualDonor &&
+                !donorDetailAvatarFailed ? (
+                  <img
+                    src={selectedDonorDetails.donor.profileImageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={() => setDonorDetailAvatarFailed(true)}
+                  />
+                ) : (
+                  (selectedDonorDetails.donor.fullName || '?').trim().charAt(0).toUpperCase() || '?'
+                )}
+              </div>
             </div>
 
             <div className="space-y-4 text-sm">

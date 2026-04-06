@@ -11,6 +11,9 @@ function ProfileSettings() {
   const [notifications, setNotifications] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState(null)
+  const [pendingProfile, setPendingProfile] = useState(null)
+  const [userRole, setUserRole] = useState('')
 
   const [profileData, setProfileData] = useState({
     name: '',
@@ -34,6 +37,11 @@ function ProfileSettings() {
           apiRequest('/api/notifications').catch(() => []),
         ])
         const savedAvatar = localStorage.getItem('profileAvatar')
+        const serverAvatar = data.profile_image_url || data.profileImageUrl || null
+        const avatar = serverAvatar || savedAvatar || null
+
+        setUserRole(data.role || '')
+        setPendingProfile(data.pending_profile || data.pendingProfile || null)
 
         setNotifications(Array.isArray(notificationsData) ? notificationsData : [])
 
@@ -44,7 +52,7 @@ function ProfileSettings() {
           email: data.email || '',
           bloodType: data.blood_type || '',
           lastDonationDate: data.last_donation_date || null,
-          avatar: savedAvatar || null,
+          avatar,
         })
         setEditedData({
           name: data.full_name || '',
@@ -53,7 +61,7 @@ function ProfileSettings() {
           email: data.email || '',
           bloodType: data.blood_type || '',
           lastDonationDate: data.last_donation_date || null,
-          avatar: savedAvatar || null,
+          avatar,
         })
       } catch (err) {
         setError(err.message || 'Failed to load profile')
@@ -65,9 +73,24 @@ function ProfileSettings() {
     loadProfile()
   }, [])
 
+  const showToast = (message) => {
+    setToast({ message })
+    window.setTimeout(() => setToast(null), 6000)
+  }
+
   const handleEdit = () => {
     setIsEditing(true)
-    setEditedData({ ...profileData })
+    if (userRole === 'donor' && pendingProfile) {
+      setEditedData({
+        ...profileData,
+        name: pendingProfile.fullName ?? profileData.name,
+        phone: pendingProfile.phone ?? profileData.phone,
+        bloodType: pendingProfile.bloodType ?? profileData.bloodType,
+        avatar: pendingProfile.profileImageUrl ?? profileData.avatar,
+      })
+    } else {
+      setEditedData({ ...profileData })
+    }
   }
 
   const handleCancel = () => {
@@ -78,22 +101,28 @@ function ProfileSettings() {
   const handleSave = async () => {
     try {
       setError('')
-      // Update profile in backend (only editable fields)
-      await apiRequest('/api/user/me', {
+      const data = await apiRequest('/api/user/me', {
         method: 'PUT',
         body: JSON.stringify({
           fullName: editedData.name,
           phone: editedData.phone,
           bloodType: editedData.bloodType,
+          profileImageUrl: editedData.avatar || null,
         }),
       })
-      setProfileData({ ...editedData })
 
-      // Persist avatar locally so it stays after a reload (backend does not store avatars)
-      if (editedData.avatar) {
-        localStorage.setItem('profileAvatar', editedData.avatar)
+      if (data.role === 'donor') {
+        setPendingProfile(data.pending_profile || data.pendingProfile || null)
+        showToast(
+          'Your changes were submitted for admin approval. Your profile will update after they approve.',
+        )
       } else {
-        localStorage.removeItem('profileAvatar')
+        setProfileData({ ...editedData })
+        if (editedData.avatar) {
+          localStorage.setItem('profileAvatar', editedData.avatar)
+        } else {
+          localStorage.removeItem('profileAvatar')
+        }
       }
 
       setIsEditing(false)
@@ -263,6 +292,16 @@ function ProfileSettings() {
           </p>
         </div>
 
+        {userRole === 'donor' && pendingProfile && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <p className="font-semibold">Profile update pending review</p>
+            <p className="mt-1 text-amber-900/90">
+              An administrator must approve your latest changes before they replace what is shown on your
+              profile.
+            </p>
+          </div>
+        )}
+
         {/* Profile Card */}
         <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
           <div className="border-b border-slate-100 bg-linear-to-r from-red-50/30 to-white px-4 py-4 sm:px-6">
@@ -292,14 +331,14 @@ function ProfileSettings() {
                   <div className="flex flex-col items-center lg:items-start">
                     <div className="relative">
                       <div className="flex h-32 w-32 items-center justify-center rounded-full bg-red-600 text-3xl font-semibold text-white shadow-lg ring-4 ring-white">
-                        {editedData.avatar ? (
+                        {(isEditing ? editedData : profileData).avatar ? (
                           <img
-                            src={editedData.avatar}
+                            src={(isEditing ? editedData : profileData).avatar}
                             alt={profileData.name}
                             className="h-full w-full rounded-full object-cover"
                           />
                         ) : (
-                          editedData.name.charAt(0).toUpperCase()
+                          profileData.name.charAt(0).toUpperCase()
                         )}
                       </div>
                       {isEditing && (
@@ -474,6 +513,35 @@ function ProfileSettings() {
           </div>
         </div>
       </main>
+
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center p-4 sm:bottom-auto sm:top-4 sm:justify-end sm:px-6">
+          <div
+            className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-950 shadow-lg ring-1 ring-emerald-100"
+            role="status"
+          >
+            <svg className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <p className="flex-1 text-sm font-medium leading-snug">{toast.message}</p>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="shrink-0 rounded p-1 text-emerald-700 transition hover:bg-emerald-100"
+              aria-label="Dismiss"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

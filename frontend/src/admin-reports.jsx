@@ -177,40 +177,75 @@ function AdminReports() {
     if (stockByBloodType[key] === undefined) stockByBloodType[key] = 0
   })
 
-  const bloodShortageForecast = Object.entries(stockByBloodType).map(([key, currentStock]) => {
+  const bloodShortageForecast = Object.entries(stockByBloodType).map(([key, currentStockRaw]) => {
     const [bloodType, componentType] = key.split('|')
-    const usedInWindow = usageByBloodType[key] || 0
-    const averageDailyUsage =
-      usedInWindow > 0 ? usedInWindow / Math.max(1, usageWindowDays) : 0
-    const daysRemaining =
-      averageDailyUsage > 0 ? currentStock / averageDailyUsage : Infinity
+    const currentStock = Number(currentStockRaw) || 0
+    const usage = usageByBloodType[key] || 0
 
-    let status = 'sufficient'
-    if (daysRemaining < 7) status = 'critical'
-    else if (daysRemaining < 14) status = 'low'
+    let supplyStatusKey = 'sufficient'
+    let statusLabel = 'Sufficient'
+    let estimatedDaysRemaining = '—'
+    let numericDaysRemaining = Infinity
+
+    if (currentStock === 0) {
+      if (usage > 0) {
+        supplyStatusKey = 'critical_out'
+        statusLabel = 'Critical – Out of Stock'
+        estimatedDaysRemaining = '0.0'
+        numericDaysRemaining = 0
+      } else {
+        supplyStatusKey = 'at_risk'
+        statusLabel = 'At Risk'
+        estimatedDaysRemaining = '—'
+        numericDaysRemaining = 0
+      }
+    } else if (usage === 0) {
+      supplyStatusKey = 'sufficient_no_usage'
+      statusLabel = 'Sufficient (No recent usage)'
+      estimatedDaysRemaining = '—'
+      numericDaysRemaining = Infinity
+    } else {
+      const averageDailyUsage = usage / usageWindowDays
+      const daysRemaining = currentStock / averageDailyUsage
+      numericDaysRemaining = daysRemaining
+      estimatedDaysRemaining = daysRemaining.toFixed(1)
+      if (daysRemaining < 7) {
+        supplyStatusKey = 'critical'
+        statusLabel = 'Critical'
+      } else if (daysRemaining < 14) {
+        supplyStatusKey = 'low'
+        statusLabel = 'Low'
+      } else {
+        supplyStatusKey = 'sufficient'
+        statusLabel = 'Sufficient'
+      }
+    }
 
     return {
       bloodType,
       componentType,
       currentStock,
-      estimatedDaysRemaining: daysRemaining === Infinity ? '—' : daysRemaining.toFixed(1),
-      numericDaysRemaining: daysRemaining,
-      status,
+      estimatedDaysRemaining,
+      numericDaysRemaining,
+      supplyStatusKey,
+      statusLabel,
     }
   })
 
   bloodShortageForecast.sort((a, b) => a.numericDaysRemaining - b.numericDaysRemaining)
 
-  const getSupplyStatusClasses = (status) => {
-    if (status === 'critical') return 'bg-red-50 text-red-700 ring-red-200'
-    if (status === 'low') return 'bg-yellow-50 text-yellow-700 ring-yellow-200'
+  const getSupplyStatusClasses = (supplyStatusKey) => {
+    if (supplyStatusKey === 'critical_out' || supplyStatusKey === 'critical') {
+      return 'bg-red-50 text-red-700 ring-red-200'
+    }
+    if (supplyStatusKey === 'at_risk') {
+      return 'bg-orange-50 text-orange-800 ring-orange-200'
+    }
+    if (supplyStatusKey === 'low') return 'bg-yellow-50 text-yellow-700 ring-yellow-200'
+    if (supplyStatusKey === 'sufficient_no_usage') {
+      return 'bg-sky-50 text-sky-800 ring-sky-200'
+    }
     return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-  }
-
-  const getSupplyStatusLabel = (status) => {
-    if (status === 'critical') return 'Critical'
-    if (status === 'low') return 'Low'
-    return 'Sufficient'
   }
 
   // Blood Usage Trends (fulfilled usage in window)
@@ -456,10 +491,11 @@ function AdminReports() {
       return da - db
     })
 
-  // Donor Contact Suggestions (for critically low or zero stock)
-  const shortageByBloodType = bloodShortageForecast.filter(
-    (b) => b.status === 'critical' || (b.currentStock || 0) === 0,
-  )
+  // Donor Contact Suggestions (zero stock, or runway critical/low)
+  const shortageByBloodType = bloodShortageForecast.filter((b) => {
+    if ((b.currentStock || 0) === 0) return true
+    return b.supplyStatusKey === 'critical' || b.supplyStatusKey === 'low'
+  })
 
   const eligibleDonorSuggestions = shortageByBloodType.flatMap((shortage) => {
     const bt = shortage.bloodType
@@ -1038,17 +1074,19 @@ function AdminReports() {
                               {row.currentStock}
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700">
-                              {row.estimatedDaysRemaining === '—'
+                              {row.supplyStatusKey === 'sufficient_no_usage'
                                 ? 'No recent usage'
-                                : `${row.estimatedDaysRemaining} days`}
+                                : row.supplyStatusKey === 'at_risk'
+                                  ? '—'
+                                  : `${row.estimatedDaysRemaining} days`}
                             </td>
                             <td className="px-3 py-2 text-xs">
                               <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${getSupplyStatusClasses(
-                                  row.status,
+                                className={`inline-flex max-w-56 items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${getSupplyStatusClasses(
+                                  row.supplyStatusKey,
                                 )}`}
                               >
-                                {getSupplyStatusLabel(row.status)}
+                                {row.statusLabel}
                               </span>
                             </td>
                           </tr>
@@ -1184,7 +1222,7 @@ function AdminReports() {
                           Units Expiring Soon
                         </th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">
-                          Min Days Left
+                        Days Left
                         </th>
                       </tr>
                     </thead>

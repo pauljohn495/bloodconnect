@@ -1,10 +1,13 @@
 const { pool } = require('../db')
+const { approvePendingDonorProfile, rejectPendingDonorProfile } = require('../models/userModel')
+const { createNotification } = require('../models/notificationModel')
 
 const getDonorsController = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT id, username, email, full_name, phone, blood_type, last_donation_date, created_at, status
+      SELECT id, username, email, full_name, phone, blood_type, last_donation_date, created_at, status,
+             profile_image_url, pending_profile_json, profile_update_requested_at
       FROM users
       WHERE role = 'donor'
       ORDER BY created_at DESC
@@ -68,8 +71,8 @@ const createDonorController = async (req, res) => {
 
     const [result] = await pool.query(
       `
-      INSERT INTO users (username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date)
-      VALUES (?, ?, ?, 'donor', ?, ?, ?, 'active', NULL)
+      INSERT INTO users (username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date, is_manual_donor)
+      VALUES (?, ?, ?, 'donor', ?, ?, ?, 'active', NULL, 1)
     `,
       [finalUsername, safeEmail, passwordHash, donorName, contactPhone, bloodType],
     )
@@ -101,7 +104,7 @@ const getDonorDetailsController = async (req, res) => {
   try {
     const [users] = await pool.query(
       `
-      SELECT id, full_name, phone, blood_type, status, last_donation_date
+      SELECT id, full_name, phone, blood_type, status, last_donation_date, profile_image_url, is_manual_donor
       FROM users
       WHERE id = ? AND role = 'donor'
       LIMIT 1
@@ -165,6 +168,9 @@ const getDonorDetailsController = async (req, res) => {
       }
     })
 
+    const isManualDonor = Boolean(donor.is_manual_donor)
+    const profileImageUrl = donor.profile_image_url || null
+
     return res.json({
       donor: {
         id: donor.id,
@@ -173,6 +179,8 @@ const getDonorDetailsController = async (req, res) => {
         bloodType: donor.blood_type,
         status: donor.status,
         lastDonationDate: donor.last_donation_date,
+        profileImageUrl,
+        isManualDonor,
       },
       stats,
       totalDonations,
@@ -216,7 +224,8 @@ const updateDonorController = async (req, res) => {
     await pool.query(
       `
       UPDATE users
-      SET full_name = ?, blood_type = ?, phone = ?, status = ?
+      SET full_name = ?, blood_type = ?, phone = ?, status = ?,
+          pending_profile_json = NULL, profile_update_requested_at = NULL
       WHERE id = ? AND role = 'donor'
     `,
       [donorName, bloodType, contactPhone, finalStatus, donorId],
@@ -226,6 +235,72 @@ const updateDonorController = async (req, res) => {
   } catch (error) {
     console.error('Update donor error:', error)
     return res.status(500).json({ message: 'Failed to update donor' })
+  }
+}
+
+const approveDonorProfileUpdateController = async (req, res) => {
+  const donorId = parseInt(req.params.id, 10)
+  if (Number.isNaN(donorId)) {
+    return res.status(400).json({ message: 'Invalid donor id' })
+  }
+  try {
+    const result = await approvePendingDonorProfile(donorId)
+    if (!result.ok) {
+      if (result.code === 'NOT_FOUND') return res.status(404).json({ message: 'Donor not found' })
+      if (result.code === 'NO_PENDING') {
+        return res.status(400).json({ message: 'No pending profile update for this donor' })
+      }
+      if (result.code === 'PHONE_TAKEN') {
+        return res.status(400).json({ message: 'Pending phone number is already registered to another user' })
+      }
+      if (result.code === 'INVALID_PENDING') {
+        return res.status(500).json({ message: 'Invalid pending profile data' })
+      }
+      return res.status(500).json({ message: 'Failed to approve profile update' })
+    }
+    try {
+      await createNotification(
+        donorId,
+        'Profile update approved',
+        'Your profile update was approved. Your profile now reflects your submitted changes.',
+        'info',
+      )
+    } catch (notifErr) {
+      console.error('Notify donor after profile approval:', notifErr)
+    }
+    return res.json({ message: 'Profile update approved' })
+  } catch (error) {
+    console.error('Approve donor profile error:', error)
+    return res.status(500).json({ message: 'Failed to approve profile update' })
+  }
+}
+
+const rejectDonorProfileUpdateController = async (req, res) => {
+  const donorId = parseInt(req.params.id, 10)
+  if (Number.isNaN(donorId)) {
+    return res.status(400).json({ message: 'Invalid donor id' })
+  }
+  try {
+    const updated = await rejectPendingDonorProfile(donorId)
+    if (!updated) {
+      const [rows] = await pool.query(`SELECT id FROM users WHERE id = ? AND role = 'donor'`, [donorId])
+      if (rows.length === 0) return res.status(404).json({ message: 'Donor not found' })
+      return res.status(400).json({ message: 'No pending profile update for this donor' })
+    }
+    try {
+      await createNotification(
+        donorId,
+        'Profile update rejected',
+        'Your profile update was rejected. Your profile was left unchanged.',
+        'warning',
+      )
+    } catch (notifErr) {
+      console.error('Notify donor after profile rejection:', notifErr)
+    }
+    return res.json({ message: 'Profile update rejected' })
+  } catch (error) {
+    console.error('Reject donor profile error:', error)
+    return res.status(500).json({ message: 'Failed to reject profile update' })
   }
 }
 
@@ -258,6 +333,8 @@ module.exports = {
   createDonorController,
   getDonorDetailsController,
   updateDonorController,
+  approveDonorProfileUpdateController,
+  rejectDonorProfileUpdateController,
   deleteDonorController,
 }
 

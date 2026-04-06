@@ -18,6 +18,8 @@ const {
   createDonorController,
   getDonorDetailsController,
   updateDonorController,
+  approveDonorProfileUpdateController,
+  rejectDonorProfileUpdateController,
   deleteDonorController,
 } = require('../controllers/adminDonorController')
 const {
@@ -96,6 +98,10 @@ router.post('/donors', createDonorController)
 
 // GET /api/admin/donors/:id/details - donation status & stats for a donor
 router.get('/donors/:id/details', getDonorDetailsController)
+
+// POST approve/reject donor-submitted profile changes (donor role)
+router.post('/donors/:id/profile-update/approve', approveDonorProfileUpdateController)
+router.post('/donors/:id/profile-update/reject', rejectDonorProfileUpdateController)
 
 // PUT /api/admin/donors/:id - update donor user (admin side)
 router.put('/donors/:id', updateDonorController)
