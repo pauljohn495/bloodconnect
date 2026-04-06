@@ -1,12 +1,12 @@
 const { errorResponse } = require('../utils/response')
 
 function validateUpdateMe(req, res, next) {
-  const { fullName, phone, bloodType } = req.body
+  const { fullName, phone, bloodType, profileImageUrl } = req.body
 
-  if (!fullName && !phone && !bloodType) {
+  if (!fullName && !phone && !bloodType && profileImageUrl === undefined) {
     return errorResponse(res, {
       statusCode: 400,
-      message: 'At least one of fullName, phone, or bloodType must be provided',
+      message: 'At least one of fullName, phone, bloodType, or profileImageUrl must be provided',
     })
   }
 

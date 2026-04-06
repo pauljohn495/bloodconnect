@@ -3,7 +3,8 @@ const { pool } = require('../db')
 async function getUserById(userId) {
   const [rows] = await pool.query(
     `
-    SELECT id, username, email, role, full_name, phone, blood_type, status, created_at, updated_at, last_donation_date
+    SELECT id, username, email, role, full_name, phone, blood_type, status, created_at, updated_at, last_donation_date,
+           profile_image_url, is_manual_donor, pending_profile_json, profile_update_requested_at
     FROM users
     WHERE id = ?
   `,
@@ -12,17 +13,122 @@ async function getUserById(userId) {
   return rows[0] || null
 }
 
-async function updateUserProfile(userId, { fullName, phone, bloodType }) {
+async function setPendingDonorProfile(userId, { fullName, phone, bloodType, profileImageUrl }) {
+  const snapshot = {
+    fullName: fullName ?? null,
+    phone: phone ?? null,
+    bloodType: bloodType ?? null,
+    profileImageUrl: profileImageUrl !== undefined ? profileImageUrl : null,
+  }
   const [result] = await pool.query(
     `
     UPDATE users
-    SET full_name = COALESCE(?, full_name),
-        phone = COALESCE(?, phone),
-        blood_type = COALESCE(?, blood_type)
-    WHERE id = ?
+    SET pending_profile_json = ?, profile_update_requested_at = NOW()
+    WHERE id = ? AND role = 'donor'
   `,
-    [fullName ?? null, phone ?? null, bloodType ?? null, userId],
+    [JSON.stringify(snapshot), userId],
   )
+  return result.affectedRows > 0
+}
+
+async function approvePendingDonorProfile(donorId) {
+  const conn = await pool.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [rows] = await conn.query(
+      `SELECT pending_profile_json FROM users WHERE id = ? AND role = 'donor' FOR UPDATE`,
+      [donorId],
+    )
+    if (rows.length === 0) {
+      await conn.rollback()
+      return { ok: false, code: 'NOT_FOUND' }
+    }
+    const pendingRaw = rows[0].pending_profile_json
+    if (!pendingRaw) {
+      await conn.rollback()
+      return { ok: false, code: 'NO_PENDING' }
+    }
+    let pending
+    try {
+      pending = JSON.parse(pendingRaw)
+    } catch {
+      await conn.rollback()
+      return { ok: false, code: 'INVALID_PENDING' }
+    }
+    const newPhone = pending.phone
+    if (newPhone) {
+      const [conflict] = await conn.query(
+        `SELECT id FROM users WHERE phone = ? AND id <> ? LIMIT 1`,
+        [newPhone, donorId],
+      )
+      if (conflict.length > 0) {
+        await conn.rollback()
+        return { ok: false, code: 'PHONE_TAKEN' }
+      }
+    }
+    await conn.query(
+      `
+      UPDATE users
+      SET full_name = ?,
+          phone = ?,
+          blood_type = ?,
+          profile_image_url = ?,
+          pending_profile_json = NULL,
+          profile_update_requested_at = NULL
+      WHERE id = ? AND role = 'donor'
+    `,
+      [
+        pending.fullName ?? null,
+        pending.phone ?? null,
+        pending.bloodType ?? null,
+        pending.profileImageUrl ?? null,
+        donorId,
+      ],
+    )
+    await conn.commit()
+    return { ok: true }
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
+  }
+}
+
+async function rejectPendingDonorProfile(donorId) {
+  const [result] = await pool.query(
+    `
+    UPDATE users
+    SET pending_profile_json = NULL, profile_update_requested_at = NULL
+    WHERE id = ? AND role = 'donor' AND pending_profile_json IS NOT NULL
+  `,
+    [donorId],
+  )
+  return result.affectedRows > 0
+}
+
+async function updateUserProfile(userId, { fullName, phone, bloodType, profileImageUrl }) {
+  const sets = []
+  const vals = []
+  if (fullName !== undefined) {
+    sets.push('full_name = COALESCE(?, full_name)')
+    vals.push(fullName ?? null)
+  }
+  if (phone !== undefined) {
+    sets.push('phone = COALESCE(?, phone)')
+    vals.push(phone ?? null)
+  }
+  if (bloodType !== undefined) {
+    sets.push('blood_type = COALESCE(?, blood_type)')
+    vals.push(bloodType ?? null)
+  }
+  if (profileImageUrl !== undefined) {
+    sets.push('profile_image_url = ?')
+    vals.push(profileImageUrl || null)
+  }
+  if (sets.length === 0) return false
+  vals.push(userId)
+  const [result] = await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, vals)
   return result.affectedRows > 0
 }
 
@@ -258,6 +364,9 @@ async function createScheduleRequest({
 
 module.exports = {
   getUserById,
+  setPendingDonorProfile,
+  approvePendingDonorProfile,
+  rejectPendingDonorProfile,
   updateUserProfile,
   getUserDonations,
   getUserBloodAvailability,

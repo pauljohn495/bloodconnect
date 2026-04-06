@@ -38,8 +38,8 @@ async function createDonorUser({ fullName, username, email, phone, bloodType, pa
 
     await conn.query(
       `
-      INSERT INTO users (username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date)
-      VALUES (?, ?, ?, 'donor', ?, ?, ?, 'active', NULL)
+      INSERT INTO users (username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date, is_manual_donor)
+      VALUES (?, ?, ?, 'donor', ?, ?, ?, 'active', NULL, 0)
     `,
       [username, safeEmail, passwordHash, fullName, phone, bloodType],
     )

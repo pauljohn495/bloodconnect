@@ -1,5 +1,6 @@
 const {
   getUserById,
+  setPendingDonorProfile,
   updateUserProfile,
   getUserDonations,
   getUserBloodAvailability,
@@ -18,6 +19,25 @@ const DONATION_COOLDOWNS = {
   plasma: 28,
 }
 
+function buildUserMePayload(user) {
+  const { pending_profile_json, ...rest } = user
+  let pendingProfile = null
+  if (pending_profile_json) {
+    try {
+      pendingProfile = JSON.parse(pending_profile_json)
+    } catch {
+      pendingProfile = null
+    }
+  }
+  return {
+    ...rest,
+    pending_profile: pendingProfile,
+    pendingProfile,
+    profile_update_requested_at: user.profile_update_requested_at,
+    profileUpdateRequestedAt: user.profile_update_requested_at,
+  }
+}
+
 async function getMe(req, res, next) {
   try {
     const user = await getUserById(req.user.id)
@@ -29,7 +49,7 @@ async function getMe(req, res, next) {
 
     return successResponse(res, {
       message: 'User profile fetched successfully',
-      data: user,
+      data: buildUserMePayload(user),
     })
   } catch (error) {
     return next(error)
@@ -37,10 +57,34 @@ async function getMe(req, res, next) {
 }
 
 async function updateMe(req, res, next) {
-  const { fullName, phone, bloodType } = req.body
+  const { fullName, phone, bloodType, profileImageUrl } = req.body
 
   try {
-    const updated = await updateUserProfile(req.user.id, { fullName, phone, bloodType })
+    if (req.user.role === 'donor') {
+      const updated = await setPendingDonorProfile(req.user.id, {
+        fullName,
+        phone,
+        bloodType,
+        profileImageUrl,
+      })
+      if (!updated) {
+        const error = new Error('User not found')
+        error.statusCode = 404
+        throw error
+      }
+      const user = await getUserById(req.user.id)
+      return successResponse(res, {
+        message: 'Your profile changes were submitted for admin approval.',
+        data: buildUserMePayload(user),
+      })
+    }
+
+    const updated = await updateUserProfile(req.user.id, {
+      fullName,
+      phone,
+      bloodType,
+      profileImageUrl,
+    })
     if (!updated) {
       const error = new Error('User not found')
       error.statusCode = 404
@@ -51,7 +95,7 @@ async function updateMe(req, res, next) {
 
     return successResponse(res, {
       message: 'User profile updated successfully',
-      data: user,
+      data: buildUserMePayload(user),
     })
   } catch (error) {
     return next(error)

@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Mobile-first: prevent stray horizontal scroll; keep iOS text readable */

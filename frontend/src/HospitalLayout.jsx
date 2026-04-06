@@ -93,7 +93,7 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
             <NavLinks />
           </div>
           <div className="border-t border-slate-100 px-5 py-4">
-            <p className="text-[11px] leading-relaxed text-slate-500">
+            <p className="text-[11px] leading-relaxed text-slate-700">
               View stock, request blood, and monitor expiry. Sign out on shared workstations when finished.
             </p>
           </div>
@@ -155,7 +155,7 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
                 <h1 className="text-base font-semibold leading-tight text-slate-900 sm:text-lg md:truncate">
                   {pageTitle || 'Hospital overview'}
                 </h1>
-                <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 sm:text-sm">
+                <p className="mt-0.5 line-clamp-2 text-xs text-slate-700 sm:text-sm">
                   {pageDescription || 'Manage blood inventory and requests.'}
                 </p>
               </div>

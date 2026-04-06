@@ -17,7 +17,7 @@ export const adminPanel = {
     header:
       'flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-amber-50/50 via-white to-white px-4 py-4 sm:px-5 sm:flex-row sm:items-center sm:justify-between',
     title: 'text-base font-semibold tracking-tight text-slate-900',
-    subtitle: 'mt-0.5 text-sm text-slate-500',
+    subtitle: 'mt-0.5 text-sm text-slate-700',
     tableScroll: `${tableScrollBase} bg-slate-50/40`,
     thead: 'bg-slate-50/95',
     th: 'text-xs font-semibold uppercase tracking-wider text-slate-600',
@@ -29,7 +29,7 @@ export const adminPanel = {
     header:
       'flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-rose-50/45 via-white to-white px-4 py-4 sm:px-5 sm:flex-row sm:items-center sm:justify-between',
     title: 'text-base font-semibold tracking-tight text-slate-900',
-    subtitle: 'mt-0.5 text-sm text-slate-500',
+    subtitle: 'mt-0.5 text-sm text-slate-700',
     tableScroll: `${tableScrollBase} bg-slate-50/40`,
     thead: 'bg-slate-50/95',
     th: 'text-xs font-semibold uppercase tracking-wider text-slate-600',
@@ -41,7 +41,7 @@ export const adminPanel = {
     header:
       'flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/45 via-white to-white px-4 py-4 sm:px-5 sm:flex-row sm:items-center sm:justify-between',
     title: 'text-base font-semibold tracking-tight text-slate-900',
-    subtitle: 'mt-0.5 text-sm text-slate-500',
+    subtitle: 'mt-0.5 text-sm text-slate-700',
     tableScroll: `mt-0 ${tableScrollBase} bg-slate-50/40`,
     thead: 'bg-slate-50/95',
     th: 'text-xs font-semibold uppercase tracking-wider text-slate-600',
@@ -53,7 +53,7 @@ export const adminPanel = {
     header:
       'flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-sky-50/40 via-white to-white px-4 py-4 sm:px-5 sm:flex-row sm:items-center sm:justify-between',
     title: 'text-base font-semibold tracking-tight text-slate-900',
-    subtitle: 'mt-0.5 text-sm text-slate-500',
+    subtitle: 'mt-0.5 text-sm text-slate-700',
     tableScroll: `mt-0 ${tableScrollBase} bg-slate-50/40`,
     thead: 'bg-slate-50/95',
     th: 'text-xs font-semibold uppercase tracking-wider text-slate-600',
@@ -65,7 +65,7 @@ export const adminPanel = {
     header:
       'border-b border-slate-100 bg-gradient-to-r from-violet-50/35 via-white to-white px-4 py-4 sm:px-5',
     title: 'text-base font-semibold tracking-tight text-slate-900',
-    subtitle: 'mt-0.5 text-sm text-slate-500',
+    subtitle: 'mt-0.5 text-sm text-slate-700',
     tableScroll: `${tableScrollBase} bg-slate-50/40`,
     thead: 'bg-slate-50/95',
     th: 'text-xs font-semibold uppercase tracking-wider text-slate-600',

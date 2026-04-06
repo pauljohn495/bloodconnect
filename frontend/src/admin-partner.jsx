@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import AdminLayout from './AdminLayout.jsx'
-import { adminPanel } from './admin-ui.jsx'
 import { apiRequest } from './api.js'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { adminPanel } from './admin-ui.jsx'
 
 function AdminPartner() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -36,9 +36,6 @@ function AdminPartner() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [selectedRequestIds, setSelectedRequestIds] = useState(new Set())
   const [plannedRequestStatuses, setPlannedRequestStatuses] = useState({})
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [hospitalToDelete, setHospitalToDelete] = useState(null)
-  const [isDeletingHospital, setIsDeletingHospital] = useState(false)
 
   const selectedRequests = useMemo(() => hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId)), [hospitalApprovedRequests, selectedRequestIds])
 
@@ -159,31 +156,19 @@ function AdminPartner() {
     }
   }
 
-  const handleDeleteHospital = (hospital) => {
-    setHospitalToDelete(hospital)
-    setIsDeleteModalOpen(true)
-    setOpenMenuHospitalId(null)
-  }
+  const handleDeleteHospital = async (hospital) => {
+    const name = hospital.hospital_name || hospital.hospitalName || 'this hospital'
+    const confirmed = window.confirm(`Delete ${name}? This will remove its hospital login too.`)
+    if (!confirmed) return
 
-  const handleCloseDeleteModal = () => {
-    setIsDeleteModalOpen(false)
-    setHospitalToDelete(null)
-    setIsDeletingHospital(false)
-  }
-
-  const handleConfirmDeleteHospital = async () => {
-    if (!hospitalToDelete) return
     try {
-      setIsDeletingHospital(true)
-      await apiRequest(`/api/admin/hospitals/${hospitalToDelete.id}`, { method: 'DELETE' })
+      await apiRequest(`/api/admin/hospitals/${hospital.id}`, { method: 'DELETE' })
       setOpenMenuHospitalId(null)
       await loadHospitals()
       showNotification('Hospital deleted successfully!', 'primary')
-      handleCloseDeleteModal()
     } catch (err) {
       console.error('Failed to delete hospital', err)
       showNotification(err.message || 'Failed to delete hospital', 'destructive')
-      setIsDeletingHospital(false)
     }
   }
 
@@ -330,7 +315,7 @@ function AdminPartner() {
     }))
 
     try {
-      await apiRequest('/api/admin/transfers', {
+      await apiRequest('/api/admin/transfer', {
         method: 'POST',
         body: JSON.stringify({
           hospitalId: hospitalId,
@@ -348,7 +333,7 @@ function AdminPartner() {
 
       for (const update of pendingStatusUpdates) {
         try {
-          await apiRequest(`/api/admin/requests/${update.requestId}`, {
+          await apiRequest(`/api/admin/requests/${update.requestId}/status`, {
             method: 'PATCH',
             body: JSON.stringify({
               status: update.status,
@@ -404,19 +389,17 @@ function AdminPartner() {
     >
       <React.Fragment>
       <section className="mt-2">
-        <div className={`h-[600px] overflow-hidden ${adminPanel.sky.outer}`}>
-          <div className={adminPanel.sky.header}>
+        <div className={`${adminPanel.sky.outer} flex h-[600px] flex-col`}>
+          <div className={`${adminPanel.sky.header} shrink-0`}>
             <div>
               <h2 className={adminPanel.sky.title}>Partner Hospitals</h2>
-              <p className={adminPanel.sky.subtitle}>
-                List of all partnered hospitals
-              </p>
+              <p className={adminPanel.sky.subtitle}>List of all partnered hospitals</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleOpenHistoryModal}
-                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 History
               </button>
@@ -430,7 +413,7 @@ function AdminPartner() {
             </div>
           </div>
 
-          <div className={adminPanel.sky.tableScroll}>
+          <div className={`${adminPanel.sky.tableScroll} min-h-0 flex-1`}>
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className={adminPanel.sky.thead}>
                 <tr>
@@ -504,15 +487,18 @@ function AdminPartner() {
                                 return (
                                   <div key={req.requestId} className="flex flex-col gap-1">
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                      <BloodTypeBadge type={req.bloodType} className="text-xs" />
-                                      <span className="inline-flex items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/90">
+                                      <BloodTypeBadge
+                                        type={req.bloodType}
+                                        className="max-w-full flex-wrap px-2.5 py-1 text-xs font-semibold"
+                                      >
+                                        {req.bloodType}{' '}
                                         {req.componentType === 'platelets'
                                           ? '(Platelets)'
                                           : req.componentType === 'plasma'
                                           ? '(Plasma)'
                                           : ''}
                                         : {req.unitsRequested} units
-                                      </span>
+                                      </BloodTypeBadge>
                                       <span
                                         className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                                           req.status === 'partially_fulfilled'
@@ -571,7 +557,7 @@ function AdminPartner() {
                               }
                               setOpenMenuHospitalId((prev) => (prev === hospital.id ? null : hospital.id))
                             }}
-                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-sm opacity-0 transition hover:bg-slate-50 hover:text-slate-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 group-hover:opacity-100"
                             aria-haspopup="menu"
                             aria-expanded={openMenuHospitalId === hospital.id}
                             aria-label="Open hospital actions menu"
@@ -665,63 +651,6 @@ function AdminPartner() {
         </>
       )}
 
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">Delete Hospital</h3>
-              <button
-                type="button"
-                onClick={handleCloseDeleteModal}
-                className="text-slate-400 hover:text-slate-600"
-                disabled={isDeletingHospital}
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <p className="mt-4 text-sm text-slate-900">
-              Are you sure you want to delete this hospital account?
-            </p>
-            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs text-slate-700">
-                <span className="font-semibold text-slate-900">Hospital:</span>{' '}
-                {hospitalToDelete?.hospital_name || hospitalToDelete?.hospitalName || '—'}
-              </p>
-              <p className="mt-1 text-xs text-slate-700">
-                <span className="font-semibold text-slate-900">Username:</span>{' '}
-                {hospitalToDelete?.username || '—'}
-              </p>
-              <p className="mt-1 text-xs text-slate-700">
-                <span className="font-semibold text-slate-900">Email:</span>{' '}
-                {hospitalToDelete?.email || '—'}
-              </p>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                onClick={handleCloseDeleteModal}
-                disabled={isDeletingHospital}
-                className="inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteHospital}
-                disabled={isDeletingHospital}
-                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isDeletingHospital ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
@@ -798,7 +727,7 @@ function AdminPartner() {
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
                 >
                   Save Hospital
                 </button>
@@ -897,7 +826,7 @@ function AdminPartner() {
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+                  className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
                 >
                   Update Hospital
                 </button>
@@ -919,7 +848,10 @@ function AdminPartner() {
                       Transfer Blood Stock
                     </h3>
                     <p className="mt-1 text-sm font-semibold text-slate-900">
-                      Transfer to: <span className="text-blue-600">{selectedHospital.hospital_name || selectedHospital.hospitalName}</span>
+                      Transfer to:{' '}
+                      <span className="text-slate-800">
+                        {selectedHospital.hospital_name || selectedHospital.hospitalName}
+                      </span>
                     </p>
                     {hospitalApprovedRequests.filter((req) => req.status !== 'fulfilled').length > 0 && (
                       <div className="mt-3 space-y-2">
@@ -941,8 +873,11 @@ function AdminPartner() {
                               />
                               <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <BloodTypeBadge type={request.bloodType} className="text-xs" />
-                                  <span className="inline-flex flex-wrap items-center rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200/90">
+                                  <BloodTypeBadge
+                                    type={request.bloodType}
+                                    className="max-w-full flex-wrap px-2.5 py-1 text-xs font-semibold"
+                                  >
+                                    {request.bloodType}{' '}
                                     {request.componentType === 'platelets'
                                       ? '(Platelets)'
                                       : request.componentType === 'plasma'
@@ -951,16 +886,16 @@ function AdminPartner() {
                                     : {request.unitsRequested} units
                                     {request.remainingBalance > 0 &&
                                       request.remainingBalance < request.unitsRequested && (
-                                        <span className="ml-2 text-[10px]">
+                                        <span className="ml-2 text-[10px] opacity-90">
                                           ({request.remainingBalance} remaining)
                                         </span>
                                       )}
-                                  </span>
+                                  </BloodTypeBadge>
                                   <span
                                     className={`text-[10px] px-2 py-0.5 rounded-full ${
                                       request.status === 'partially_fulfilled'
                                         ? 'bg-yellow-100 text-yellow-700'
-                                        : 'bg-blue-100 text-blue-700'
+                                        : 'bg-slate-100 text-slate-600'
                                     }`}
                                   >
                                     {request.status === 'partially_fulfilled' ? 'Partial' : 'Pending'}
@@ -1104,7 +1039,7 @@ function AdminPartner() {
                                         onChange={() => handleStockToggle(item.id, availableUnits)}
                                       />
                                     </td>
-                                    <td className="px-4 py-3 font-semibold text-slate-900">
+                                    <td className="px-4 py-3">
                                       <BloodTypeBadge type={item.blood_type || item.bloodType} className="text-xs" />
                                     </td>
                                     <td className="px-4 py-3 text-slate-700">
@@ -1191,7 +1126,7 @@ function AdminPartner() {
                     type="button"
                     onClick={handleConfirmTransferClick}
                     disabled={Object.keys(selectedStocks).length === 0}
-                    className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Confirm Transfer
                   </button>
@@ -1232,12 +1167,10 @@ function AdminPartner() {
                           key={inventoryId}
                           className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
                         >
-                          <span className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
-                            <BloodTypeBadge type={item.blood_type || item.bloodType} className="text-xs" />
-                            <span className="text-slate-700">
-                              {(item.component_type || item.componentType) === 'platelets' && ' (Platelets)'}
-                              {(item.component_type || item.componentType) === 'plasma' && ' (Plasma)'}
-                            </span>
+                          <span className="font-semibold text-slate-900">
+                            {item.blood_type || item.bloodType}
+                            {(item.component_type || item.componentType) === 'platelets' && ' (Platelets)'}
+                            {(item.component_type || item.componentType) === 'plasma' && ' (Plasma)'}
                           </span>
                           <span className="text-slate-600">{units} unit(s)</span>
                         </div>
@@ -1258,7 +1191,7 @@ function AdminPartner() {
                     <button
                       type="button"
                       onClick={handleConfirmTransfer}
-                      className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+                      className="inline-flex items-center justify-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition"
                     >
                       Confirm Transfer
                     </button>
@@ -1332,8 +1265,8 @@ function AdminPartner() {
                           <td className="px-4 py-3 font-semibold text-slate-900">
                             {request.hospital_name}
                           </td>
-                          <td className="px-4 py-3 font-semibold text-slate-900">
-                            <BloodTypeBadge type={request.blood_type} className="text-xs" />
+                          <td className="px-4 py-3">
+                            <BloodTypeBadge type={request.blood_type} className="text-xs font-semibold" />
                           </td>
                           <td className="px-4 py-3">
                             <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-100">
@@ -1380,12 +1313,12 @@ function AdminPartner() {
 
       {/* Notification Container */}
       {notification && (
-        <div className="fixed right-4 top-4 z-60 transition-all duration-300 ease-in-out">
+        <div className="fixed top-4 right-4 z-200 transition-all duration-300 ease-in-out">
           <div
-            className={`flex min-w-[300px] max-w-md items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${
+            className={`flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg min-w-[300px] max-w-md ${
               notification.type === 'destructive'
                 ? 'border-red-200 bg-red-50 text-red-800'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                : 'border-red-200 bg-red-50 text-red-800'
             }`}
           >
             {notification.type === 'destructive' ? (
@@ -1400,11 +1333,7 @@ function AdminPartner() {
             <p className="text-sm font-medium flex-1">{notification.message}</p>
             <button
               onClick={() => setNotification(null)}
-              className={`shrink-0 rounded p-1 transition hover:opacity-70 ${
-                notification.type === 'destructive'
-                  ? 'text-red-600 hover:bg-red-100'
-                  : 'text-emerald-700 hover:bg-emerald-100'
-              }`}
+              className="shrink-0 rounded p-1 transition hover:opacity-70 text-red-600 hover:bg-red-100"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
