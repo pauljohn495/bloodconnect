@@ -7,6 +7,7 @@ const {
   getHospitalDonations,
   createHospitalRequest,
   getHospitalRequests,
+  confirmHospitalRequestReceived,
   getHospitalHistoricalWastage,
   getHospitalWastagePredictions,
 } = require('../models/hospitalModel')
@@ -191,6 +192,34 @@ async function getRequests(req, res, next) {
   }
 }
 
+async function confirmRequestReceived(req, res, next) {
+  try {
+    const hospitalId = await resolveHospitalIdOrBadRequest(req.user.id, res)
+    if (!hospitalId) return
+
+    const requestId = Number.parseInt(req.params.id, 10)
+    if (!requestId || requestId <= 0) {
+      return errorResponse(res, {
+        statusCode: 400,
+        message: 'Invalid request id',
+      })
+    }
+
+    const result = await confirmHospitalRequestReceived({
+      hospitalId,
+      requestId,
+      receivedByUserId: req.user.id,
+    })
+
+    return successResponse(res, {
+      message: 'Blood request marked as received and inventory updated',
+      data: result,
+    })
+  } catch (error) {
+    return next(error)
+  }
+}
+
 async function getWastagePredictions(req, res, next) {
   try {
     const hospitalId = await resolveHospitalIdOrBadRequest(req.user.id, res)
@@ -232,6 +261,7 @@ module.exports = {
   getDonations,
   createRequestHandler,
   getRequests,
+  confirmRequestReceived,
   getWastagePredictions,
   getHistoricalWastage,
 }

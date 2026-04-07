@@ -491,14 +491,42 @@ function AdminReports() {
       return da - db
     })
 
-  // Donor Contact Suggestions (zero stock, or runway critical/low)
-  const shortageByBloodType = bloodShortageForecast.filter((b) => {
-    if ((b.currentStock || 0) === 0) return true
-    return b.supplyStatusKey === 'critical' || b.supplyStatusKey === 'low'
+  // Donor Contact Suggestions (aggregate by blood type, not per component row)
+  // This avoids suggesting the same blood type donor when overall stock is sufficient.
+  const usageByBloodTypeAggregate = fulfilledRequestsInWindow.reduce((acc, req) => {
+    const bt = req.blood_type || req.bloodType
+    if (!bt) return acc
+    const units = req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0
+    acc[bt] = (acc[bt] || 0) + Number(units || 0)
+    return acc
+  }, {})
+
+  const stockByBloodTypeAggregate = inventory
+    .filter((item) => item.status !== 'expired')
+    .reduce((acc, item) => {
+      const bt = item.blood_type || item.bloodType
+      if (!bt) return acc
+      const ct = normalizeComponentType(item.component_type || item.componentType)
+      if (componentFilter !== 'all' && ct !== componentFilter) return acc
+      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
+      acc[bt] = (acc[bt] || 0) + Number(units || 0)
+      return acc
+    }, {})
+
+  const shortageByBloodType = Object.keys({
+    ...stockByBloodTypeAggregate,
+    ...usageByBloodTypeAggregate,
+  }).filter((bloodType) => {
+    const currentStock = Number(stockByBloodTypeAggregate[bloodType] || 0)
+    const usage = Number(usageByBloodTypeAggregate[bloodType] || 0)
+    if (currentStock === 0) return true
+    if (usage <= 0) return false
+    const averageDailyUsage = usage / usageWindowDays
+    const daysRemaining = currentStock / averageDailyUsage
+    return daysRemaining < 14
   })
 
-  const eligibleDonorSuggestions = shortageByBloodType.flatMap((shortage) => {
-    const bt = shortage.bloodType
+  const rawEligibleDonorSuggestions = shortageByBloodType.flatMap((bt) => {
     const matchingDonors = donors.filter((donor) => {
       const donorBt = (donor.blood_type || donor.bloodType || '').toString().trim()
       if (donorBt !== (bt || '').toString().trim()) return false
@@ -514,6 +542,7 @@ function AdminReports() {
       return nextEligibleDate <= now
     })
     return matchingDonors.slice(0, 5).map((donor) => ({
+      donorId: donor.id,
       bloodType: bt,
       donorName:
         donor.full_name ||
@@ -523,6 +552,16 @@ function AdminReports() {
         donor.username ||
         'Unnamed donor',
     }))
+  })
+
+  // Prevent duplicate donor cards when the same donor matches multiple shortage rows
+  // (e.g., same blood type appears under multiple component shortages).
+  const seenDonorSuggestionKeys = new Set()
+  const eligibleDonorSuggestions = rawEligibleDonorSuggestions.filter((item) => {
+    const key = `${item.donorId || item.donorName}|${item.bloodType}`
+    if (seenDonorSuggestionKeys.has(key)) return false
+    seenDonorSuggestionKeys.add(key)
+    return true
   })
 
   // Expiring Blood Action Suggestions

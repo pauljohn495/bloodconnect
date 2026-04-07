@@ -3,18 +3,6 @@ import HospitalLayout from './HospitalLayout.jsx'
 import { apiRequest } from './api.js'
 import { adminReportSection } from './admin-ui.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Label,
-  LabelList,
-} from 'recharts'
 
 const NEAR_EXPIRY_DAYS = 7
 const CRITICAL_EXPIRY_DAYS = 3
@@ -60,27 +48,6 @@ function HospitalReports() {
       ),
     [inventory],
   )
-
-  const wastageForecastData = useMemo(() => {
-    const predictWastage = (days) => {
-      return availableItems.reduce((sum, item) => {
-        const exp = item.expiration_date || item.expirationDate
-        if (!exp) return sum
-        const expDate = new Date(exp)
-        expDate.setHours(0, 0, 0, 0)
-        const daysLeft = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24))
-        if (daysLeft > 0 && daysLeft <= days) {
-          return sum + (item.available_units || item.availableUnits || 0)
-        }
-        return sum
-      }, 0)
-    }
-    return [
-      { period: 'Next 7 Days', predicted: predictWastage(7) },
-      { period: 'Next 14 Days', predicted: predictWastage(14) },
-      { period: 'Next 30 Days', predicted: predictWastage(30) },
-    ]
-  }, [availableItems, today])
 
   const { expirationAlerts, summaryByType } = useMemo(() => {
     const byKey = {}
@@ -140,68 +107,6 @@ function HospitalReports() {
               <div className="py-8 text-center text-sm text-slate-500">Loading analytics...</div>
             ) : (
               <>
-                {/* Predicted Wastage Forecast - same style as admin reports */}
-                <div className="mb-8 min-w-0">
-                  <h3 className="mb-2 text-base font-semibold text-slate-900">Predicted wastage forecast</h3>
-                  <p className="mb-4 text-sm text-slate-500">
-                    Units at risk of expiration (wastage) in the next 7, 14, and 30 days based on current inventory.
-                  </p>
-                  <div className="h-[min(280px,55vh)] w-full min-w-0 sm:h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={wastageForecastData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
-                      <XAxis
-                        dataKey="period"
-                        tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
-                        stroke="#64748b"
-                        tickLine={{ stroke: '#64748b' }}
-                      >
-                        <Label value="Time Period" offset={-5} position="insideBottom" style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }} />
-                      </XAxis>
-                      <YAxis
-                        tick={{ fontSize: 13, fill: '#475569', fontWeight: 500 }}
-                        stroke="#64748b"
-                        tickLine={{ stroke: '#64748b' }}
-                      >
-                        <Label
-                          value="Predicted Units"
-                          angle={-90}
-                          position="insideLeft"
-                          style={{ fontSize: 13, fill: '#64748b', fontWeight: 600 }}
-                        />
-                      </YAxis>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          padding: '10px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                        }}
-                        formatter={(value) => [`${value} units`, 'Predicted Wastage']}
-                        labelStyle={{ fontWeight: 600, marginBottom: '5px' }}
-                      />
-                      <Legend wrapperStyle={{ fontSize: '13px', fontWeight: 500, paddingTop: '10px' }} />
-                      <Bar
-                        dataKey="predicted"
-                        fill="#dc2626"
-                        radius={[6, 6, 0, 0]}
-                        name="Predicted Wastage (units)"
-                      >
-                        <LabelList
-                          dataKey="predicted"
-                          position="top"
-                          style={{ fontSize: 12, fill: '#1e293b', fontWeight: 600 }}
-                          formatter={(value) => `${value}`}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                  </div>
-                </div>
-
                 {/* Expiration / Wastage Alerts */}
                 <div className="space-y-4">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Expiration Alerts</h3>
