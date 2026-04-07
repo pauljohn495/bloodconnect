@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { ensureBloodRequestStatusSupportsDelivery } = require('../utils/requestStatusSchema')
 
 const createTransferController = async (req, res) => {
   const { hospitalId, transfers, requestFulfillments } = req.body
@@ -8,6 +9,8 @@ const createTransferController = async (req, res) => {
   }
 
   try {
+    await ensureBloodRequestStatusSupportsDelivery()
+
     const [hospitalRows] = await pool.query('SELECT id FROM hospitals WHERE id = ?', [hospitalId])
     if (hospitalRows.length === 0) {
       return res.status(404).json({ message: 'Hospital not found' })
@@ -55,77 +58,6 @@ const createTransferController = async (req, res) => {
           [units, inventoryId],
         )
 
-        const component = inventory.component_type || 'whole_blood'
-        const [existingDest] = await pool.query(
-          `
-          SELECT 
-            id,
-            available_units
-          FROM blood_inventory
-          WHERE hospital_id = ?
-            AND blood_type = ?
-            AND expiration_date = ?
-            AND COALESCE(component_type, 'whole_blood') = ?
-            AND status = ?
-        `,
-          [
-            hospitalId,
-            inventory.blood_type,
-            inventory.expiration_date,
-            component,
-            'available',
-          ],
-        )
-
-        if (existingDest.length > 0) {
-          await pool.query(
-            'UPDATE blood_inventory SET available_units = available_units + ?, units = units + ? WHERE id = ?',
-            [units, units, existingDest[0].id],
-          )
-        } else {
-          try {
-            await pool.query(
-              `
-              INSERT INTO blood_inventory 
-                (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
-              VALUES (?, ?, ?, ?, 'available', ?, ?, ?)
-            `,
-              [
-                inventory.blood_type,
-                units,
-                units,
-                inventory.expiration_date,
-                req.user.id,
-                hospitalId,
-                component,
-              ],
-            )
-          } catch (error) {
-            if (
-              error.code === 'ER_BAD_FIELD_ERROR' ||
-              (error.message && error.message.includes('component_type'))
-            ) {
-              await pool.query(
-                `
-                INSERT INTO blood_inventory 
-                  (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
-                VALUES (?, ?, ?, ?, 'available', ?, ?)
-              `,
-                [
-                  inventory.blood_type,
-                  units,
-                  units,
-                  inventory.expiration_date,
-                  req.user.id,
-                  hospitalId,
-                ],
-              )
-            } else {
-              throw error
-            }
-          }
-        }
-
         await pool.query(
           `INSERT INTO blood_transfers 
            (source_inventory_id, hospital_id, blood_type, units_transferred, transferred_by, transfer_date)
@@ -152,29 +84,28 @@ const createTransferController = async (req, res) => {
           if (requestRows.length === 0) continue
 
           const request = requestRows[0]
-          const [transferRows] = await pool.query(
-            `SELECT COALESCE(SUM(units_transferred), 0) as total_fulfilled
-             FROM blood_transfers bt
-             INNER JOIN blood_requests br ON bt.blood_type COLLATE utf8mb4_unicode_ci = br.blood_type COLLATE utf8mb4_unicode_ci
-             WHERE bt.hospital_id = ? 
-               AND br.id = ?
-               AND bt.transfer_date >= br.request_date`,
-            [hospitalId, requestId],
-          )
-
-          const totalFulfilled = transferRows[0]?.total_fulfilled || 0
-          const remainingBalance = request.units_requested - totalFulfilled
-
           let newStatus = request.status
-          if (remainingBalance <= 0) newStatus = 'fulfilled'
-          else if (totalFulfilled > 0) newStatus = 'partially_fulfilled'
+          if (request.status === 'approved' || request.status === 'partially_fulfilled') {
+            newStatus = 'delivered'
+          }
 
           await pool.query(
             `UPDATE blood_requests 
              SET status = ?, units_approved = COALESCE(units_approved, ?)
              WHERE id = ?`,
-            [newStatus, totalFulfilled, requestId],
+            [newStatus, unitsTransferred, requestId],
           )
+
+          try {
+            await pool.query(
+              `UPDATE blood_requests
+               SET delivered_at = COALESCE(delivered_at, NOW())
+               WHERE id = ?`,
+              [requestId],
+            )
+          } catch (err) {
+            if (err.code !== 'ER_BAD_FIELD_ERROR') throw err
+          }
         }
       }
 
@@ -285,19 +216,55 @@ const updateRequestStatusController = async (req, res) => {
   const { id } = req.params
   const { status, unitsApproved, notes } = req.body
 
-  if (!['approved', 'rejected', 'cancelled', 'fulfilled', 'partially_fulfilled'].includes(status)) {
+  if (!['approved', 'rejected', 'cancelled', 'fulfilled', 'partially_fulfilled', 'delivered', 'received'].includes(status)) {
     return res.status(400).json({ message: 'Invalid status value' })
   }
 
   try {
-    const [result] = await pool.query(
-      `
+    await ensureBloodRequestStatusSupportsDelivery()
+
+    let query = `
       UPDATE blood_requests
-      SET status = ?, units_approved = COALESCE(?, units_approved), approved_by = ?, approved_at = NOW(), notes = COALESCE(?, notes)
-      WHERE id = ?
-    `,
-      [status, unitsApproved ?? null, req.user.id, notes ?? null, id],
-    )
+      SET status = ?, units_approved = COALESCE(?, units_approved), notes = COALESCE(?, notes)
+    `
+    const params = [status, unitsApproved ?? null, notes ?? null]
+
+    if (status === 'approved') {
+      query += `, approved_by = ?, approved_at = NOW()`
+      params.push(req.user.id)
+    }
+
+    if (status === 'delivered') {
+      try {
+        const [result] = await pool.query(
+          `${query}, delivered_at = COALESCE(delivered_at, NOW()) WHERE id = ?`,
+          [...params, id],
+        )
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ message: 'Request not found' })
+        }
+        return res.json({ message: 'Request updated' })
+      } catch (err) {
+        if (err.code !== 'ER_BAD_FIELD_ERROR') throw err
+      }
+    }
+
+    if (status === 'received') {
+      try {
+        const [result] = await pool.query(
+          `${query}, received_at = COALESCE(received_at, NOW()) WHERE id = ?`,
+          [...params, id],
+        )
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ message: 'Request not found' })
+        }
+        return res.json({ message: 'Request updated' })
+      } catch (err) {
+        if (err.code !== 'ER_BAD_FIELD_ERROR') throw err
+      }
+    }
+
+    const [result] = await pool.query(`${query} WHERE id = ?`, [...params, id])
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Request not found' })

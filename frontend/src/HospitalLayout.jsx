@@ -5,7 +5,7 @@ import { BrandLogo } from './BrandLogo.jsx'
 const sidebarItems = [
   { name: 'Inventory', path: '/hospital/inventory' },
   { name: 'Blood Request', path: '/hospital/blood-request' },
-  { name: 'Requests', path: '/hospital/requests' },
+  { name: 'Transaction History', path: '/hospital/transaction-history' },
   { name: 'Reports and Analytics', path: '/hospital/reports' },
 ]
 

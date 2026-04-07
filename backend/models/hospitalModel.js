@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { ensureBloodRequestStatusSupportsDelivery } = require('../utils/requestStatusSchema')
 
 async function getHospitalIdForUser(userId) {
   const [rows] = await pool.query('SELECT id FROM hospitals WHERE user_id = ?', [userId])
@@ -221,6 +222,207 @@ async function getHospitalRequests(hospitalId) {
   }
 }
 
+async function confirmHospitalRequestReceived({ hospitalId, requestId, receivedByUserId }) {
+  await ensureBloodRequestStatusSupportsDelivery()
+
+  const conn = await pool.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    await conn.query(
+      `
+      CREATE TABLE IF NOT EXISTS hospital_request_transfer_receipts (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        request_id BIGINT NOT NULL,
+        transfer_id BIGINT NOT NULL UNIQUE,
+        received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        received_by BIGINT NULL,
+        INDEX idx_receipt_request (request_id),
+        INDEX idx_receipt_transfer (transfer_id)
+      )
+    `,
+    )
+
+    const [requestRows] = await conn.query(
+      `
+      SELECT id, hospital_id, blood_type, request_date, status, units_approved
+      FROM blood_requests
+      WHERE id = ? AND hospital_id = ?
+      LIMIT 1
+    `,
+      [requestId, hospitalId],
+    )
+
+    if (requestRows.length === 0) {
+      const error = new Error('Request not found')
+      error.statusCode = 404
+      throw error
+    }
+
+    const request = requestRows[0]
+    const status = (request.status || '').toLowerCase()
+    if (status === 'received' || status === 'fulfilled') {
+      const error = new Error('Request already marked as received')
+      error.statusCode = 400
+      throw error
+    }
+    if (status !== 'delivered') {
+      const error = new Error('Only delivered requests can be marked as received')
+      error.statusCode = 400
+      throw error
+    }
+
+    const [transferRows] = await conn.query(
+      `
+      SELECT
+        bt.id AS transfer_id,
+        bt.blood_type,
+        bt.units_transferred,
+        bi.expiration_date,
+        COALESCE(bi.component_type, 'whole_blood') AS component_type
+      FROM blood_transfers bt
+      LEFT JOIN blood_inventory bi ON bi.id = bt.source_inventory_id
+      LEFT JOIN hospital_request_transfer_receipts rr ON rr.transfer_id = bt.id
+      WHERE bt.hospital_id = ?
+        AND bt.blood_type COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
+        AND bt.transfer_date >= ?
+        AND rr.transfer_id IS NULL
+      ORDER BY bt.transfer_date ASC
+    `,
+      [hospitalId, request.blood_type, request.request_date],
+    )
+
+    if (transferRows.length === 0) {
+      const error = new Error('No delivered transfer found to receive for this request')
+      error.statusCode = 400
+      throw error
+    }
+
+    const grouped = new Map()
+    let totalReceivedUnits = 0
+    for (const row of transferRows) {
+      const expirationDate = row.expiration_date
+        ? new Date(row.expiration_date).toISOString().slice(0, 10)
+        : null
+      if (!expirationDate) continue
+
+      const component = row.component_type || 'whole_blood'
+      const key = `${row.blood_type}|${component}|${expirationDate}`
+      const units = Number(row.units_transferred || 0)
+      totalReceivedUnits += units
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          bloodType: row.blood_type,
+          componentType: component,
+          expirationDate,
+          units,
+        })
+      } else {
+        grouped.get(key).units += units
+      }
+    }
+
+    for (const entry of grouped.values()) {
+      const [existingDest] = await conn.query(
+        `
+        SELECT id
+        FROM blood_inventory
+        WHERE hospital_id = ?
+          AND blood_type = ?
+          AND expiration_date = ?
+          AND COALESCE(component_type, 'whole_blood') = ?
+          AND status = 'available'
+        LIMIT 1
+      `,
+        [hospitalId, entry.bloodType, entry.expirationDate, entry.componentType],
+      )
+
+      if (existingDest.length > 0) {
+        await conn.query(
+          'UPDATE blood_inventory SET available_units = available_units + ?, units = units + ? WHERE id = ?',
+          [entry.units, entry.units, existingDest[0].id],
+        )
+      } else {
+        try {
+          await conn.query(
+            `
+            INSERT INTO blood_inventory
+              (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
+            VALUES (?, ?, ?, ?, 'available', ?, ?, ?)
+          `,
+            [
+              entry.bloodType,
+              entry.units,
+              entry.units,
+              entry.expirationDate,
+              receivedByUserId,
+              hospitalId,
+              entry.componentType,
+            ],
+          )
+        } catch (error) {
+          if (
+            error.code === 'ER_BAD_FIELD_ERROR' ||
+            (error.message && error.message.includes('component_type'))
+          ) {
+            await conn.query(
+              `
+              INSERT INTO blood_inventory
+                (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
+              VALUES (?, ?, ?, ?, 'available', ?, ?)
+            `,
+              [entry.bloodType, entry.units, entry.units, entry.expirationDate, receivedByUserId, hospitalId],
+            )
+          } else {
+            throw error
+          }
+        }
+      }
+    }
+
+    for (const row of transferRows) {
+      await conn.query(
+        `
+        INSERT INTO hospital_request_transfer_receipts (request_id, transfer_id, received_by)
+        VALUES (?, ?, ?)
+      `,
+        [requestId, row.transfer_id, receivedByUserId || null],
+      )
+    }
+
+    await conn.query(
+      `
+      UPDATE blood_requests
+      SET status = 'received', units_approved = COALESCE(units_approved, ?)
+      WHERE id = ?
+    `,
+      [totalReceivedUnits || request.units_approved || null, requestId],
+    )
+
+    try {
+      await conn.query(
+        `
+        UPDATE blood_requests
+        SET received_at = COALESCE(received_at, NOW())
+        WHERE id = ?
+      `,
+        [requestId],
+      )
+    } catch (err) {
+      if (err.code !== 'ER_BAD_FIELD_ERROR') throw err
+    }
+
+    await conn.commit()
+    return { requestId, status: 'received', unitsReceived: totalReceivedUnits }
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
+  }
+}
+
 async function getHospitalHistoricalWastage(hospitalId, days) {
   const [wastageByDate] = await pool.query(
     `
@@ -425,6 +627,7 @@ module.exports = {
   getHospitalDonations,
   createHospitalRequest,
   getHospitalRequests,
+  confirmHospitalRequestReceived,
   getHospitalHistoricalWastage,
   getHospitalWastagePredictions,
 }

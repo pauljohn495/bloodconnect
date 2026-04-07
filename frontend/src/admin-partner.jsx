@@ -35,7 +35,6 @@ function AdminPartner() {
   const [fulfilledRequests, setFulfilledRequests] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [selectedRequestIds, setSelectedRequestIds] = useState(new Set())
-  const [plannedRequestStatuses, setPlannedRequestStatuses] = useState({})
 
   const selectedRequests = useMemo(() => hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId)), [hospitalApprovedRequests, selectedRequestIds])
 
@@ -179,7 +178,6 @@ function AdminPartner() {
     setIsLoadingInventory(true)
     setHospitalApprovedRequests([])
     setSelectedRequestIds(new Set())
-    setPlannedRequestStatuses({})
 
     try {
       // Fetch available inventory (where hospital_id is NULL)
@@ -282,13 +280,6 @@ function AdminPartner() {
     })
   }
 
-  const handlePlannedStatusChange = (requestId, newStatus) => {
-    setPlannedRequestStatuses((prev) => ({
-      ...prev,
-      [requestId]: newStatus,
-    }))
-  }
-
   const handleConfirmTransferClick = () => {
     if (!selectedHospital || Object.keys(selectedStocks).length === 0) {
       showNotification('Please select at least one blood stock to transfer', 'destructive')
@@ -313,6 +304,19 @@ function AdminPartner() {
       inventoryId: parseInt(inventoryId),
       units: parseInt(units),
     }))
+    const selectedRequestsForDelivery = hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId))
+    const requestFulfillments = selectedRequestsForDelivery.map((req) => {
+      const deliveredUnits = transfers
+        .filter((t) => {
+          const item = availableInventory.find((inv) => inv.id === t.inventoryId)
+          return item && (item.blood_type || item.bloodType) === req.bloodType
+        })
+        .reduce((sum, t) => sum + Number(t.units || 0), 0)
+      return {
+        requestId: req.requestId,
+        unitsTransferred: deliveredUnits > 0 ? deliveredUnits : req.unitsRequested,
+      }
+    })
 
     try {
       await apiRequest('/api/admin/transfer', {
@@ -320,29 +324,9 @@ function AdminPartner() {
         body: JSON.stringify({
           hospitalId: hospitalId,
           transfers,
+          requestFulfillments,
         }),
       })
-
-      // After successful transfer, apply any planned status changes for requests
-      const pendingStatusUpdates = hospitalApprovedRequests
-        .filter((req) => plannedRequestStatuses[req.requestId] && plannedRequestStatuses[req.requestId] !== req.status)
-        .map((req) => ({
-          requestId: req.requestId,
-          status: plannedRequestStatuses[req.requestId],
-        }))
-
-      for (const update of pendingStatusUpdates) {
-        try {
-          await apiRequest(`/api/admin/requests/${update.requestId}/status`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-              status: update.status,
-            }),
-          })
-        } catch (err) {
-          console.error('Failed to apply planned request status', err)
-        }
-      }
       
       // Refresh available inventory to remove items with 0 available units
       setIsLoadingInventory(true)
@@ -367,9 +351,8 @@ function AdminPartner() {
       // Clear selections and planned statuses
       setSelectedStocks({})
       setSelectedRequestIds(new Set())
-      setPlannedRequestStatuses({})
       
-      showNotification('Blood stocks transferred successfully!', 'primary')
+      showNotification('Blood transferred and request marked as delivered.', 'primary')
       
       // Refresh hospital list to update totals (this will show the transferred blood in the hospital table)
       await loadHospitals()
@@ -911,17 +894,9 @@ function AdminPartner() {
                                       {request.priority === 'critical' ? 'Critical' : 'Urgent'}
                                     </span>
                                   )}
-                                  <select
-                                    value={plannedRequestStatuses[request.requestId] || request.status}
-                                    onChange={(e) =>
-                                      handlePlannedStatusChange(request.requestId, e.target.value)
-                                    }
-                                    className="ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-red-500"
-                                  >
-                                    <option value="approved">Approved</option>
-                                    <option value="partially_fulfilled">Partially Fulfilled</option>
-                                    <option value="fulfilled">Fulfilled</option>
-                                  </select>
+                                  <span className="ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                                    Will become Delivered after transfer
+                                  </span>
                                 </div>
                               </div>
                             </div>

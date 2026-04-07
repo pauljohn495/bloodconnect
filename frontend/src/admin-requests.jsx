@@ -268,10 +268,24 @@ function AdminRequests() {
                           <button
                             type="button"
                             onClick={() => handleOpenNotesModal(request)}
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-all duration-200"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-200/90 bg-amber-50/80 text-amber-700 transition-all duration-200 hover:border-amber-300 hover:bg-amber-100/90 hover:text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/35 focus:ring-offset-1"
                             title="View notes"
+                            aria-label="View notes"
                           >
-                            <span className="text-sm font-bold leading-none">â‹¯</span>
+                            <svg
+                              className="h-4 w-4 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.75}
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
                           </button>
                         ) : (
                           '—'

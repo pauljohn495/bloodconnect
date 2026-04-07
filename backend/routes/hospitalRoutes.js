@@ -7,6 +7,7 @@ const {
   getDonations,
   createRequestHandler,
   getRequests,
+  confirmRequestReceived,
   getWastagePredictions,
   getHistoricalWastage,
 } = require('../controllers/hospitalController')
@@ -31,6 +32,9 @@ router.post('/requests', validateHospitalRequest, createRequestHandler)
 
 // GET /api/hospital/requests
 router.get('/requests', getRequests)
+
+// PATCH /api/hospital/requests/:id/received
+router.patch('/requests/:id/received', confirmRequestReceived)
 
 // ===== Hospital Analytics =====
 
