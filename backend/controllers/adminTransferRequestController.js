@@ -65,6 +65,64 @@ const createTransferController = async (req, res) => {
           [inventoryId, hospitalId, inventory.blood_type, units, req.user.id],
         )
 
+        const expirationDate = inventory.expiration_date
+        const componentType = inventory.component_type || 'whole_blood'
+        if (!expirationDate) {
+          throw new Error(`Inventory item ${inventoryId} has no expiration date and cannot be transferred`)
+        }
+
+        const [existingDestinationRows] = await pool.query(
+          `
+          SELECT id
+          FROM blood_inventory
+          WHERE hospital_id = ?
+            AND blood_type = ?
+            AND expiration_date = ?
+            AND COALESCE(component_type, 'whole_blood') = ?
+            AND status = 'available'
+          LIMIT 1
+        `,
+          [hospitalId, inventory.blood_type, expirationDate, componentType],
+        )
+
+        if (existingDestinationRows.length > 0) {
+          await pool.query(
+            `
+            UPDATE blood_inventory
+            SET available_units = available_units + ?, units = units + ?
+            WHERE id = ?
+          `,
+            [units, units, existingDestinationRows[0].id],
+          )
+        } else {
+          try {
+            await pool.query(
+              `
+              INSERT INTO blood_inventory
+                (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
+              VALUES (?, ?, ?, ?, 'available', ?, ?, ?)
+            `,
+              [inventory.blood_type, units, units, expirationDate, req.user.id, hospitalId, componentType],
+            )
+          } catch (error) {
+            if (
+              error.code === 'ER_BAD_FIELD_ERROR' ||
+              (error.message && error.message.includes('component_type'))
+            ) {
+              await pool.query(
+                `
+                INSERT INTO blood_inventory
+                  (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
+                VALUES (?, ?, ?, ?, 'available', ?, ?)
+              `,
+                [inventory.blood_type, units, units, expirationDate, req.user.id, hospitalId],
+              )
+            } else {
+              throw error
+            }
+          }
+        }
+
         transferResults.push({
           inventoryId,
           bloodType: inventory.blood_type,

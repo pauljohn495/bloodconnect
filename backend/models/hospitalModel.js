@@ -298,87 +298,10 @@ async function confirmHospitalRequestReceived({ hospitalId, requestId, receivedB
       throw error
     }
 
-    const grouped = new Map()
     let totalReceivedUnits = 0
     for (const row of transferRows) {
-      const expirationDate = row.expiration_date
-        ? new Date(row.expiration_date).toISOString().slice(0, 10)
-        : null
-      if (!expirationDate) continue
-
-      const component = row.component_type || 'whole_blood'
-      const key = `${row.blood_type}|${component}|${expirationDate}`
       const units = Number(row.units_transferred || 0)
       totalReceivedUnits += units
-
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          bloodType: row.blood_type,
-          componentType: component,
-          expirationDate,
-          units,
-        })
-      } else {
-        grouped.get(key).units += units
-      }
-    }
-
-    for (const entry of grouped.values()) {
-      const [existingDest] = await conn.query(
-        `
-        SELECT id
-        FROM blood_inventory
-        WHERE hospital_id = ?
-          AND blood_type = ?
-          AND expiration_date = ?
-          AND COALESCE(component_type, 'whole_blood') = ?
-          AND status = 'available'
-        LIMIT 1
-      `,
-        [hospitalId, entry.bloodType, entry.expirationDate, entry.componentType],
-      )
-
-      if (existingDest.length > 0) {
-        await conn.query(
-          'UPDATE blood_inventory SET available_units = available_units + ?, units = units + ? WHERE id = ?',
-          [entry.units, entry.units, existingDest[0].id],
-        )
-      } else {
-        try {
-          await conn.query(
-            `
-            INSERT INTO blood_inventory
-              (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
-            VALUES (?, ?, ?, ?, 'available', ?, ?, ?)
-          `,
-            [
-              entry.bloodType,
-              entry.units,
-              entry.units,
-              entry.expirationDate,
-              receivedByUserId,
-              hospitalId,
-              entry.componentType,
-            ],
-          )
-        } catch (error) {
-          if (
-            error.code === 'ER_BAD_FIELD_ERROR' ||
-            (error.message && error.message.includes('component_type'))
-          ) {
-            await conn.query(
-              `
-              INSERT INTO blood_inventory
-                (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
-              VALUES (?, ?, ?, ?, 'available', ?, ?)
-            `,
-              [entry.bloodType, entry.units, entry.units, entry.expirationDate, receivedByUserId, hospitalId],
-            )
-          } else {
-            throw error
-          }
-        }
-      }
     }
 
     for (const row of transferRows) {

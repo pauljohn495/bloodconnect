@@ -12,6 +12,7 @@ const userRoutes = require('./routes/userRoutes')
 const notificationRoutes = require('./routes/notificationRoutes')
 const errorHandler = require('./middleware/errorHandler')
 const { successResponse, errorResponse } = require('./utils/response')
+const { startHospitalInventoryAlertScheduler } = require('./services/hospitalInventoryAlertService')
 
 dotenv.config()
 
@@ -68,6 +69,7 @@ async function start() {
       console.log('✅ Database connection successful')
       try {
         await ensureDonorProfileColumns()
+        startHospitalInventoryAlertScheduler()
       } catch (migrationError) {
         console.error('❌ Schema migration failed:', migrationError.message)
         process.exit(1)

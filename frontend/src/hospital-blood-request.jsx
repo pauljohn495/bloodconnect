@@ -324,7 +324,7 @@ function HospitalBloodRequest() {
             <div>
               <h2 className={adminPanel.amber.title}>Blood requests</h2>
               <p className={adminPanel.amber.subtitle}>
-                Pending, approved, and delivered requests are listed below.
+                Pending requests are listed below.
               </p>
             </div>
           </div>
