@@ -7,12 +7,6 @@ import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 function HospitalInventory() {
   const [inventory, setInventory] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
-  const [bloodType, setBloodType] = useState('')
-  const [componentType, setComponentType] = useState('whole_blood')
-  const [unitsRequested, setUnitsRequested] = useState('')
-  const [notes, setNotes] = useState('')
-  const [requestPriority, setRequestPriority] = useState('normal')
   const [notification, setNotification] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false)
@@ -41,8 +35,6 @@ function HospitalInventory() {
     return () => clearInterval(interval)
   }, [])
 
-  const bloodTypes = ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-']
-
   const loadDonationHistory = async () => {
     try {
       setIsHistoryLoading(true)
@@ -56,61 +48,11 @@ function HospitalInventory() {
     }
   }
 
-  const handleOpenRequestModal = () => {
-    setIsRequestModalOpen(true)
-    setBloodType('')
-    setComponentType('whole_blood')
-    setUnitsRequested('')
-    setNotes('')
-    setRequestPriority('normal')
-  }
-
-  const handleCloseRequestModal = () => {
-    setIsRequestModalOpen(false)
-    setBloodType('')
-    setComponentType('whole_blood')
-    setUnitsRequested('')
-    setNotes('')
-    setRequestPriority('normal')
-  }
-
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
     setTimeout(() => {
       setNotification(null)
     }, 5000)
-  }
-
-  const handleSubmitRequest = async (e) => {
-    e.preventDefault()
-    if (!bloodType || !unitsRequested) {
-      showNotification('Blood type and units requested are required', 'destructive')
-      return
-    }
-
-    const units = parseInt(unitsRequested, 10)
-    if (Number.isNaN(units) || units <= 0) {
-      showNotification('Units requested must be a positive number', 'destructive')
-      return
-    }
-
-    try {
-      await apiRequest('/api/hospital/requests', {
-        method: 'POST',
-        body: JSON.stringify({
-          bloodType,
-          componentType,
-          unitsRequested: units,
-          notes: notes || null,
-          priority: requestPriority,
-        }),
-      })
-      handleCloseRequestModal()
-      showNotification('Blood request submitted successfully!', 'primary')
-    } catch (err) {
-      console.error('Failed to submit request', err)
-      showNotification(err.message || 'Failed to submit blood request', 'destructive')
-    }
   }
 
   // Filter inventory based on status
@@ -159,13 +101,6 @@ function HospitalInventory() {
                   <option value="near_expiry">Near Expiry</option>
                   <option value="expired">Expired</option>
                 </select>
-                <button
-                  type="button"
-                  onClick={handleOpenRequestModal}
-                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
-                >
-                  Request blood
-                </button>
               </div>
             </div>
           </div>
@@ -274,121 +209,6 @@ function HospitalInventory() {
           </div>
         </div>
       </section>
-
-      {/* Request Blood Modal */}
-      {isRequestModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xl ring-1 ring-slate-100">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">Request blood</h3>
-              <button
-                type="button"
-                onClick={handleCloseRequestModal}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitRequest} className="mt-4 space-y-4 text-xs">
-              <div>
-                <label className="block text-xs font-medium text-slate-700">
-                  Component Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={componentType}
-                  onChange={(e) => setComponentType(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  required
-                >
-                  <option value="whole_blood">Whole Blood</option>
-                  <option value="platelets">Platelets</option>
-                  <option value="plasma">Plasma</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700">
-                  Request Priority <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={requestPriority}
-                  onChange={(e) => setRequestPriority(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  required
-                >
-                  <option value="normal">Normal – Standard request</option>
-                  <option value="urgent">Urgent – Needed soon</option>
-                  <option value="critical">Critical / Emergency – Immediate</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700">
-                  Blood Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={bloodType}
-                  onChange={(e) => setBloodType(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  required
-                >
-                  <option value="">Select blood type</option>
-                  {bloodTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700">
-                  Units Requested <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={unitsRequested}
-                  onChange={(e) => setUnitsRequested(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  placeholder="Enter number of units"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Notes (Optional)</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  placeholder="Add any additional notes or requirements"
-                />
-              </div>
-
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseRequestModal}
-                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
-                >
-                  Submit Request
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Record Donation Modal */}
       {isDonateModalOpen && selectedInventoryItem && (
