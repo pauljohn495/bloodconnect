@@ -10,6 +10,7 @@ function HospitalRequests() {
   const [error, setError] = useState('')
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false)
   const [selectedRequestNotes, setSelectedRequestNotes] = useState(null)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
 
   const loadRequests = async () => {
     try {
@@ -87,6 +88,12 @@ function HospitalRequests() {
     }
   }
 
+  const normalizedStatus = (status) => (status || '').toLowerCase()
+  const pendingRequests = requests.filter((request) => normalizedStatus(request.status) === 'pending')
+  const historyRequests = requests.filter((request) =>
+    ['approved', 'rejected', 'fulfilled'].includes(normalizedStatus(request.status)),
+  )
+
   return (
     <HospitalLayout
       pageTitle="Blood Requests"
@@ -96,10 +103,21 @@ function HospitalRequests() {
         <div className={adminPanel.amber.outer}>
           <div className={adminPanel.amber.header}>
             <div>
-              <h2 className={adminPanel.amber.title}>Blood requests</h2>
-              <p className={adminPanel.amber.subtitle}>
-                Track the status of your blood requests
-              </p>
+              <div>
+                <h2 className={adminPanel.amber.title}>Blood requests</h2>
+                <p className={adminPanel.amber.subtitle}>
+                  Pending requests are listed below.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsHistoryModalOpen(true)}
+                className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 shadow-sm transition hover:bg-red-100"
+              >
+                History
+              </button>
             </div>
           </div>
 
@@ -148,16 +166,16 @@ function HospitalRequests() {
                     </td>
                   </tr>
                 )}
-                {!isLoading && !error && requests.length === 0 && (
+                {!isLoading && !error && pendingRequests.length === 0 && (
                   <tr>
                     <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={8}>
-                      No blood requests found. Submit a request from the Inventory page.
+                      No pending blood requests. Submit a request from the Blood Request page.
                     </td>
                   </tr>
                 )}
                 {!isLoading &&
                   !error &&
-                  requests.map((request) => (
+                  pendingRequests.map((request) => (
                     <tr key={request.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-xs font-semibold text-slate-900">
                         <BloodTypeBadge type={request.blood_type} />
@@ -290,6 +308,133 @@ function HospitalRequests() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="flex h-[80vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl ring-1 ring-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Request history</h3>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Approved, rejected, and fulfilled requests.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHistoryModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+                aria-label="Close history"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto px-5 py-4">
+              {isLoading ? (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-xs text-slate-500">Loading request history...</p>
+                </div>
+              ) : error ? (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-xs text-red-500">{error}</p>
+                </div>
+              ) : historyRequests.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-xs text-slate-500">No request history yet.</p>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-slate-100 text-xs">
+                  <thead className={adminPanel.amber.thead}>
+                    <tr>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
+                        Blood Type
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
+                        Component Type
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
+                        Units Requested
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
+                        Units Approved
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
+                        Request Date
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
+                        Priority
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left ${adminPanel.amber.th}`}>
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className={adminPanel.amber.tbody}>
+                    {historyRequests.map((request) => (
+                      <tr key={request.id} className="hover:bg-slate-50/60">
+                        <td className="whitespace-nowrap px-4 py-2 text-xs font-semibold text-slate-900">
+                          <BloodTypeBadge type={request.blood_type} />
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
+                          {request.component_type === 'whole_blood' ? 'Whole Blood' : request.component_type === 'platelets' ? 'Platelets' : request.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs">
+                          <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
+                            {request.units_requested}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs">
+                          {request.units_approved ? (
+                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-green-50 px-2 py-1 text-[13px] font-semibold text-green-700 ring-1 ring-green-100">
+                              {request.units_approved}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
+                          {request.request_date
+                            ? new Date(request.request_date).toLocaleDateString()
+                            : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ring-1 ${
+                              (request.priority || 'normal') === 'critical'
+                                ? 'bg-red-50 text-red-700 ring-red-100'
+                                : (request.priority || 'normal') === 'urgent'
+                                ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                                : 'bg-slate-50 text-slate-700 ring-slate-100'
+                            }`}
+                          >
+                            {(request.priority || 'normal') === 'critical'
+                              ? 'Critical'
+                              : (request.priority || 'normal') === 'urgent'
+                              ? 'Urgent'
+                              : 'Normal'}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-xs">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${getStatusColor(
+                              request.status,
+                            )}`}
+                          >
+                            {request.status || 'pending'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>

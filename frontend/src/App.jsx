@@ -11,6 +11,7 @@ import AdminAnnouncements from './admin-announcements.jsx'
 import UserDashboard from './user-dashboard.jsx'
 import ProfileSettings from './profile-settings.jsx'
 import HospitalInventory from './hospital-inventory.jsx'
+import HospitalBloodRequest from './hospital-blood-request.jsx'
 import HospitalRequests from './hospital-requests.jsx'
 import HospitalReports from './hospital-reports.jsx'
 import DonorRegistration from './donor-registration.jsx'
@@ -34,6 +35,7 @@ function App() {
         <Route path="/admin/announcements" element={<AdminAnnouncements />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/hospital/inventory" element={<HospitalInventory />} />
+        <Route path="/hospital/blood-request" element={<HospitalBloodRequest />} />
         <Route path="/hospital/requests" element={<HospitalRequests />} />
         <Route path="/hospital/reports" element={<HospitalReports />} />
         <Route path="/hospital/dashboard" element={<Navigate to="/hospital/inventory" replace />} />
