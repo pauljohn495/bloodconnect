@@ -14,6 +14,9 @@ function parseDonorPendingProfile(donor) {
 }
 
 function AdminDonation() {
+  const WHOLE_BLOOD_COOLDOWN_DAYS = 90
+  const BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+
   const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations' | 'rc143'
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [donorName, setDonorName] = useState('')
@@ -38,6 +41,8 @@ function AdminDonation() {
   const [selectedDonorDetails, setSelectedDonorDetails] = useState(null)
   const [donorDetailAvatarFailed, setDonorDetailAvatarFailed] = useState(false)
   const [donorSearch, setDonorSearch] = useState('')
+  const [donorBloodTypeFilter, setDonorBloodTypeFilter] = useState('all')
+  const [donorEligibilityFilter, setDonorEligibilityFilter] = useState('all')
   const [organizationSearch, setOrganizationSearch] = useState('')
   const [notification, setNotification] = useState(null)
   const [openMenuDonorId, setOpenMenuDonorId] = useState(null)
@@ -236,10 +241,31 @@ function AdminDonation() {
       .toString()
       .toLowerCase()
 
+  const getWholeBloodEligibility = (donor) => {
+    const raw = donor?.last_donation_date || donor?.lastDonationDate
+    if (!raw) return true
+    const lastDonation = new Date(raw)
+    if (Number.isNaN(lastDonation.getTime())) return true
+
+    const nextEligibleDate = new Date(lastDonation)
+    nextEligibleDate.setDate(nextEligibleDate.getDate() + WHOLE_BLOOD_COOLDOWN_DAYS)
+    return nextEligibleDate <= new Date()
+  }
+
   const filteredDonors = donors.filter((donor) => {
     const q = donorSearch.trim().toLowerCase()
-    if (!q) return true
-    return donorNameForSearch(donor).includes(q)
+    const matchesSearch = !q || donorNameForSearch(donor).includes(q)
+
+    const donorBloodType = (donor.blood_type || donor.bloodType || '').toUpperCase()
+    const matchesBloodType = donorBloodTypeFilter === 'all' || donorBloodType === donorBloodTypeFilter
+
+    const isWholeBloodEligible = getWholeBloodEligibility(donor)
+    const matchesEligibility =
+      donorEligibilityFilter === 'all' ||
+      (donorEligibilityFilter === 'available' && isWholeBloodEligible) ||
+      (donorEligibilityFilter === 'not_available' && !isWholeBloodEligible)
+
+    return matchesSearch && matchesBloodType && matchesEligibility
   })
 
   const filteredOrganizations = organizations.filter((org) => {
@@ -980,6 +1006,31 @@ function AdminDonation() {
                   className="w-56 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
               </div>
+              {activeSection === 'donors' && (
+                <>
+                  <select
+                    value={donorBloodTypeFilter}
+                    onChange={(e) => setDonorBloodTypeFilter(e.target.value)}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  >
+                    <option value="all">All Blood Types</option>
+                    {BLOOD_TYPE_OPTIONS.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={donorEligibilityFilter}
+                    onChange={(e) => setDonorEligibilityFilter(e.target.value)}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  >
+                    <option value="all">All</option>
+                    <option value="available">Available</option>
+                    <option value="not_available">Not Available</option>
+                  </select>
+                </>
+              )}
               {activeSection === 'donors' ? (
                 <>
                   <button
@@ -1055,6 +1106,9 @@ function AdminDonation() {
                         Contact
                       </th>
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                        Eligibility
+                      </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                         Status
                       </th>
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
@@ -1085,7 +1139,7 @@ function AdminDonation() {
               <tbody className={adminPanel.emerald.tbody}>
                 {activeSection === 'donors' && isLoading && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={6}>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={7}>
                       Loading donors...
                     </td>
                   </tr>
@@ -1093,7 +1147,7 @@ function AdminDonation() {
 
                 {activeSection === 'donors' && !isLoading && error && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={6}>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={7}>
                       {error}
                     </td>
                   </tr>
@@ -1101,7 +1155,7 @@ function AdminDonation() {
 
                 {activeSection === 'donors' && !isLoading && !error && donors.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
                       No donors added yet.
                     </td>
                   </tr>
@@ -1120,6 +1174,17 @@ function AdminDonation() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
                         {donor.phone || donor.contact_phone || donor.contactPhone || '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-sm">
+                        {getWholeBloodEligibility(donor) ? (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                            Available
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                            Not Available
+                          </span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm">
                         <span

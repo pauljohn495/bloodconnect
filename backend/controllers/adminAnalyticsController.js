@@ -546,9 +546,35 @@ const getHistoricalWastageController = async (req, res) => {
   }
 }
 
+const getExpiredUnitsController = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT
+        id,
+        inventory_id,
+        blood_type,
+        COALESCE(component_type, 'whole_blood') as component_type,
+        units_expired,
+        hospital_id,
+        expiration_date,
+        expired_at
+      FROM expired_units
+      ORDER BY expired_at DESC, id DESC
+    `,
+    )
+
+    res.json(rows)
+  } catch (error) {
+    console.error('Expired units fetch error:', error)
+    res.status(500).json({ message: 'Failed to fetch expired units' })
+  }
+}
+
 module.exports = {
   getWastagePredictionsController,
   getWastagePrescriptionsController,
   getHistoricalWastageController,
+  getExpiredUnitsController,
 }
 

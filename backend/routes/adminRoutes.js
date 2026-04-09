@@ -38,6 +38,7 @@ const {
   getWastagePredictionsController,
   getWastagePrescriptionsController,
   getHistoricalWastageController,
+  getExpiredUnitsController,
 } = require('../controllers/adminAnalyticsController')
 const {
   getScheduleRequestsController,
@@ -169,6 +170,9 @@ router.get('/analytics/wastage-prescriptions', getWastagePrescriptionsController
 
 // GET /api/admin/analytics/historical-wastage
 router.get('/analytics/historical-wastage', getHistoricalWastageController)
+
+// GET /api/admin/analytics/expired-units
+router.get('/analytics/expired-units', getExpiredUnitsController)
 
 // ===== Schedule Requests =====
 

@@ -3,6 +3,71 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 import { adminPanel } from './admin-ui.jsx'
+import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+const DEFAULT_MAP_CENTER = [8.4542, 124.6319]
+const defaultIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+})
+
+function LocationPickerMap({ latitude, longitude, onPick }) {
+  function ClickToPlaceMarker() {
+    useMapEvents({
+      click(event) {
+        onPick(event.latlng.lat, event.latlng.lng)
+      },
+    })
+    return null
+  }
+
+  const markerPosition =
+    Number.isFinite(latitude) && Number.isFinite(longitude) ? [latitude, longitude] : null
+  const center = markerPosition || DEFAULT_MAP_CENTER
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <MapContainer center={center} zoom={13} className="h-56 w-full" scrollWheelZoom>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <ClickToPlaceMarker />
+        {markerPosition && <Marker position={markerPosition} icon={defaultIcon} />}
+      </MapContainer>
+    </div>
+  )
+}
+
+function parseCoordinatesInput(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return { latitude: null, longitude: null, valid: false }
+  const parts = raw.split(',').map((part) => part.trim())
+  if (parts.length !== 2) return { latitude: null, longitude: null, valid: false }
+
+  const latitude = Number(parts[0])
+  const longitude = Number(parts[1])
+  const valid =
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+
+  return { latitude, longitude, valid }
+}
+
+function formatCoordinatesInput(latitude, longitude) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return ''
+  return `${latitude}, ${longitude}`
+}
 
 function AdminPartner() {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -10,6 +75,9 @@ function AdminPartner() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
+  const [hospitalLatitude, setHospitalLatitude] = useState(null)
+  const [hospitalLongitude, setHospitalLongitude] = useState(null)
+  const [hospitalCoordinatesInput, setHospitalCoordinatesInput] = useState('')
   const [hospitals, setHospitals] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -30,6 +98,9 @@ function AdminPartner() {
   const [editEmail, setEditEmail] = useState('')
   const [editUsername, setEditUsername] = useState('')
   const [editPassword, setEditPassword] = useState('')
+  const [editHospitalLatitude, setEditHospitalLatitude] = useState(null)
+  const [editHospitalLongitude, setEditHospitalLongitude] = useState(null)
+  const [editHospitalCoordinatesInput, setEditHospitalCoordinatesInput] = useState('')
   const [hospitalApprovedRequests, setHospitalApprovedRequests] = useState([])
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [fulfilledRequests, setFulfilledRequests] = useState([])
@@ -82,6 +153,9 @@ function AdminPartner() {
     setUsername('')
     setPassword('')
     setEmail('')
+    setHospitalLatitude(null)
+    setHospitalLongitude(null)
+    setHospitalCoordinatesInput('')
   }
 
   const handleSubmit = async (e) => {
@@ -94,6 +168,8 @@ function AdminPartner() {
           username,
           email,
           password,
+          latitude: hospitalLatitude,
+          longitude: hospitalLongitude,
         }),
       })
       // Refresh table so new hospital appears immediately
@@ -112,6 +188,15 @@ function AdminPartner() {
     setEditEmail(hospital.email || '')
     setEditUsername(hospital.username || '')
     setEditPassword('') // Don't pre-fill password for security
+    setEditHospitalLatitude(
+      Number.isFinite(Number(hospital.latitude)) ? Number(hospital.latitude) : null,
+    )
+    setEditHospitalLongitude(
+      Number.isFinite(Number(hospital.longitude)) ? Number(hospital.longitude) : null,
+    )
+    setEditHospitalCoordinatesInput(
+      formatCoordinatesInput(Number(hospital.latitude), Number(hospital.longitude)),
+    )
     setIsEditModalOpen(true)
     setOpenMenuHospitalId(null)
   }
@@ -123,6 +208,9 @@ function AdminPartner() {
     setEditEmail('')
     setEditUsername('')
     setEditPassword('')
+    setEditHospitalLatitude(null)
+    setEditHospitalLongitude(null)
+    setEditHospitalCoordinatesInput('')
   }
 
   const handleUpdateHospital = async (e) => {
@@ -134,6 +222,8 @@ function AdminPartner() {
         hospitalName: editHospitalName,
         email: editEmail,
         username: editUsername,
+        latitude: editHospitalLatitude,
+        longitude: editHospitalLongitude,
       }
       
       // Only include password if it's been changed
@@ -700,6 +790,41 @@ function AdminPartner() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Hospital Location</label>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Click on the map to place the hospital marker.
+                </p>
+                <div className="mt-2">
+                  <LocationPickerMap
+                    latitude={hospitalLatitude}
+                    longitude={hospitalLongitude}
+                    onPick={(lat, lng) => {
+                      setHospitalLatitude(lat)
+                      setHospitalLongitude(lng)
+                      setHospitalCoordinatesInput(formatCoordinatesInput(lat, lng))
+                    }}
+                  />
+                </div>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    value={hospitalCoordinatesInput}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setHospitalCoordinatesInput(value)
+                      const parsed = parseCoordinatesInput(value)
+                      if (parsed.valid) {
+                        setHospitalLatitude(parsed.latitude)
+                        setHospitalLongitude(parsed.longitude)
+                      }
+                    }}
+                    placeholder="Latitude, Longitude (e.g. 7.912533352681932, 125.09225766537743)"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+                  />
+                </div>
+              </div>
+
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
@@ -710,6 +835,7 @@ function AdminPartner() {
                 </button>
                 <button
                   type="submit"
+                  disabled={hospitalLatitude === null || hospitalLongitude === null}
                   className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
                 >
                   Save Hospital
@@ -799,6 +925,41 @@ function AdminPartner() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Hospital Location</label>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Click on the map to update the hospital marker.
+                </p>
+                <div className="mt-2">
+                  <LocationPickerMap
+                    latitude={editHospitalLatitude}
+                    longitude={editHospitalLongitude}
+                    onPick={(lat, lng) => {
+                      setEditHospitalLatitude(lat)
+                      setEditHospitalLongitude(lng)
+                      setEditHospitalCoordinatesInput(formatCoordinatesInput(lat, lng))
+                    }}
+                  />
+                </div>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    value={editHospitalCoordinatesInput}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setEditHospitalCoordinatesInput(value)
+                      const parsed = parseCoordinatesInput(value)
+                      if (parsed.valid) {
+                        setEditHospitalLatitude(parsed.latitude)
+                        setEditHospitalLongitude(parsed.longitude)
+                      }
+                    }}
+                    placeholder="Latitude, Longitude (e.g. 8.149000386640877, 125.13190618071813)"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
+                  />
+                </div>
+              </div>
+
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
@@ -809,6 +970,7 @@ function AdminPartner() {
                 </button>
                 <button
                   type="submit"
+                  disabled={editHospitalLatitude === null || editHospitalLongitude === null}
                   className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-500"
                 >
                   Update Hospital

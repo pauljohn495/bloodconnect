@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
-import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { adminReportLoading, adminReportSection, responsiveTableContainer } from './admin-ui.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
-import { getBloodTypeChartColor } from './bloodTypeColors.js'
 
 function AdminReports() {
   const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'
@@ -13,6 +11,7 @@ function AdminReports() {
   const [requests, setRequests] = useState([])
   const [donors, setDonors] = useState([])
   const [hospitals, setHospitals] = useState([])
+  const [expiredUnits, setExpiredUnits] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -21,16 +20,18 @@ function AdminReports() {
       try {
         setIsLoading(true)
         setError('')
-        const [inventoryData, requestsData, donorsData, hospitalsData] = await Promise.all([
+        const [inventoryData, requestsData, donorsData, hospitalsData, expiredUnitsData] = await Promise.all([
           apiRequest('/api/admin/inventory'),
           apiRequest('/api/admin/requests'),
           apiRequest('/api/admin/donors'),
           apiRequest('/api/admin/hospitals'),
+          apiRequest('/api/admin/analytics/expired-units'),
         ])
         setInventory(inventoryData || [])
         setRequests(requestsData || [])
         setDonors(donorsData || [])
         setHospitals(hospitalsData || [])
+        setExpiredUnits(expiredUnitsData || [])
       } catch (err) {
         console.error('Failed to load reports data', err)
         setError(err.message || 'Failed to load reports data')
@@ -133,16 +134,20 @@ function AdminReports() {
   const usageWindowDays = 30
   const windowStart = new Date(now.getTime() - usageWindowDays * msPerDay)
 
-  const fulfilledRequestsInWindow = requests.filter((req) => {
-    if (req.status !== 'fulfilled') return false
-    if (!req.request_date) return false
-    const d = new Date(req.request_date)
+  const usageRequestsInWindow = requests.filter((req) => {
+    const status = (req.status || '').toString().toLowerCase()
+    if (!(status === 'delivered' || status === 'received')) return false
+    const usageDate = req.request_date || req.requestDate || req.created_at || req.createdAt
+    if (!usageDate) return false
+    const d = new Date(usageDate)
+    if (Number.isNaN(d.getTime())) return false
     const ct = normalizeComponentType(req.component_type || req.componentType)
     if (componentFilter !== 'all' && ct !== componentFilter) return false
     return d >= windowStart && d <= now
   })
+  const fulfilledRequestsInWindow = usageRequestsInWindow
 
-  const usageByBloodType = fulfilledRequestsInWindow.reduce((acc, req) => {
+  const usageByBloodType = usageRequestsInWindow.reduce((acc, req) => {
     const bt = req.blood_type || req.bloodType
     if (!bt) return acc
     const ct = normalizeComponentType(req.component_type || req.componentType)
@@ -261,43 +266,79 @@ function AdminReports() {
     })
     .sort((a, b) => b.unitsUsed - a.unitsUsed)
 
-  // Donor Availability Forecast
-  const donorBuckets = {
-    tomorrow: 0, // now
-    within3: 0, // within 7 days
-    within7: 0, // within 30 days
-  }
+  const topUsageItem = bloodUsageTrendsData[0] || null
 
-  donors.forEach((donor) => {
-    // If donor has never donated, treat as eligible now
-    if (!donor.last_donation_date && !donor.lastDonationDate) {
-      donorBuckets.tomorrow += 1
-      return
-    }
-    const lastDate = donor.last_donation_date || donor.lastDonationDate
-    const donationType =
-      donor.last_donation_type || donor.lastDonationType || 'whole_blood'
+  // Wastage Monitoring
+  const inventoryWithUnits = inventory.map((item) => {
+    const raw = item.available_units ?? item.availableUnits ?? item.units ?? 0
+    const units = Number(raw || 0)
+    return { ...item, units: Number.isFinite(units) ? units : 0 }
+  })
 
-    let waitDays = 56
-    if (donationType === 'platelets') waitDays = 7
-    else if (donationType === 'plasma') waitDays = 28
-
-    const nextEligibleDate = new Date(lastDate)
-    nextEligibleDate.setDate(nextEligibleDate.getDate() + waitDays)
-
-    const daysUntilEligible = Math.round((nextEligibleDate - now) / msPerDay)
-
-    if (daysUntilEligible <= 0) {
-      // Eligible now
-      donorBuckets.tomorrow += 1
-    } else if (daysUntilEligible > 0 && daysUntilEligible <= 7) {
-      // Within 7 days
-      donorBuckets.within3 += 1
-    } else if (daysUntilEligible > 7 && daysUntilEligible <= 30) {
-      // Within 30 days
-      donorBuckets.within7 += 1
+  const expiredInventory = expiredUnits.map((item) => {
+    const rawUnits = item.units_expired ?? item.unitsExpired ?? 0
+    const units = Number(rawUnits || 0)
+    return {
+      ...item,
+      units: Number.isFinite(units) ? units : 0,
+      blood_type: item.blood_type || item.bloodType,
+      component_type: item.component_type || item.componentType || 'whole_blood',
     }
   })
+
+  const totalExpiredUnits = expiredInventory.reduce((sum, item) => sum + item.units, 0)
+  const deliveredOrReceivedUnits = requests.reduce((sum, req) => {
+    const status = (req.status || '').toString().toLowerCase()
+    if (!(status === 'delivered' || status === 'received')) return sum
+    const units = Number(req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0)
+    return sum + (Number.isFinite(units) ? units : 0)
+  }, 0)
+  const wastageBaseUnits = totalExpiredUnits + deliveredOrReceivedUnits
+  const wastageRate = wastageBaseUnits > 0 ? (totalExpiredUnits / wastageBaseUnits) * 100 : 0
+
+  const wastageLevel =
+    wastageRate < 5
+      ? { label: 'Low', icon: '🟢', classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
+      : wastageRate <= 10
+        ? { label: 'Moderate', icon: '🟡', classes: 'bg-amber-50 text-amber-800 ring-amber-200' }
+        : { label: 'High', icon: '🔴', classes: 'bg-red-50 text-red-700 ring-red-200' }
+
+  const wastedByBloodTypeMap = expiredInventory.reduce((acc, item) => {
+    const bt = item.blood_type || item.bloodType
+    if (!bt) return acc
+    acc[bt] = (acc[bt] || 0) + item.units
+    return acc
+  }, {})
+
+  const topWastedBloodTypes = Object.entries(wastedByBloodTypeMap)
+    .map(([bloodType, units]) => ({ bloodType, units: Number(units || 0) }))
+    .sort((a, b) => b.units - a.units)
+    .slice(0, 5)
+
+  const maxWastedUnits = topWastedBloodTypes[0]?.units || 0
+  const topThreeShare =
+    totalExpiredUnits > 0
+      ? (topWastedBloodTypes.slice(0, 3).reduce((sum, item) => sum + item.units, 0) / totalExpiredUnits) *
+        100
+      : 0
+  const topTwoInsightTypes = topWastedBloodTypes.slice(0, 2).map((item) => item.bloodType)
+
+  const wastageInsight =
+    topWastedBloodTypes.length === 0
+      ? 'No blood units have expired so far.'
+      : topWastedBloodTypes.length === 1
+        ? `${topWastedBloodTypes[0].bloodType} has the highest number of expired units.`
+        : topThreeShare >= 60
+          ? 'Most of the wastage comes from the top 3 blood types.'
+          : `${topTwoInsightTypes[0]} and ${topTwoInsightTypes[1]} have the highest number of expired units.`
+
+  const topTwoWastedTypes = topWastedBloodTypes.slice(0, 2).map((item) => item.bloodType)
+  const wastageSuggestion =
+    topWastedBloodTypes.length === 0
+      ? 'Balance blood collection with current demand and use older stock first to reduce waste.'
+      : topTwoWastedTypes.length === 1
+        ? `Collect less ${topTwoWastedTypes[0]} for now and use existing stock first before it expires.`
+        : `Collect less ${topTwoWastedTypes[0]} and ${topTwoWastedTypes[1]} for now, and prioritize using current stock before it expires.`
 
   // Blood Expiry Risk Detection
   const expiryThresholdDays = 7
@@ -746,7 +787,7 @@ function AdminReports() {
               <section className={adminReportSection.sky}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Transfer Recommendations</h2>
+                    <h2 className="text-sm font-semibold text-slate-900">🔁 Transfer Recommendations</h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Automatically generated recommendations for every active hospital blood request.
                     </p>
@@ -875,7 +916,7 @@ function AdminReports() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      Urgent &amp; Critical Requests
+                      🚨 Urgent &amp; Critical Requests
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Prioritize hospitals with the most time-sensitive needs.
@@ -949,7 +990,7 @@ function AdminReports() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      Donor Contact Suggestions
+                      📞 Donor Contact Suggestions
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Top donors to reach out to for critically low or zero-stock blood types.
@@ -987,7 +1028,7 @@ function AdminReports() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      Expiring Blood Action Suggestions
+                      ⏳ Expiring Blood Action Suggestions
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-900">
                       Redirect near-expiry units to the hospitals most likely to use them.
@@ -1064,7 +1105,7 @@ function AdminReports() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      Blood Shortage Forecast
+                      📉 Blood Supply Forecast
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Estimate how long each blood type will last based on the last 30 days of usage.
@@ -1136,12 +1177,99 @@ function AdminReports() {
                 </div>
               </section>
 
+              {/* Wastage Monitoring */}
+              <section className={adminReportSection.indigo}>
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      🩸 Wastage Monitoring
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      Track expired inventory, wastage rate, and high-wastage blood types in real time.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-4 text-xs text-slate-700 sm:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-[11px] font-medium text-slate-600">Total Expired Units</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {totalExpiredUnits} units
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      Inventory records with status marked as expired.
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-medium text-slate-600">Wastage Rate</p>
+                        <p className="mt-1 text-2xl font-semibold text-slate-900">
+                          {wastageRate.toFixed(1)}%
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${wastageLevel.classes}`}
+                      >
+                        {wastageLevel.icon} {wastageLevel.label}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      Based on expired units over total collected units.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-xs font-semibold text-slate-900">
+                      Top 5 Most Wasted Blood Types
+                    </h3>
+                    <span className="text-[11px] text-slate-500">Ranked by expired units</span>
+                  </div>
+                  {topWastedBloodTypes.length === 0 ? (
+                    <p className="text-xs text-slate-500">No expired blood units to rank.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {topWastedBloodTypes.map((item) => {
+                        const ratio = maxWastedUnits > 0 ? (item.units / maxWastedUnits) * 100 : 0
+                        return (
+                          <li
+                            key={`wasted-${item.bloodType}`}
+                            className="grid grid-cols-[52px_1fr_auto] items-center gap-3"
+                          >
+                            <span className="text-xs font-semibold text-slate-800">{item.bloodType}</span>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                              <div
+                                className="h-full rounded-full bg-indigo-500"
+                                style={{ width: `${Math.max(6, ratio)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-slate-700">{item.units}</span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
+                    <p className="text-[11px] font-semibold text-amber-800">⚠️ Insight</p>
+                    <p className="mt-1 text-xs text-amber-900">{wastageInsight}</p>
+                  </div>
+                  <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200">
+                    <p className="text-[11px] font-semibold text-sky-800">💡 Suggestion</p>
+                    <p className="mt-1 text-xs text-sky-900">{wastageSuggestion}</p>
+                  </div>
+                </div>
+              </section>
+
               {/* Blood Usage Trends */}
               <section className={adminReportSection.slate}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      Blood Usage Trends
+                      📊 Blood Usage Trends
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Compare which blood types are most frequently requested over time.
@@ -1153,87 +1281,31 @@ function AdminReports() {
                     Not enough fulfilled requests to show usage trends.
                   </p>
                 ) : (
-                  <div className="min-h-[200px] h-52 w-full min-w-0 sm:h-64 md:h-72">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={bloodUsageTrendsData}
-                        margin={{ top: 16, right: 20, left: 0, bottom: 24 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis
-                          dataKey="label"
-                          tick={{ fontSize: 12, fill: '#475569' }}
-                          stroke="#cbd5f5"
-                        />
-                        <YAxis
-                          tick={{ fontSize: 12, fill: '#475569' }}
-                          stroke="#cbd5f5"
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                          formatter={(value) => [`${value} units`, 'Units used']}
-                        />
-                        <Bar dataKey="unitsUsed" radius={[6, 6, 0, 0]}>
-                          {bloodUsageTrendsData.map((entry, index) => (
-                            <Cell key={`usage-${entry.label}-${index}`} fill={getBloodTypeChartColor(entry.bloodType)} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <ul className="space-y-2">
+                      {bloodUsageTrendsData.slice(0, 8).map((item) => {
+                        const ratio = topUsageItem
+                          ? (Number(item.unitsUsed || 0) / Number(topUsageItem.unitsUsed || 1)) * 100
+                          : 0
+                        return (
+                          <li
+                            key={`usage-bar-${item.label}`}
+                            className="grid grid-cols-[120px_1fr_auto] items-center gap-3 sm:grid-cols-[160px_1fr_auto]"
+                          >
+                            <span className="truncate text-xs font-semibold text-slate-800">{item.label}</span>
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+                              <div
+                                className="h-full rounded-full bg-violet-500"
+                                style={{ width: `${Math.max(8, ratio)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-slate-700">{item.unitsUsed}</span>
+                          </li>
+                        )
+                      })}
+                    </ul>
                   </div>
                 )}
-              </section>
-
-              {/* Donor Availability Forecast */}
-              <section className={adminReportSection.indigo}>
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">
-                      Donor Availability Forecast
-                    </h2>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Plan upcoming drives by seeing how soon existing donors can donate again.
-                    </p>
-                  </div>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-3 text-xs text-slate-700">
-                  <div className="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
-                    <p className="text-[11px] font-medium text-emerald-700">Eligible Now</p>
-                    <p className="mt-1 text-2xl font-semibold text-emerald-900">
-                      {donorBuckets.tomorrow}
-                    </p>
-                    <p className="mt-1 text-[11px] text-emerald-800">
-                      Can be contacted immediately for donation.
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-100">
-                    <p className="text-[11px] font-medium text-sky-700">
-                      Eligible within 7 days
-                    </p>
-                    <p className="mt-1 text-2xl font-semibold text-sky-900">
-                      {donorBuckets.within3}
-                    </p>
-                    <p className="mt-1 text-[11px] text-sky-800">
-                      Short-term planning window for outreach.
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
-                    <p className="text-[11px] font-medium text-indigo-700">
-                      Eligible within 30 days
-                    </p>
-                    <p className="mt-1 text-2xl font-semibold text-indigo-900">
-                      {donorBuckets.within7}
-                    </p>
-                    <p className="mt-1 text-[11px] text-indigo-800">
-                      Medium-term donor pipeline for future needs.
-                    </p>
-                  </div>
-                </div>
               </section>
 
               {/* Blood Expiry Risk Detection */}
@@ -1241,7 +1313,7 @@ function AdminReports() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      Blood Expiry Risk Detection
+                      ⚠️ Blood Expiry Risk Detection
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Identify blood types at highest risk of wastage in the next 7 days.
