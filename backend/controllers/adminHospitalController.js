@@ -33,13 +33,15 @@ async function getHospitalsController(req, res, next) {
 
 async function createHospitalController(req, res, next) {
   try {
-    const { hospitalName, username, email, password } = req.body
+    const { hospitalName, username, email, password, latitude, longitude } = req.body
 
     const created = await createHospital({
       hospitalName,
       username,
       email,
       password,
+      latitude,
+      longitude,
       createdByUserId: req.user.id,
     })
 
@@ -56,7 +58,7 @@ async function createHospitalController(req, res, next) {
 async function updateHospitalController(req, res, next) {
   try {
     const { hospitalId } = req
-    const { hospitalName, email, username, password } = req.body
+    const { hospitalName, email, username, password, latitude, longitude } = req.body
 
     await updateHospital({
       hospitalId,
@@ -64,6 +66,8 @@ async function updateHospitalController(req, res, next) {
       email,
       username,
       password,
+      latitude,
+      longitude,
     })
 
     return successResponse(res, {

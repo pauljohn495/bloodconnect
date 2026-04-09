@@ -4,15 +4,6 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { apiRequest } from './api.js'
 
-const HOSPITAL_COORDINATES = {
-  'ST. JUDE': { lat: 8.15514, lng: 125.12983 },
-  'SIMBULAN SNGH': { lat: 7.68181, lng: 124.99663 },
-  LVGHI: { lat: 7.90809, lng: 125.09225 },
-  VPGHI: { lat: 7.91491, lng: 125.09202 },
-  MPGHI: { lat: 8.14901, lng: 125.13193 },
-  AMCV: { lat: 7.91255, lng: 125.09233 },
-}
-
 const DEFAULT_THRESHOLDS = {
   greenMin: 50,
   yellowMin: 20,
@@ -70,10 +61,6 @@ function FitBoundsToMarkers({ markers }) {
   return null
 }
 
-function normalizeName(name) {
-  return (name || '').trim().toUpperCase()
-}
-
 function FlyToSelectedHospital({ selectedHospital, selectedHospitalId, markerRefs }) {
   const map = useMap()
 
@@ -120,22 +107,17 @@ function HospitalSupplyMap() {
 
         if (!isMounted) return
 
-        const allowedNames = Object.keys(HOSPITAL_COORDINATES)
-
         const baseHospitals = data
           .map((h) => {
-            const normalized = normalizeName(h.hospital_name || h.hospitalName)
-            const matchingKey =
-              allowedNames.find((key) => normalized.includes(key)) || normalized
-
-            const coords = HOSPITAL_COORDINATES[matchingKey]
-            if (!coords) return null
+            const lat = Number(h.latitude)
+            const lng = Number(h.longitude)
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
 
             return {
               id: h.id,
-              name: h.hospital_name || h.hospitalName || matchingKey,
-              lat: coords.lat,
-              lng: coords.lng,
+              name: h.hospital_name || h.hospitalName || `Hospital #${h.id}`,
+              lat,
+              lng,
             }
           })
           .filter(Boolean)
@@ -254,17 +236,19 @@ function HospitalSupplyMap() {
             Live overview of partner hospital blood stock levels.
           </p>
         </div>
-        {lastUpdated && (
-          <p className="text-[11px] text-slate-400">
-            Last updated{' '}
-            {lastUpdated.toLocaleString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </p>
-        )}
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <p className="text-[11px] text-slate-400">
+              Last updated{' '}
+              {lastUpdated.toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="relative flex-1">

@@ -16,7 +16,7 @@ function validateHospitalIdParam(req, res, next) {
 }
 
 function validateCreateHospital(req, res, next) {
-  const { hospitalName, username, email, password } = req.body
+  const { hospitalName, username, email, password, latitude, longitude } = req.body
 
   if (!hospitalName || !username || !email || !password) {
     return errorResponse(res, {
@@ -25,16 +25,46 @@ function validateCreateHospital(req, res, next) {
     })
   }
 
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'latitude and longitude are required',
+    })
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'Invalid latitude/longitude range',
+    })
+  }
+
   return next()
 }
 
 function validateUpdateHospital(req, res, next) {
-  const { hospitalName, email, username } = req.body
+  const { hospitalName, email, username, latitude, longitude } = req.body
 
   if (!hospitalName || !email || !username) {
     return errorResponse(res, {
       statusCode: 400,
       message: 'hospitalName, email, and username are required',
+    })
+  }
+
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'latitude and longitude are required',
+    })
+  }
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'Invalid latitude/longitude range',
     })
   }
 

@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { logExpiredInventoryIfMissing } = require('../models/expiredUnitModel')
 
 const getInventoryController = async (req, res) => {
   try {
@@ -60,8 +61,19 @@ const getInventoryController = async (req, res) => {
           dbStatus = 'available'
         }
 
-        if (dbStatus !== row.status && dbStatus === 'expired') {
-          await pool.query('UPDATE blood_inventory SET status = ? WHERE id = ?', [dbStatus, row.id])
+        if (dbStatus === 'expired') {
+          if (dbStatus !== row.status) {
+            await pool.query('UPDATE blood_inventory SET status = ? WHERE id = ?', [dbStatus, row.id])
+          }
+          await logExpiredInventoryIfMissing({
+            inventoryId: row.id,
+            bloodType: row.blood_type || row.bloodType,
+            componentType: row.component_type || row.componentType || 'whole_blood',
+            unitsExpired: Number(row.available_units ?? row.availableUnits ?? row.units ?? 0),
+            hospitalId: row.hospital_id ?? row.hospitalId ?? null,
+            expirationDate: row.expiration_date || row.expirationDate || null,
+            notes: 'Auto-logged from admin inventory expiry status update',
+          })
         }
 
         const requestedBlood = requestedBloodMap[row.blood_type] || null

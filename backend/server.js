@@ -3,7 +3,12 @@ const cors = require('cors')
 const dotenv = require('dotenv')
 
 const { pool, testConnection } = require('./db')
-const { ensureDonorProfileColumns } = require('./ensureSchema')
+const {
+  ensureDonorProfileColumns,
+  ensureHospitalLocationColumns,
+  ensureExpiredUnitsTable,
+  backfillExpiredUnitsFromInventory,
+} = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const authRoutes = require('./routes/authRoutes')
 const adminRoutes = require('./routes/adminRoutes')
@@ -69,6 +74,9 @@ async function start() {
       console.log('✅ Database connection successful')
       try {
         await ensureDonorProfileColumns()
+        await ensureHospitalLocationColumns()
+        await ensureExpiredUnitsTable()
+        await backfillExpiredUnitsFromInventory()
         startHospitalInventoryAlertScheduler()
       } catch (migrationError) {
         console.error('❌ Schema migration failed:', migrationError.message)

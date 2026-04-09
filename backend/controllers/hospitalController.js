@@ -11,6 +11,7 @@ const {
   getHospitalHistoricalWastage,
   getHospitalWastagePredictions,
 } = require('../models/hospitalModel')
+const { logExpiredInventoryIfMissing } = require('../models/expiredUnitModel')
 const { successResponse, errorResponse } = require('../utils/response')
 
 async function resolveHospitalIdOrBadRequest(userId, res) {
@@ -59,8 +60,19 @@ async function getInventory(req, res, next) {
           dbStatus = 'available'
         }
 
-        if (dbStatus !== row.status && dbStatus === 'expired') {
-          await updateInventoryStatusToExpired(row.id, dbStatus)
+        if (dbStatus === 'expired') {
+          if (dbStatus !== row.status) {
+            await updateInventoryStatusToExpired(row.id, dbStatus)
+          }
+          await logExpiredInventoryIfMissing({
+            inventoryId: row.id,
+            bloodType: row.blood_type || row.bloodType,
+            componentType: row.component_type || row.componentType || 'whole_blood',
+            unitsExpired: Number(row.available_units ?? row.availableUnits ?? row.units ?? 0),
+            hospitalId: row.hospital_id ?? row.hospitalId ?? null,
+            expirationDate: row.expiration_date || row.expirationDate || null,
+            notes: 'Auto-logged from hospital inventory expiry status update',
+          })
         }
 
         return {

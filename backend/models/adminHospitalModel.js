@@ -38,6 +38,8 @@ async function getHospitalsWithRequests() {
     SELECT
       h.id,
       h.hospital_name,
+      h.latitude,
+      h.longitude,
       h.is_active,
       h.created_at,
       u.username,
@@ -138,7 +140,15 @@ async function getHospitalsWithRequests() {
   return hospitalsWithRequests || []
 }
 
-async function createHospital({ hospitalName, username, email, password, createdByUserId }) {
+async function createHospital({
+  hospitalName,
+  username,
+  email,
+  password,
+  latitude,
+  longitude,
+  createdByUserId,
+}) {
   const bcrypt = require('bcryptjs')
 
   const [existingUsers] = await pool.query(
@@ -223,10 +233,10 @@ async function createHospital({ hospitalName, username, email, password, created
 
     const [hospitalResult] = await conn.query(
       `
-      INSERT INTO hospitals (user_id, hospital_name, created_by)
-      VALUES (?, ?, ?)
+      INSERT INTO hospitals (user_id, hospital_name, latitude, longitude, created_by)
+      VALUES (?, ?, ?, ?, ?)
     `,
-      [userId, hospitalName, createdByUserId],
+      [userId, hospitalName, Number(latitude), Number(longitude), createdByUserId],
     )
 
     await conn.commit()
@@ -235,6 +245,8 @@ async function createHospital({ hospitalName, username, email, password, created
       id: hospitalResult.insertId,
       userId,
       hospitalName,
+      latitude: Number(latitude),
+      longitude: Number(longitude),
     }
   } catch (error) {
     await conn.rollback()
@@ -256,7 +268,7 @@ async function getHospitalWithUserId(hospitalId) {
   return rows[0] || null
 }
 
-async function updateHospital({ hospitalId, hospitalName, email, username, password }) {
+async function updateHospital({ hospitalId, hospitalName, email, username, password, latitude, longitude }) {
   const hospital = await getHospitalWithUserId(hospitalId)
   if (!hospital) {
     const error = new Error('Hospital not found')
@@ -282,7 +294,12 @@ async function updateHospital({ hospitalId, hospitalName, email, username, passw
       )
     }
 
-    await conn.query('UPDATE hospitals SET hospital_name = ? WHERE id = ?', [hospitalName, hospitalId])
+    await conn.query('UPDATE hospitals SET hospital_name = ?, latitude = ?, longitude = ? WHERE id = ?', [
+      hospitalName,
+      Number(latitude),
+      Number(longitude),
+      hospitalId,
+    ])
 
     await conn.commit()
   } catch (error) {

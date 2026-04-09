@@ -33,4 +33,78 @@ async function ensureDonorProfileColumns() {
   }
 }
 
-module.exports = { ensureDonorProfileColumns }
+async function ensureHospitalLocationColumns() {
+  if (!(await columnExists('hospitals', 'latitude'))) {
+    await pool.query('ALTER TABLE hospitals ADD COLUMN latitude DECIMAL(10, 7) NULL')
+    console.log('Schema: added hospitals.latitude')
+  }
+  if (!(await columnExists('hospitals', 'longitude'))) {
+    await pool.query('ALTER TABLE hospitals ADD COLUMN longitude DECIMAL(10, 7) NULL')
+    console.log('Schema: added hospitals.longitude')
+  }
+}
+
+async function ensureExpiredUnitsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS expired_units (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      inventory_id INT NULL,
+      blood_type VARCHAR(5) NOT NULL,
+      component_type ENUM('whole_blood', 'platelets', 'plasma') NOT NULL DEFAULT 'whole_blood',
+      units_expired INT NOT NULL,
+      hospital_id INT NULL,
+      expiration_date DATE NULL,
+      expired_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      notes VARCHAR(255) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_expired_units_inventory
+        FOREIGN KEY (inventory_id) REFERENCES blood_inventory(id)
+        ON DELETE SET NULL,
+      INDEX idx_expired_units_blood_component (blood_type, component_type),
+      INDEX idx_expired_units_hospital (hospital_id),
+      INDEX idx_expired_units_expired_at (expired_at)
+    )
+  `)
+  console.log('Schema: ensured expired_units table')
+}
+
+async function backfillExpiredUnitsFromInventory() {
+  const [result] = await pool.query(
+    `
+      INSERT INTO expired_units (
+        inventory_id,
+        blood_type,
+        component_type,
+        units_expired,
+        hospital_id,
+        expiration_date,
+        expired_at,
+        notes
+      )
+      SELECT
+        bi.id AS inventory_id,
+        bi.blood_type,
+        COALESCE(bi.component_type, 'whole_blood') AS component_type,
+        COALESCE(bi.available_units, 0) AS units_expired,
+        bi.hospital_id,
+        bi.expiration_date,
+        NOW() AS expired_at,
+        'Backfilled from existing expired inventory rows'
+      FROM blood_inventory bi
+      LEFT JOIN expired_units eu ON eu.inventory_id = bi.id
+      WHERE bi.status = 'expired'
+        AND eu.id IS NULL
+    `,
+  )
+
+  const inserted = Number(result?.affectedRows || 0)
+  console.log(`Schema: backfilled expired_units rows: ${inserted}`)
+}
+
+module.exports = {
+  ensureDonorProfileColumns,
+  ensureHospitalLocationColumns,
+  ensureExpiredUnitsTable,
+  backfillExpiredUnitsFromInventory,
+}
