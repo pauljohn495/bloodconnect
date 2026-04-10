@@ -49,7 +49,7 @@ function HospitalReports() {
     [inventory],
   )
 
-  const { expirationAlerts, summaryByType } = useMemo(() => {
+  const { expirationAlerts } = useMemo(() => {
     const byKey = {}
     availableItems.forEach((item) => {
       const bt = item.blood_type || item.bloodType
@@ -87,10 +87,7 @@ function HospitalReports() {
     })
     expirationAlerts.sort((a, b) => a.daysLeft - b.daysLeft)
 
-    return {
-      expirationAlerts,
-      summaryByType: Object.values(byKey).sort((a, b) => a.bloodType.localeCompare(b.bloodType) || a.componentType.localeCompare(b.componentType)),
-    }
+    return { expirationAlerts }
   }, [availableItems, today])
 
   const hasCritical = expirationAlerts.some((a) => a.isCritical)
@@ -157,63 +154,6 @@ function HospitalReports() {
                       </ul>
                     </div>
                   )}
-                </div>
-
-                {/* Summary by blood type + component (highlight critical) */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Stock by blood type & component</h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-100 text-xs">
-                      <thead className="bg-slate-50/95">
-                        <tr>
-                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Blood Type</th>
-                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Component</th>
-                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Available Units</th>
-                          <th className="whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {summaryByType.length === 0 && (
-                          <tr>
-                            <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>No inventory data</td>
-                          </tr>
-                        )}
-                        {summaryByType.map((row) => {
-                          const hasExpiring = row.expiring.length > 0
-                          const isCritical = row.expiring.some((e) => e.daysLeft <= CRITICAL_EXPIRY_DAYS)
-                          return (
-                            <tr
-                              key={`${row.bloodType}_${row.componentType}`}
-                              className={isCritical ? 'bg-red-50/50' : ''}
-                            >
-                              <td className={`whitespace-nowrap px-3 py-2 font-semibold ${isCritical ? 'text-red-900' : 'text-slate-900'}`}>
-                                <BloodTypeBadge type={row.bloodType} />
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-2 text-slate-700">
-                                {componentLabel(row.componentType)}
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-2">
-                                <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                                  {row.totalUnits}
-                                </span>
-                              </td>
-                              <td className="whitespace-nowrap px-3 py-2">
-                                {hasExpiring && (
-                                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${isCritical ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Near expiry
-                                  </span>
-                                )}
-                                {!hasExpiring && <span className="text-slate-500">—</span>}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
               </>
             )}

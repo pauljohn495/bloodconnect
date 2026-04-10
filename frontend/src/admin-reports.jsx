@@ -7,11 +7,11 @@ import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 function AdminReports() {
   const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'
   const [componentFilter, setComponentFilter] = useState('all') // 'all' | 'whole_blood' | 'platelets' | 'plasma'
+  const [usageTrendPeriodDays, setUsageTrendPeriodDays] = useState(30) // 7 | 30
   const [inventory, setInventory] = useState([])
   const [requests, setRequests] = useState([])
   const [donors, setDonors] = useState([])
   const [hospitals, setHospitals] = useState([])
-  const [expiredUnits, setExpiredUnits] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -20,18 +20,16 @@ function AdminReports() {
       try {
         setIsLoading(true)
         setError('')
-        const [inventoryData, requestsData, donorsData, hospitalsData, expiredUnitsData] = await Promise.all([
+        const [inventoryData, requestsData, donorsData, hospitalsData] = await Promise.all([
           apiRequest('/api/admin/inventory'),
           apiRequest('/api/admin/requests'),
           apiRequest('/api/admin/donors'),
           apiRequest('/api/admin/hospitals'),
-          apiRequest('/api/admin/analytics/expired-units'),
         ])
         setInventory(inventoryData || [])
         setRequests(requestsData || [])
         setDonors(donorsData || [])
         setHospitals(hospitalsData || [])
-        setExpiredUnits(expiredUnitsData || [])
       } catch (err) {
         console.error('Failed to load reports data', err)
         setError(err.message || 'Failed to load reports data')
@@ -54,7 +52,8 @@ function AdminReports() {
 
   const getHospitalName = (hospitalId) => {
     if (!hospitalId) return 'Central Inventory'
-    const h = hospitals.find((x) => x.id === hospitalId)
+    const wanted = Number(hospitalId)
+    const h = hospitals.find((x) => Number(x.id) === wanted)
     return h?.hospital_name || h?.hospitalName || `Hospital #${hospitalId}`
   }
 
@@ -71,6 +70,9 @@ function AdminReports() {
     if (v === 'plasma') return 'Plasma'
     return 'Whole Blood'
   }
+
+  const normalizeBloodType = (value) =>
+    (value || '').toString().trim().toUpperCase()
 
   const RecommendationIcon = ({ kind, className }) => {
     // Simple inline SVGs so we don't rely on external icon libraries.
@@ -170,6 +172,25 @@ function AdminReports() {
       return acc
     }, {})
 
+  // Units that will expire within 7 days (per blood type + component),
+  // treated as non-usable for shortage horizon calculations.
+  const expiringSoonByBloodType = inventory
+    .filter((item) => item.status !== 'expired')
+    .reduce((acc, item) => {
+      const bt = item.blood_type || item.bloodType
+      if (!bt) return acc
+      const ct = normalizeComponentType(item.component_type || item.componentType)
+      if (componentFilter !== 'all' && ct !== componentFilter) return acc
+      const expDate = item.expiration_date || item.expirationDate
+      if (!expDate) return acc
+      const daysLeft = diffInDays(expDate, now)
+      if (daysLeft > 7) return acc
+      const key = `${bt}|${ct}`
+      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
+      acc[key] = (acc[key] || 0) + Number(units || 0)
+      return acc
+    }, {})
+
   // Expired units are excluded above, so a type that only exists as expired inventory
   // would otherwise disappear from the forecast and Donor Contact Suggestions.
   inventory.forEach((item) => {
@@ -185,6 +206,8 @@ function AdminReports() {
   const bloodShortageForecast = Object.entries(stockByBloodType).map(([key, currentStockRaw]) => {
     const [bloodType, componentType] = key.split('|')
     const currentStock = Number(currentStockRaw) || 0
+    const expiringSoonUnits = Number(expiringSoonByBloodType[key] || 0)
+    const usableStock = Math.max(0, currentStock - expiringSoonUnits)
     const usage = usageByBloodType[key] || 0
 
     let supplyStatusKey = 'sufficient'
@@ -192,8 +215,13 @@ function AdminReports() {
     let estimatedDaysRemaining = '—'
     let numericDaysRemaining = Infinity
 
-    if (currentStock === 0) {
-      if (usage > 0) {
+    if (usableStock === 0) {
+      if (currentStock > 0 && expiringSoonUnits >= currentStock) {
+        supplyStatusKey = 'near_expiry_only'
+        statusLabel = 'Critical – Near-Expiry Stock'
+        estimatedDaysRemaining = '0.0'
+        numericDaysRemaining = 0
+      } else if (usage > 0) {
         supplyStatusKey = 'critical_out'
         statusLabel = 'Critical – Out of Stock'
         estimatedDaysRemaining = '0.0'
@@ -211,7 +239,7 @@ function AdminReports() {
       numericDaysRemaining = Infinity
     } else {
       const averageDailyUsage = usage / usageWindowDays
-      const daysRemaining = currentStock / averageDailyUsage
+      const daysRemaining = usableStock / averageDailyUsage
       numericDaysRemaining = daysRemaining
       estimatedDaysRemaining = daysRemaining.toFixed(1)
       if (daysRemaining < 7) {
@@ -243,6 +271,9 @@ function AdminReports() {
     if (supplyStatusKey === 'critical_out' || supplyStatusKey === 'critical') {
       return 'bg-red-50 text-red-700 ring-red-200'
     }
+    if (supplyStatusKey === 'near_expiry_only') {
+      return 'bg-rose-50 text-rose-700 ring-rose-200'
+    }
     if (supplyStatusKey === 'at_risk') {
       return 'bg-orange-50 text-orange-800 ring-orange-200'
     }
@@ -253,20 +284,171 @@ function AdminReports() {
     return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
   }
 
-  // Blood Usage Trends (fulfilled usage in window)
-  const bloodUsageTrendsData = Object.entries(usageByBloodType)
-    .map(([key, unitsUsed]) => {
+  // Blood Usage Trends (current period vs previous period)
+  const trendNowMs = now.getTime()
+  const trendCurrentStart = new Date(trendNowMs - usageTrendPeriodDays * msPerDay)
+  const trendPreviousStart = new Date(trendNowMs - usageTrendPeriodDays * 2 * msPerDay)
+
+  const trendUsageCurrentByKey = {}
+  const trendUsagePreviousByKey = {}
+
+  requests.forEach((req) => {
+    const status = (req.status || '').toString().toLowerCase()
+    if (!(status === 'delivered' || status === 'received')) return
+    const bt = normalizeBloodType(req.blood_type || req.bloodType)
+    if (!bt) return
+    const ct = normalizeComponentType(req.component_type || req.componentType)
+    if (componentFilter !== 'all' && ct !== componentFilter) return
+    const usageDate = req.request_date || req.requestDate || req.created_at || req.createdAt
+    if (!usageDate) return
+    const d = new Date(usageDate)
+    if (Number.isNaN(d.getTime())) return
+    if (d > now) return
+    const units = Number(req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0)
+    if (!Number.isFinite(units) || units <= 0) return
+    const key = `${bt}|${ct}`
+
+    if (d >= trendCurrentStart) trendUsageCurrentByKey[key] = (trendUsageCurrentByKey[key] || 0) + units
+    else if (d >= trendPreviousStart) trendUsagePreviousByKey[key] = (trendUsagePreviousByKey[key] || 0) + units
+  })
+
+  const trendKeys = new Set([
+    ...Object.keys(trendUsageCurrentByKey),
+    ...Object.keys(trendUsagePreviousByKey),
+  ])
+
+  const bloodUsageTrendRows = Array.from(trendKeys)
+    .map((key) => {
       const [bloodType, componentType] = key.split('|')
+      const currentUnits = Number(trendUsageCurrentByKey[key] || 0)
+      const previousUnits = Number(trendUsagePreviousByKey[key] || 0)
+      const averageDailyUsage = currentUnits / usageTrendPeriodDays
+      const averageWeeklyUsage = averageDailyUsage * 7
+      const expectedDemandNext7Days = averageWeeklyUsage
+      const percentChange =
+        previousUnits > 0
+          ? ((currentUnits - previousUnits) / previousUnits) * 100
+          : currentUnits > 0
+            ? 100
+            : 0
+
+      const trendKey =
+        percentChange > 10 ? 'increasing' : percentChange < -10 ? 'decreasing' : 'stable'
+      const trendArrow = trendKey === 'increasing' ? '📈' : trendKey === 'decreasing' ? '📉' : '➖'
+      const demandRiskKey =
+        trendKey === 'increasing' && expectedDemandNext7Days >= 12
+          ? 'high'
+          : trendKey === 'increasing' || expectedDemandNext7Days >= 7
+            ? 'moderate'
+            : 'low'
+
+      const unusualKey =
+        previousUnits > 0
+          ? currentUnits >= previousUnits * 1.6
+            ? 'spike'
+            : currentUnits <= previousUnits * 0.5
+              ? 'drop'
+              : 'normal'
+          : currentUnits > 0
+            ? 'spike'
+            : 'normal'
+
       return {
-        label: `${bloodType} • ${formatComponentType(componentType)}`,
+        key,
         bloodType,
         componentType,
-        unitsUsed,
+        currentUnits,
+        previousUnits,
+        averageDailyUsage,
+        averageWeeklyUsage,
+        expectedDemandNext7Days,
+        percentChange,
+        trendKey,
+        trendArrow,
+        demandRiskKey,
+        unusualKey,
       }
     })
-    .sort((a, b) => b.unitsUsed - a.unitsUsed)
+    .sort((a, b) => b.currentUnits - a.currentUnits)
 
-  const topUsageItem = bloodUsageTrendsData[0] || null
+  const trendByBloodType = bloodUsageTrendRows.reduce((acc, row) => {
+    if (!acc[row.bloodType]) {
+      acc[row.bloodType] = {
+        bloodType: row.bloodType,
+        currentUnits: 0,
+        previousUnits: 0,
+        expectedDemandNext7Days: 0,
+      }
+    }
+    acc[row.bloodType].currentUnits += row.currentUnits
+    acc[row.bloodType].previousUnits += row.previousUnits
+    acc[row.bloodType].expectedDemandNext7Days += row.expectedDemandNext7Days
+    return acc
+  }, {})
+
+  const topUsedBloodTypes = Object.values(trendByBloodType)
+    .sort((a, b) => b.currentUnits - a.currentUnits)
+    .slice(0, 3)
+
+  const topIncreasingTrend = bloodUsageTrendRows
+    .filter((r) => r.trendKey === 'increasing')
+    .sort((a, b) => b.percentChange - a.percentChange)[0]
+
+  const topDecreasingTrend = bloodUsageTrendRows
+    .filter((r) => r.trendKey === 'decreasing')
+    .sort((a, b) => a.percentChange - b.percentChange)[0]
+
+  const notableSpike = bloodUsageTrendRows.find((r) => r.unusualKey === 'spike')
+  const notableDrop = bloodUsageTrendRows.find((r) => r.unusualKey === 'drop')
+
+  const bloodUsageTrendInsight =
+    bloodUsageTrendRows.length === 0
+      ? 'Not enough fulfilled request data to compute usage trends yet.'
+      : topIncreasingTrend
+        ? `${topIncreasingTrend.bloodType} (${formatComponentType(topIncreasingTrend.componentType)}) demand increased by ${Math.round(topIncreasingTrend.percentChange)}% in the last ${usageTrendPeriodDays} days.${notableSpike ? ` Unusual spike detected in ${notableSpike.bloodType}.` : ''}`
+        : topDecreasingTrend
+          ? `${topDecreasingTrend.bloodType} (${formatComponentType(topDecreasingTrend.componentType)}) usage is decreasing by ${Math.abs(Math.round(topDecreasingTrend.percentChange))}% and may lead to overstock.${notableDrop ? ` Unusual drop detected in ${notableDrop.bloodType}.` : ''}`
+          : 'Demand is stable across blood types with no significant shifts versus the previous period.'
+
+  const highDemandTypes = topUsedBloodTypes
+    .filter((x) => x.currentUnits > 0)
+    .slice(0, 2)
+    .map((x) => x.bloodType)
+  const highDemandSet = new Set(highDemandTypes)
+  const maxCurrentUsage = topUsedBloodTypes[0]?.currentUnits || 0
+  const lowDemandTypes = Object.values(trendByBloodType)
+    .map((x) => {
+      const percentChange =
+        x.previousUnits > 0
+          ? ((x.currentUnits - x.previousUnits) / x.previousUnits) * 100
+          : x.currentUnits > 0
+            ? 100
+            : 0
+      return { ...x, percentChange }
+    })
+    .filter((x) => {
+      if (x.currentUnits <= 0) return false
+      if (highDemandSet.has(x.bloodType)) return false
+      const lowVsTop = maxCurrentUsage > 0 && x.currentUnits <= maxCurrentUsage * 0.35
+      const decreasingOrFlat = x.percentChange <= 5
+      return lowVsTop && decreasingOrFlat
+    })
+    .sort((a, b) => a.currentUnits - b.currentUnits)
+    .slice(0, 2)
+    .map((x) => x.bloodType)
+
+  const bloodUsageTrendBaseSuggestion =
+    bloodUsageTrendRows.length === 0
+      ? 'Gather more fulfilled request records to enable trend-based recommendations.'
+      : highDemandTypes.length > 0
+        ? `Increase donation campaigns for high-demand blood types (${highDemandTypes.join(', ')}).${lowDemandTypes.length > 0 ? ` Temporarily reduce collection for low-demand blood types (${lowDemandTypes.join(', ')}) to prevent wastage.` : ''}`
+        : 'Keep current donation and distribution strategy, and continue monitoring weekly trend shifts.'
+
+  const getTrendRiskClasses = (riskKey) => {
+    if (riskKey === 'high') return 'bg-red-50 text-red-700 ring-red-200'
+    if (riskKey === 'moderate') return 'bg-amber-50 text-amber-800 ring-amber-200'
+    return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+  }
 
   // Wastage Monitoring
   const inventoryWithUnits = inventory.map((item) => {
@@ -275,76 +457,112 @@ function AdminReports() {
     return { ...item, units: Number.isFinite(units) ? units : 0 }
   })
 
-  const expiredInventory = expiredUnits.map((item) => {
-    const rawUnits = item.units_expired ?? item.unitsExpired ?? 0
-    const units = Number(rawUnits || 0)
-    return {
-      ...item,
-      units: Number.isFinite(units) ? units : 0,
-      blood_type: item.blood_type || item.bloodType,
-      component_type: item.component_type || item.componentType || 'whole_blood',
-    }
-  })
+  // Wastage Forecast (next 7 days)
+  const forecastWindowDays = 7
 
-  const totalExpiredUnits = expiredInventory.reduce((sum, item) => sum + item.units, 0)
-  const deliveredOrReceivedUnits = requests.reduce((sum, req) => {
-    const status = (req.status || '').toString().toLowerCase()
-    if (!(status === 'delivered' || status === 'received')) return sum
-    const units = Number(req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0)
-    return sum + (Number.isFinite(units) ? units : 0)
-  }, 0)
-  const wastageBaseUnits = totalExpiredUnits + deliveredOrReceivedUnits
-  const wastageRate = wastageBaseUnits > 0 ? (totalExpiredUnits / wastageBaseUnits) * 100 : 0
-
-  const wastageLevel =
-    wastageRate < 5
-      ? { label: 'Low', icon: '🟢', classes: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
-      : wastageRate <= 10
-        ? { label: 'Moderate', icon: '🟡', classes: 'bg-amber-50 text-amber-800 ring-amber-200' }
-        : { label: 'High', icon: '🔴', classes: 'bg-red-50 text-red-700 ring-red-200' }
-
-  const wastedByBloodTypeMap = expiredInventory.reduce((acc, item) => {
-    const bt = item.blood_type || item.bloodType
+  const expiringNext7ByBloodType = inventoryWithUnits.reduce((acc, item) => {
+    if (item.status === 'expired') return acc
+    const ct = normalizeComponentType(item.component_type || item.componentType)
+    if (componentFilter !== 'all' && ct !== componentFilter) return acc
+    const bt = normalizeBloodType(item.blood_type || item.bloodType)
     if (!bt) return acc
-    acc[bt] = (acc[bt] || 0) + item.units
+    const expDate = item.expiration_date || item.expirationDate
+    if (!expDate) return acc
+    const daysLeft = diffInDays(expDate, now)
+    if (daysLeft > forecastWindowDays) return acc
+    const units = Number(item.units || 0)
+    if (units <= 0) return acc
+    acc[bt] = (acc[bt] || 0) + units
     return acc
   }, {})
 
-  const topWastedBloodTypes = Object.entries(wastedByBloodTypeMap)
-    .map(([bloodType, units]) => ({ bloodType, units: Number(units || 0) }))
-    .sort((a, b) => b.units - a.units)
-    .slice(0, 5)
+  const predictedExpiredUnits7Days = Object.values(expiringNext7ByBloodType).reduce(
+    (sum, x) => sum + Number(x || 0),
+    0,
+  )
 
-  const maxWastedUnits = topWastedBloodTypes[0]?.units || 0
-  const topThreeShare =
-    totalExpiredUnits > 0
-      ? (topWastedBloodTypes.slice(0, 3).reduce((sum, item) => sum + item.units, 0) / totalExpiredUnits) *
-        100
-      : 0
-  const topTwoInsightTypes = topWastedBloodTypes.slice(0, 2).map((item) => item.bloodType)
+  const usageByBloodTypeOnly = usageRequestsInWindow.reduce((acc, req) => {
+    const bt = normalizeBloodType(req.blood_type || req.bloodType)
+    if (!bt) return acc
+    const units = Number(req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0)
+    acc[bt] = (acc[bt] || 0) + (Number.isFinite(units) ? units : 0)
+    return acc
+  }, {})
 
-  const wastageInsight =
-    topWastedBloodTypes.length === 0
-      ? 'No blood units have expired so far.'
-      : topWastedBloodTypes.length === 1
-        ? `${topWastedBloodTypes[0].bloodType} has the highest number of expired units.`
-        : topThreeShare >= 60
-          ? 'Most of the wastage comes from the top 3 blood types.'
-          : `${topTwoInsightTypes[0]} and ${topTwoInsightTypes[1]} have the highest number of expired units.`
+  const allBloodTypes = new Set([
+    ...Object.keys(expiringNext7ByBloodType),
+    ...Object.keys(usageByBloodTypeOnly),
+  ])
 
-  const topTwoWastedTypes = topWastedBloodTypes.slice(0, 2).map((item) => item.bloodType)
-  const wastageSuggestion =
-    topWastedBloodTypes.length === 0
-      ? 'Balance blood collection with current demand and use older stock first to reduce waste.'
-      : topTwoWastedTypes.length === 1
-        ? `Collect less ${topTwoWastedTypes[0]} for now and use existing stock first before it expires.`
-        : `Collect less ${topTwoWastedTypes[0]} and ${topTwoWastedTypes[1]} for now, and prioritize using current stock before it expires.`
+  const wastageForecastRows = Array.from(allBloodTypes).map((bt) => {
+    const expiringUnits = Number(expiringNext7ByBloodType[bt] || 0)
+    const usedUnitsWindow = Number(usageByBloodTypeOnly[bt] || 0)
+    const avgDailyUsage = usedUnitsWindow > 0 ? usedUnitsWindow / usageWindowDays : 0
+    const expectedUsageIn7Days = avgDailyUsage * forecastWindowDays
+    const potentialWastage = Math.max(0, expiringUnits - expectedUsageIn7Days)
+
+    let riskKey = 'low'
+    if (expiringUnits > 0) {
+      if (avgDailyUsage <= 0) riskKey = 'high'
+      else if (expiringUnits > expectedUsageIn7Days * 1.2) riskKey = 'high'
+      else if (expiringUnits > expectedUsageIn7Days * 0.6) riskKey = 'moderate'
+      else riskKey = 'low'
+    }
+
+    return {
+      bloodType: bt,
+      expiringUnits,
+      avgDailyUsage,
+      expectedUsageIn7Days,
+      potentialWastage,
+      riskKey,
+    }
+  })
+
+  const riskRank = { high: 3, moderate: 2, low: 1 }
+  const highRiskBloodTypes = wastageForecastRows
+    .filter((r) => r.riskKey === 'high' && r.expiringUnits > 0)
+    .sort((a, b) => b.expiringUnits - a.expiringUnits)
+    .slice(0, 2)
+    .map((r) => r.bloodType)
+
+  const topRiskTypes = wastageForecastRows
+    .filter((r) => r.expiringUnits > 0)
+    .sort((a, b) => {
+      if (riskRank[b.riskKey] !== riskRank[a.riskKey]) return riskRank[b.riskKey] - riskRank[a.riskKey]
+      return b.expiringUnits - a.expiringUnits
+    })
+    .slice(0, 2)
+    .map((r) => r.bloodType)
+
+  const wastageForecastInsight =
+    predictedExpiredUnits7Days === 0
+      ? `No significant expirations are expected in the next ${forecastWindowDays} days.`
+      : topRiskTypes.length === 0
+        ? `Some units may expire in the next ${forecastWindowDays} days—monitor distribution closely.`
+        : `${topRiskTypes.join(' and ')} are likely to have the highest number of expirations in the next ${forecastWindowDays} days.`
+
+  const wastageForecastSuggestion =
+    predictedExpiredUnits7Days === 0
+      ? 'Keep current collection and distribution plans; continue FEFO (first-expire-first-out) handling.'
+      : (highRiskBloodTypes.length ? `Reduce incoming donations for ${highRiskBloodTypes.join(' and ')} and prioritize immediate distribution or transfers to avoid wastage.` : 'Prioritize immediate distribution of near-expiry units and apply FEFO handling to reduce wastage.')
+
+  const highWastageRiskSet = new Set(highRiskBloodTypes)
+  const demandTypesWithoutWastageConflict = highDemandTypes.filter((bt) => !highWastageRiskSet.has(bt))
+  const conflictedTypes = highDemandTypes.filter((bt) => highWastageRiskSet.has(bt))
+
+  const bloodUsageTrendSuggestion =
+    bloodUsageTrendRows.length === 0
+      ? bloodUsageTrendBaseSuggestion
+      : conflictedTypes.length > 0
+        ? `Immediately redistribute or prioritize usage of ${conflictedTypes.join(', ')} to prevent expiry. Temporarily reduce new donations until near-expiry stock is cleared.${demandTypesWithoutWastageConflict.length > 0 ? ` Increase ${demandTypesWithoutWastageConflict.join(', ')} collection to meet rising demand.` : ''}`
+        : bloodUsageTrendBaseSuggestion
 
   // Blood Expiry Risk Detection
   const expiryThresholdDays = 7
   const expiringSoonMap = inventory.reduce((acc, item) => {
     if (item.status === 'expired') return acc
-    const bt = item.blood_type || item.bloodType
+    const bt = normalizeBloodType(item.blood_type || item.bloodType)
     if (!bt) return acc
     const ct = normalizeComponentType(item.component_type || item.componentType)
     if (componentFilter !== 'all' && ct !== componentFilter) return acc
@@ -510,28 +728,6 @@ function AdminReports() {
       return da - db
     })
 
-  // Urgent or Critical Hospital Requests
-  const urgentRequests = requests
-    .filter((req) => {
-      const status = (req.status || '').toLowerCase()
-      // Align with /admin/requests visibility: only pending requests are shown there.
-      if (status !== 'pending') return false
-      const priority = (req.priority || 'normal').toLowerCase()
-      if (!(priority === 'urgent' || priority === 'critical')) return false
-      const ct = normalizeComponentType(req.component_type || req.componentType)
-      if (componentFilter !== 'all' && ct !== componentFilter) return false
-      return true
-    })
-    .sort((a, b) => {
-      const priOrder = { critical: 2, urgent: 1 }
-      const pa = priOrder[(a.priority || 'urgent').toLowerCase()] || 0
-      const pb = priOrder[(b.priority || 'urgent').toLowerCase()] || 0
-      if (pa !== pb) return pb - pa
-      const da = a.request_date ? new Date(a.request_date) : 0
-      const db = b.request_date ? new Date(b.request_date) : 0
-      return da - db
-    })
-
   // Donor Contact Suggestions (aggregate by blood type, not per component row)
   // This avoids suggesting the same blood type donor when overall stock is sufficient.
   const usageByBloodTypeAggregate = fulfilledRequestsInWindow.reduce((acc, req) => {
@@ -560,6 +756,7 @@ function AdminReports() {
   }).filter((bloodType) => {
     const currentStock = Number(stockByBloodTypeAggregate[bloodType] || 0)
     const usage = Number(usageByBloodTypeAggregate[bloodType] || 0)
+    if (currentStock < 5) return true
     if (currentStock === 0) return true
     if (usage <= 0) return false
     const averageDailyUsage = usage / usageWindowDays
@@ -607,7 +804,7 @@ function AdminReports() {
 
   // Expiring Blood Action Suggestions
   const usageByHospitalAndBlood = requests.reduce((acc, req) => {
-    const bt = req.blood_type || req.bloodType
+    const bt = normalizeBloodType(req.blood_type || req.bloodType)
     const hospitalName = req.hospital_name || req.hospitalName
     if (!bt || !hospitalName) return acc
     const key = `${hospitalName}|${bt}`
@@ -616,39 +813,80 @@ function AdminReports() {
     return acc
   }, {})
 
-  // On-hand stock by hospital for a given blood type (ignoring component type),
-  // used to prioritize destinations with the lowest stock.
-  const stockByHospitalAndBloodType = inventory
+  const normalizeHospitalName = (value) =>
+    (value || '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+
+  const hospitalIdByNormalizedName = hospitals.reduce((acc, h) => {
+    const raw = h.hospital_name || h.hospitalName
+    const normalized = normalizeHospitalName(raw)
+    if (normalized && h?.id) acc[normalized] = Number(h.id)
+    return acc
+  }, {})
+
+  const resolveHospitalIdByName = (hospitalName) => {
+    const wanted = normalizeHospitalName(hospitalName)
+    if (!wanted) return null
+    if (hospitalIdByNormalizedName[wanted]) return hospitalIdByNormalizedName[wanted]
+
+    // Fallback: tolerate abbreviations like "LVGHI" vs "L. VIGHI HOSPITAL"
+    let bestId = null
+    let bestScore = Infinity
+    Object.entries(hospitalIdByNormalizedName).forEach(([normalized, id]) => {
+      const matches = normalized.includes(wanted) || wanted.includes(normalized)
+      if (!matches) return
+      const score = Math.abs(normalized.length - wanted.length)
+      if (score < bestScore) {
+        bestScore = score
+        bestId = id
+      }
+    })
+    return bestId
+  }
+
+  const stockByHospitalIdAndBloodType = inventory
     .filter((item) => item.status !== 'expired')
     .reduce((acc, item) => {
-      const bt = item.blood_type || item.bloodType
+      const bt = normalizeBloodType(item.blood_type || item.bloodType)
       if (!bt) return acc
       const hospitalId = item.hospital_id || item.hospitalId
-      const hospitalKey = hospitalId ? 'h:' + Number(hospitalId) : 'central'
-      const key = `${hospitalKey}|${bt}`
+      if (!hospitalId) return acc
+      const key = `h:${Number(hospitalId)}|${bt}`
+      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
+      acc[key] = (acc[key] || 0) + Number(units || 0)
+      return acc
+    }, {})
+
+  // On-hand stock by (normalized hospital name + blood type). This avoids issues where
+  // requests use abbreviations (e.g., "LVGHI") and inventory rows may or may not include ids.
+  const stockByHospitalNameAndBloodType = inventory
+    .filter((item) => item.status !== 'expired')
+    .reduce((acc, item) => {
+      const bt = normalizeBloodType(item.blood_type || item.bloodType)
+      if (!bt) return acc
+
+      const hospitalId = item.hospital_id || item.hospitalId
+      const rawHospitalName =
+        item.hospital_name || item.hospitalName || getHospitalName(hospitalId)
+      const hn = normalizeHospitalName(rawHospitalName)
+      if (!hn || hn === normalizeHospitalName('Central Inventory')) return acc
+
+      const key = `${hn}|${bt}`
       const units =
         item.available_units ?? item.availableUnits ?? item.units ?? 0
       acc[key] = (acc[key] || 0) + Number(units || 0)
       return acc
     }, {})
 
-  const resolveHospitalIdByName = (hospitalName) => {
-    const wanted = (hospitalName || '').toString().trim().toLowerCase()
-    if (!wanted) return null
-    const h = hospitals.find((x) => {
-      const name = (x.hospital_name || x.hospitalName || '')
-        .toString()
-        .trim()
-        .toLowerCase()
-      return name === wanted
-    })
-    return h?.id ? Number(h.id) : null
-  }
-
   const expiringActionMap = inventory.reduce((acc, item) => {
     if (item.status === 'expired') return acc
-    const bt = item.blood_type || item.bloodType
+    const bt = normalizeBloodType(item.blood_type || item.bloodType)
     if (!bt) return acc
+    const ct = normalizeComponentType(item.component_type || item.componentType)
+    if (componentFilter !== 'all' && ct !== componentFilter) return acc
     const expDate = item.expiration_date || item.expirationDate
     if (!expDate) return acc
     const daysLeft = diffInDays(expDate, now)
@@ -657,22 +895,28 @@ function AdminReports() {
       item.available_units ?? item.availableUnits ?? item.units ?? 0,
     )
     if (units <= 0) return acc
-    if (!acc[bt]) acc[bt] = { units: 0, daysLeft }
-    acc[bt].units += units
-    acc[bt].daysLeft = Math.min(acc[bt].daysLeft, daysLeft)
+    const mapKey = `${bt}|${ct}`
+    if (!acc[mapKey]) acc[mapKey] = { units: 0, daysLeft }
+    acc[mapKey].units += units
+    acc[mapKey].daysLeft = Math.min(acc[mapKey].daysLeft, daysLeft)
     return acc
   }, {})
 
   const expiringActionSuggestions = Object.entries(expiringActionMap).map(
-    ([bloodType, info]) => {
+    ([mapKey, info]) => {
+      const pipe = mapKey.indexOf('|')
+      const bloodType = pipe === -1 ? mapKey : mapKey.slice(0, pipe)
       const candidates = Object.entries(usageByHospitalAndBlood)
         .map(([key, usage]) => {
           const [hospitalName, bt] = key.split('|')
           if (bt !== bloodType) return null
           const hospitalId = resolveHospitalIdByName(hospitalName)
-          const hospitalKey = hospitalId ? 'h:' + hospitalId : 'central'
-          const stockKey = `${hospitalKey}|${bloodType}`
-          const stock = stockByHospitalAndBloodType[stockKey] || 0
+          const stockByIdKey = hospitalId ? `h:${Number(hospitalId)}|${bloodType}` : null
+          const stockById = stockByIdKey ? stockByHospitalIdAndBloodType[stockByIdKey] || 0 : 0
+          const hn = normalizeHospitalName(hospitalName)
+          const stockByNameKey = `${hn}|${bloodType}`
+          const stockByName = stockByHospitalNameAndBloodType[stockByNameKey] || 0
+          const stock = stockById || stockByName
           return {
             hospitalName,
             usage: Number(usage || 0),
@@ -692,8 +936,12 @@ function AdminReports() {
         .sort((a, b) => a.stock - b.stock || b.usage - a.usage)
         .slice(0, 3)
 
+      const componentType =
+        pipe === -1 ? 'whole_blood' : normalizeComponentType(mapKey.slice(pipe + 1))
+
       return {
         bloodType,
+        componentType,
         units: info.units,
         daysLeft: info.daysLeft,
         suggestedHospitals,
@@ -702,6 +950,10 @@ function AdminReports() {
   )
 
   expiringActionSuggestions.sort((a, b) => a.daysLeft - b.daysLeft)
+
+  const expiringActionByRowKey = Object.fromEntries(
+    expiringActionSuggestions.map((s) => [`${s.bloodType}|${s.componentType}`, s]),
+  )
 
   const handleFulfillRequest = async (requestId) => {
     try {
@@ -911,70 +1163,105 @@ function AdminReports() {
                 )}
               </section>
 
-              {/* Urgent / Critical Requests */}
-              <section className={adminReportSection.rose}>
+              {/* Blood Expiry Risk Detection (includes redirect / action suggestions) */}
+              <section className={adminReportSection.orange}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      🚨 Urgent &amp; Critical Requests
+                      ⚠️ Blood Expiry Risk Detection
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
-                      Prioritize hospitals with the most time-sensitive needs.
+                      Units at risk in the next {expiryThresholdDays} days, with suggested hospitals to
+                      redirect stock based on demand and lowest on-hand levels.
                     </p>
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
-                    {urgentRequests.length} active
+                  <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                    {expiringBloodList.length} at risk
                   </span>
                 </div>
                 <div className={responsiveTableContainer}>
                   <table className="min-w-full divide-y divide-slate-100 text-xs">
                     <thead className="bg-slate-50">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Hospital</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
                         <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Units</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Priority</th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">
+                          Units Expiring Soon
+                        </th>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">
+                          Days Left
+                        </th>
+                        <th className="min-w-44 px-2 py-1.5 text-left text-[11px] font-medium text-slate-500">
+                          💡 Suggested Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white">
-                      {urgentRequests.length === 0 ? (
+                      {expiringBloodList.length === 0 ? (
                         <tr>
                           <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={5}>
-                            No urgent or critical requests.
+                            No units within the expiry threshold.
                           </td>
                         </tr>
                       ) : (
-                        urgentRequests.slice(0, 20).map((req, idx) => {
-                          const priority = (req.priority || 'normal').toLowerCase()
-                          const priorityClasses =
-                            priority === 'critical'
-                              ? 'bg-red-50 text-red-700 ring-red-100'
-                              : 'bg-orange-50 text-orange-700 ring-orange-100'
-                          const rowBg = priority === 'critical' ? 'bg-red-50/40' : 'bg-white'
+                        expiringBloodList.map((row, idx) => {
+                          const action =
+                            expiringActionByRowKey[`${row.bloodType}|${row.componentType}`]
+                          const suggested = action?.suggestedHospitals || []
+                          const top = suggested[0]
+                          const others = suggested.slice(1)
+
                           return (
                             <tr
-                              key={req.id}
-                              className={`transition-colors hover:bg-slate-50 ${idx % 2 === 1 ? 'bg-slate-50/40' : rowBg}`}
+                              key={`${row.bloodType}|${row.componentType}`}
+                              className={
+                                'transition-colors hover:bg-slate-50 ' +
+                                (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
+                              }
                             >
                               <td className="px-3 py-2 text-xs font-semibold text-slate-900">
-                                {req.hospital_name}
-                              </td>
-                              <td className="px-3 py-2 text-xs font-semibold text-slate-900">
-                                <BloodTypeBadge type={req.blood_type} />
+                                <BloodTypeBadge type={row.bloodType} />
                               </td>
                               <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
-                                {formatComponentType(req.component_type || req.componentType)}
+                                {formatComponentType(row.componentType)}
                               </td>
-                              <td className="px-3 py-2 text-xs text-slate-700">
-                                {req.units_requested}
+                              <td className="px-3 py-2 text-xs text-slate-700">{row.units}</td>
+                              <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
+                                {row.minDaysLeft}
                               </td>
-                              <td className="px-3 py-2 text-xs">
-                                <span
-                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${priorityClasses}`}
-                                >
-                                  {(req.priority || 'normal').toUpperCase()}
-                                </span>
+                              <td className="min-w-44 max-w-52 px-2 py-1.5 align-top">
+                                {top ? (
+                                  <div className="space-y-1.5 text-[10px] leading-tight">
+                                    <div className="rounded-md border border-red-100 bg-red-50/60 px-2 py-1.5">
+                                      <p className="font-semibold text-red-800">🔴 Highest Priority</p>
+                                      <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-900">
+                                        {top.hospitalName}
+                                      </p>
+                                      <p className="mt-0.5 text-slate-600">
+                                        Redirect near-expiry units here first based on demand signals.
+                                      </p>
+                                      {others.length > 0 && (
+                                        <div className="mt-2 rounded-md border border-amber-100 bg-amber-50/70 px-2 py-1.5">
+                                          <p className="font-semibold text-amber-900">
+                                            🟡 Alternative Option
+                                          </p>
+                                          <p className="mt-0.5 text-[11px] text-slate-700">
+                                            If unavailable, try{' '}
+                                            <span className="font-bold text-slate-900">
+                                              {others.map((h) => h.hospitalName).join(', ')}
+                                            </span>
+                                            .
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-[10px] leading-snug text-slate-500">
+                                    No high-demand destination identified yet—coordinate manually if
+                                    needed.
+                                  </p>
+                                )}
                               </td>
                             </tr>
                           )
@@ -1022,78 +1309,6 @@ function AdminReports() {
                   </ul>
                 )}
               </section>
-
-              {/* Expiring Blood Action Suggestions */}
-              <section className={adminReportSection.amber}>
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">
-                      ⏳ Expiring Blood Action Suggestions
-                    </h2>
-                    <p className="mt-1 text-[11px] text-slate-900">
-                      Redirect near-expiry units to the hospitals most likely to use them.
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
-                    {expiringActionSuggestions.length} at risk
-                  </span>
-                </div>
-                {expiringActionSuggestions.length === 0 ? (
-                  <p className="text-sm text-slate-500">
-                    No units are within the expiry risk threshold.
-                  </p>
-                ) : (
-                  <ul className="space-y-2 text-xs text-slate-700">
-                    {expiringActionSuggestions.slice(0, 15).map((item, idx) => {
-                      const suggested = item.suggestedHospitals || []
-                      const top = suggested[0]
-                      const others = suggested.slice(1)
-
-                      return (
-                        <li
-                          key={idx}
-                          className="flex flex-col rounded-lg bg-amber-50 px-3 py-2 ring-1 ring-amber-100"
-                        >
-                          <span className="flex flex-wrap items-center gap-2 font-semibold text-amber-900">
-                            <BloodTypeBadge type={item.bloodType} />
-                            <span>
-                              – {item.units} unit(s), {item.daysLeft} day(s) left
-                            </span>
-                          </span>
-
-                          {top ? (
-                            <span className="text-amber-800">
-                              Highest priority:{' '}
-                              <span className="font-semibold">
-                                {top.hospitalName}
-                              </span>{' '}
-                              <span className="text-amber-900/90">
-                                (lowest stock: {top.stock} unit(s))
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-amber-800">
-                              Suggested destination(s): high-demand hospital not identified yet
-                            </span>
-                          )}
-
-                          {others.length > 0 && (
-                            <span className="mt-1 text-amber-700">
-                              Other options:{' '}
-                              {others
-                                .map(
-                                  (h, i) =>
-                                    `${i + 2}. ${h.hospitalName} (${h.stock} unit(s))`,
-                                )
-                                .join(', ')}
-                            </span>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </section>
             </div>
           )}
 
@@ -1105,7 +1320,7 @@ function AdminReports() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      📉 Blood Supply Forecast
+                      📉 Blood Shortage Forecast
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Estimate how long each blood type will last based on the last 30 days of usage.
@@ -1177,89 +1392,49 @@ function AdminReports() {
                 </div>
               </section>
 
-              {/* Wastage Monitoring */}
-              <section className={adminReportSection.indigo}>
+              {/* Wastage Forecast */}
+              <section className={adminReportSection.orange}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-slate-900">
-                      🩸 Wastage Monitoring
-                    </h2>
+                    <h2 className="text-sm font-semibold text-slate-900">🩸 Wastage Forecast</h2>
                     <p className="mt-1 text-[11px] text-slate-600">
-                      Track expired inventory, wastage rate, and high-wastage blood types in real time.
-                    </p>
-                  </div>
-                </div>
-                <div className="grid gap-4 text-xs text-slate-700 sm:grid-cols-2">
-                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-[11px] font-medium text-slate-600">Total Expired Units</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900">
-                      {totalExpiredUnits} units
-                    </p>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Inventory records with status marked as expired.
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] font-medium text-slate-600">Wastage Rate</p>
-                        <p className="mt-1 text-2xl font-semibold text-slate-900">
-                          {wastageRate.toFixed(1)}%
-                        </p>
-                      </div>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${wastageLevel.classes}`}
-                      >
-                        {wastageLevel.icon} {wastageLevel.label}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Based on expired units over total collected units.
+                      Predict likely expirations in the next {forecastWindowDays} days based on expiry dates and recent usage.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-xs font-semibold text-slate-900">
-                      Top 5 Most Wasted Blood Types
-                    </h3>
-                    <span className="text-[11px] text-slate-500">Ranked by expired units</span>
+                <div className="grid gap-3 text-xs text-slate-700 sm:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-[11px] font-medium text-slate-600">Predicted Expired (7 days)</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {predictedExpiredUnits7Days} units
+                    </p>
                   </div>
-                  {topWastedBloodTypes.length === 0 ? (
-                    <p className="text-xs text-slate-500">No expired blood units to rank.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {topWastedBloodTypes.map((item) => {
-                        const ratio = maxWastedUnits > 0 ? (item.units / maxWastedUnits) * 100 : 0
-                        return (
-                          <li
-                            key={`wasted-${item.bloodType}`}
-                            className="grid grid-cols-[52px_1fr_auto] items-center gap-3"
-                          >
-                            <span className="text-xs font-semibold text-slate-800">{item.bloodType}</span>
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                              <div
-                                className="h-full rounded-full bg-indigo-500"
-                                style={{ width: `${Math.max(6, ratio)}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-slate-700">{item.units}</span>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-[11px] font-medium text-slate-600">High Risk Blood Types</p>
+                    {highRiskBloodTypes.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {highRiskBloodTypes.map((bt) => (
+                          <BloodTypeBadge key={`wf-risk-${bt}`} type={bt} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-2xl font-semibold text-slate-900">—</p>
+                    )}
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      🔴 High risk = Expiring soon
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
                     <p className="text-[11px] font-semibold text-amber-800">⚠️ Insight</p>
-                    <p className="mt-1 text-xs text-amber-900">{wastageInsight}</p>
+                    <p className="mt-1 text-xs text-amber-900">{wastageForecastInsight}</p>
                   </div>
                   <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200">
                     <p className="text-[11px] font-semibold text-sky-800">💡 Suggestion</p>
-                    <p className="mt-1 text-xs text-sky-900">{wastageSuggestion}</p>
+                    <p className="mt-1 text-xs text-sky-900">{wastageForecastSuggestion}</p>
                   </div>
                 </div>
               </section>
@@ -1272,105 +1447,144 @@ function AdminReports() {
                       📊 Blood Usage Trends
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
-                      Compare which blood types are most frequently requested over time.
+                      Fulfilled-request usage by blood type and component—compare to the prior period and
+                      see predicted 7-day demand.
                     </p>
                   </div>
+                  <div className="inline-flex rounded-lg bg-slate-100 p-1">
+                    {[7, 30].map((d) => (
+                      <button
+                        key={`trend-period-${d}`}
+                        type="button"
+                        onClick={() => setUsageTrendPeriodDays(d)}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                          usageTrendPeriodDays === d
+                            ? 'bg-white text-slate-900 ring-1 ring-slate-200'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Last {d}d
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {bloodUsageTrendsData.length === 0 ? (
+                {bloodUsageTrendRows.length === 0 ? (
                   <p className="text-sm text-slate-500">
                     Not enough fulfilled requests to show usage trends.
                   </p>
                 ) : (
-                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <ul className="space-y-2">
-                      {bloodUsageTrendsData.slice(0, 8).map((item) => {
-                        const ratio = topUsageItem
-                          ? (Number(item.unitsUsed || 0) / Number(topUsageItem.unitsUsed || 1)) * 100
-                          : 0
-                        return (
-                          <li
-                            key={`usage-bar-${item.label}`}
-                            className="grid grid-cols-[120px_1fr_auto] items-center gap-3 sm:grid-cols-[160px_1fr_auto]"
-                          >
-                            <span className="truncate text-xs font-semibold text-slate-800">{item.label}</span>
-                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
-                              <div
-                                className="h-full rounded-full bg-violet-500"
-                                style={{ width: `${Math.max(8, ratio)}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-medium text-slate-700">{item.unitsUsed}</span>
-                          </li>
-                        )
-                      })}
-                    </ul>
+                  <div className="space-y-4">
+                    <div className="grid gap-3 text-xs text-slate-700 sm:grid-cols-3">
+                      <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <p className="text-[11px] font-medium text-slate-600">Most Used Blood Types</p>
+                        {topUsedBloodTypes.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            {topUsedBloodTypes.map((x) => (
+                              <BloodTypeBadge key={`top-used-${x.bloodType}`} type={x.bloodType} />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-base font-semibold text-slate-900">—</p>
+                        )}
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <p className="text-[11px] font-medium text-slate-600">Predicted Demand (next 7 days)</p>
+                        <p className="mt-1 text-base font-semibold text-slate-900">
+                          {Math.round(
+                            bloodUsageTrendRows.reduce((sum, r) => sum + r.expectedDemandNext7Days, 0),
+                          )}{' '}
+                          units
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                        <p className="text-[11px] font-medium text-slate-600">Unusual Activity</p>
+                        {notableSpike ? (
+                          <div className="mt-1 flex items-center gap-1.5 text-base font-semibold text-slate-900">
+                            <span>Spike:</span>
+                            <BloodTypeBadge type={notableSpike.bloodType} />
+                          </div>
+                        ) : notableDrop ? (
+                          <div className="mt-1 flex items-center gap-1.5 text-base font-semibold text-slate-900">
+                            <span>Drop:</span>
+                            <BloodTypeBadge type={notableDrop.bloodType} />
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-base font-semibold text-slate-900">None</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={responsiveTableContainer}>
+                      <table className="min-w-full divide-y divide-slate-100 text-xs">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Used ({usageTrendPeriodDays}d)</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Avg / Day</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Trend</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Change vs Prev</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Predicted 7d</th>
+                            <th className="px-3 py-2 text-left font-medium text-slate-500">Risk</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white">
+                          {bloodUsageTrendRows.slice(0, 10).map((row) => (
+                            <tr key={`trend-row-${row.key}`}>
+                              <td className="px-3 py-2">
+                                <BloodTypeBadge type={row.bloodType} />
+                              </td>
+                              <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                                {formatComponentType(row.componentType)}
+                              </td>
+                              <td className="px-3 py-2 text-slate-700">{Math.round(row.currentUnits)}</td>
+                              <td className="px-3 py-2 text-slate-700">{row.averageDailyUsage.toFixed(1)}</td>
+                              <td className="px-3 py-2 text-slate-700">
+                                {row.trendArrow}{' '}
+                                {row.trendKey === 'increasing'
+                                  ? 'Increasing'
+                                  : row.trendKey === 'decreasing'
+                                    ? 'Decreasing'
+                                    : 'Stable'}
+                              </td>
+                              <td className="px-3 py-2 text-slate-700">
+                                {row.percentChange >= 0 ? '+' : ''}
+                                {Math.round(row.percentChange)}%
+                              </td>
+                              <td className="px-3 py-2 text-slate-700">
+                                {Math.round(row.expectedDemandNext7Days)}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${getTrendRiskClasses(
+                                    row.demandRiskKey,
+                                  )}`}
+                                >
+                                  {row.demandRiskKey === 'high'
+                                    ? '🔴 High'
+                                    : row.demandRiskKey === 'moderate'
+                                      ? '🟡 Moderate'
+                                      : '🟢 Low'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
+                        <p className="text-[11px] font-semibold text-amber-800">⚠️ Insight</p>
+                        <p className="mt-1 text-xs text-amber-900">{bloodUsageTrendInsight}</p>
+                      </div>
+                      <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200">
+                        <p className="text-[11px] font-semibold text-sky-800">💡 Suggestion</p>
+                        <p className="mt-1 text-xs text-sky-900">{bloodUsageTrendSuggestion}</p>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </section>
-
-              {/* Blood Expiry Risk Detection */}
-              <section className={adminReportSection.orange}>
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">
-                      ⚠️ Blood Expiry Risk Detection
-                    </h2>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Identify blood types at highest risk of wastage in the next 7 days.
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
-                    {expiringBloodList.length} blood types at risk
-                  </span>
-                </div>
-                <div className={responsiveTableContainer}>
-                  <table className="min-w-full divide-y divide-slate-100 text-xs">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">
-                          Units Expiring Soon
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">
-                        Days Left
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white">
-                      {expiringBloodList.length === 0 ? (
-                        <tr>
-                          <td className="px-3 py-4 text-center text-xs text-slate-500" colSpan={4}>
-                            No units within the expiry threshold.
-                          </td>
-                        </tr>
-                      ) : (
-                        expiringBloodList.map((row, idx) => (
-                          <tr
-                            key={`${row.bloodType}|${row.componentType}`}
-                            className={
-                              'transition-colors hover:bg-slate-50 ' +
-                              (idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')
-                            }
-                          >
-                            <td className="px-3 py-2 text-xs font-semibold text-slate-900">
-                              <BloodTypeBadge type={row.bloodType} />
-                            </td>
-                            <td className="px-3 py-2 text-xs text-slate-700 whitespace-nowrap">
-                              {formatComponentType(row.componentType)}
-                            </td>
-                            <td className="px-3 py-2 text-xs text-slate-700">
-                              {row.units}
-                            </td>
-                            <td className="px-3 py-2 text-xs text-slate-700">
-                              {row.minDaysLeft}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
               </section>
             </div>
           )}
