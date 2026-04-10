@@ -102,9 +102,31 @@ async function backfillExpiredUnitsFromInventory() {
   console.log(`Schema: backfilled expired_units rows: ${inserted}`)
 }
 
+async function ensureDonorRecallSmsLogTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS donor_recall_sms_log (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      user_id INT NOT NULL,
+      kind ENUM('manual', 'eligible', 'reminder') NOT NULL,
+      ref_last_donation_date DATE NULL,
+      phone_number VARCHAR(32) NOT NULL,
+      message_body TEXT NOT NULL,
+      success TINYINT(1) NOT NULL DEFAULT 1,
+      semaphore_message_id VARCHAR(64) NULL,
+      error_message VARCHAR(512) NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_donor_recall_user_kind_ref (user_id, kind, ref_last_donation_date),
+      UNIQUE KEY uniq_donor_recall_cycle (user_id, kind, ref_last_donation_date),
+      CONSTRAINT fk_donor_recall_sms_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured donor_recall_sms_log table')
+}
+
 module.exports = {
   ensureDonorProfileColumns,
   ensureHospitalLocationColumns,
   ensureExpiredUnitsTable,
   backfillExpiredUnitsFromInventory,
+  ensureDonorRecallSmsLogTable,
 }
