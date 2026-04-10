@@ -123,10 +123,86 @@ async function ensureDonorRecallSmsLogTable() {
   console.log('Schema: ensured donor_recall_sms_log table')
 }
 
+async function tableExists(tableName) {
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    [tableName],
+  )
+  return Number(rows[0]?.c || 0) > 0
+}
+
+/**
+ * Donor schedule completion: actual donation time, units, recorder;
+ * links donations row to inventory for audit.
+ */
+async function ensureScheduleDonationTrackingColumns() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS donations (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      user_id INT NOT NULL,
+      blood_type VARCHAR(5) NOT NULL,
+      donation_date DATETIME NOT NULL,
+      location VARCHAR(255) NULL,
+      hospital_id INT NULL,
+      status VARCHAR(32) NOT NULL DEFAULT 'completed',
+      units_donated INT NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_donations_user_date (user_id, donation_date),
+      CONSTRAINT fk_donations_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured donations table')
+
+  if (!(await columnExists('donations', 'schedule_request_id'))) {
+    await pool.query(
+      'ALTER TABLE donations ADD COLUMN schedule_request_id INT NULL, ADD INDEX idx_donations_schedule (schedule_request_id)',
+    )
+    console.log('Schema: added donations.schedule_request_id')
+  }
+  if (!(await columnExists('donations', 'recorded_by'))) {
+    await pool.query(
+      'ALTER TABLE donations ADD COLUMN recorded_by INT NULL, ADD INDEX idx_donations_recorded_by (recorded_by)',
+    )
+    console.log('Schema: added donations.recorded_by')
+  }
+  if (!(await columnExists('donations', 'component_type'))) {
+    await pool.query(
+      "ALTER TABLE donations ADD COLUMN component_type VARCHAR(32) NOT NULL DEFAULT 'whole_blood'",
+    )
+    console.log('Schema: added donations.component_type')
+  }
+  if (!(await columnExists('donations', 'inventory_id'))) {
+    await pool.query(
+      'ALTER TABLE donations ADD COLUMN inventory_id INT NULL, ADD INDEX idx_donations_inventory (inventory_id)',
+    )
+    console.log('Schema: added donations.inventory_id')
+  }
+
+  if (!(await tableExists('schedule_requests'))) {
+    console.log('Schema: schedule_requests table missing — skip schedule donation columns')
+    return
+  }
+
+  if (!(await columnExists('schedule_requests', 'actual_donation_at'))) {
+    await pool.query('ALTER TABLE schedule_requests ADD COLUMN actual_donation_at DATETIME NULL')
+    console.log('Schema: added schedule_requests.actual_donation_at')
+  }
+  if (!(await columnExists('schedule_requests', 'units_donated'))) {
+    await pool.query('ALTER TABLE schedule_requests ADD COLUMN units_donated INT NULL')
+    console.log('Schema: added schedule_requests.units_donated')
+  }
+  if (!(await columnExists('schedule_requests', 'recorded_by'))) {
+    await pool.query('ALTER TABLE schedule_requests ADD COLUMN recorded_by INT NULL')
+    console.log('Schema: added schedule_requests.recorded_by')
+  }
+}
+
 module.exports = {
   ensureDonorProfileColumns,
   ensureHospitalLocationColumns,
   ensureExpiredUnitsTable,
   backfillExpiredUnitsFromInventory,
   ensureDonorRecallSmsLogTable,
+  ensureScheduleDonationTrackingColumns,
 }

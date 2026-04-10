@@ -115,18 +115,68 @@ const getDonorDetailsController = async (req, res) => {
     if (users.length === 0) return res.status(404).json({ message: 'Donor not found' })
 
     const donor = users[0]
-    const [rows] = await pool.query(
-      `
-      SELECT 
-        COALESCE(component_type, 'whole_blood') AS component_type,
-        COUNT(*) AS completed_count,
-        MAX(reviewed_at) AS last_completed_at
-      FROM schedule_requests
-      WHERE user_id = ? AND status = 'completed'
-      GROUP BY COALESCE(component_type, 'whole_blood')
-    `,
-      [donorId],
-    )
+
+    const mergeDonationStats = async () => {
+      const mergeMap = {}
+      const bump = (ct, cnt, last) => {
+        const key = ct || 'whole_blood'
+        if (!mergeMap[key]) mergeMap[key] = { completed_count: 0, last_completed_at: null }
+        mergeMap[key].completed_count += Number(cnt || 0)
+        if (last) {
+          const prev = mergeMap[key].last_completed_at
+          if (!prev || new Date(last) > new Date(prev)) mergeMap[key].last_completed_at = last
+        }
+      }
+
+      try {
+        const [donAgg] = await pool.query(
+          `
+          SELECT 
+            COALESCE(component_type, 'whole_blood') AS component_type,
+            COUNT(*) AS completed_count,
+            MAX(donation_date) AS last_completed_at
+          FROM donations
+          WHERE user_id = ? AND status = 'completed'
+          GROUP BY COALESCE(component_type, 'whole_blood')
+        `,
+          [donorId],
+        )
+        donAgg.forEach((r) => bump(r.component_type, r.completed_count, r.last_completed_at))
+      } catch (e) {
+        if (!(e && (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146))) throw e
+      }
+
+      try {
+        const [orphan] = await pool.query(
+          `
+          SELECT 
+            COALESCE(sr.component_type, 'whole_blood') AS component_type,
+            COUNT(*) AS completed_count,
+            MAX(COALESCE(sr.actual_donation_at, sr.reviewed_at)) AS last_completed_at
+          FROM schedule_requests sr
+          LEFT JOIN donations d ON d.schedule_request_id = sr.id
+          WHERE sr.user_id = ? AND sr.status = 'completed' AND d.id IS NULL
+          GROUP BY COALESCE(sr.component_type, 'whole_blood')
+        `,
+          [donorId],
+        )
+        orphan.forEach((r) => bump(r.component_type, r.completed_count, r.last_completed_at))
+      } catch (e) {
+        if (
+          e &&
+          (e.code === 'ER_BAD_FIELD_ERROR' ||
+            e.message?.includes('schedule_request_id') ||
+            e.code === 'ER_NO_SUCH_COLUMN')
+        ) {
+          /* Older DB without schedule_request_id on donations — skip orphan bucket to avoid double counts. */
+        } else {
+          throw e
+        }
+      }
+      return mergeMap
+    }
+
+    const mergeMap = await mergeDonationStats()
 
     const now = new Date()
     const base = {
@@ -135,11 +185,11 @@ const getDonorDetailsController = async (req, res) => {
       plasma: { componentType: 'plasma', cooldownDays: DONATION_COOLDOWNS.plasma, lastCompletedAt: null, completedCount: 0 },
     }
 
-    rows.forEach((row) => {
-      const key = row.component_type || 'whole_blood'
-      if (base[key]) {
-        base[key].lastCompletedAt = row.last_completed_at
-        base[key].completedCount = Number(row.completed_count || 0)
+    Object.keys(base).forEach((key) => {
+      const m = mergeMap[key]
+      if (m) {
+        base[key].completedCount = m.completed_count
+        base[key].lastCompletedAt = m.last_completed_at
       }
     })
 
@@ -171,6 +221,46 @@ const getDonorDetailsController = async (req, res) => {
     const isManualDonor = Boolean(donor.is_manual_donor)
     const profileImageUrl = donor.profile_image_url || null
 
+    let donationHistory = []
+    try {
+      const [dhRows] = await pool.query(
+        `
+        SELECT 
+          d.id,
+          d.donation_date,
+          d.units_donated,
+          COALESCE(d.component_type, 'whole_blood') AS component_type,
+          d.inventory_id,
+          u.full_name AS recorded_by_name
+        FROM donations d
+        LEFT JOIN users u ON d.recorded_by = u.id
+        WHERE d.user_id = ?
+        ORDER BY d.donation_date DESC
+        LIMIT 25
+      `,
+        [donorId],
+      )
+      donationHistory = dhRows.map((r) => ({
+        id: r.id,
+        donationDate: r.donation_date ? new Date(r.donation_date).toISOString() : null,
+        unitsDonated: Number(r.units_donated || 0),
+        componentType: r.component_type || 'whole_blood',
+        inventoryId: r.inventory_id != null ? Number(r.inventory_id) : null,
+        recordedByName: r.recorded_by_name || null,
+      }))
+    } catch (histErr) {
+      if (
+        histErr &&
+        (histErr.code === 'ER_BAD_FIELD_ERROR' ||
+          histErr.code === 'ER_NO_SUCH_TABLE' ||
+          histErr.errno === 1146)
+      ) {
+        donationHistory = []
+      } else {
+        throw histErr
+      }
+    }
+
     return res.json({
       donor: {
         id: donor.id,
@@ -184,6 +274,7 @@ const getDonorDetailsController = async (req, res) => {
       },
       stats,
       totalDonations,
+      donationHistory,
     })
   } catch (error) {
     console.error('Fetch donor details error:', error)
@@ -328,6 +419,184 @@ const deleteDonorController = async (req, res) => {
   }
 }
 
+/**
+ * Walk-in / admin-only donor: record donation + inventory without a schedule request
+ * (e.g. manually created donors who never booked online).
+ */
+const recordWalkInDonationController = async (req, res) => {
+  const donorId = parseInt(req.params.id, 10)
+  if (Number.isNaN(donorId)) {
+    return res.status(400).json({ message: 'Invalid donor id' })
+  }
+
+  const { unitsDonated, expirationDate: expirationRaw, componentType: compRaw } = req.body || {}
+
+  const units = parseInt(String(unitsDonated ?? ''), 10)
+  if (Number.isNaN(units) || units < 1 || units > 50) {
+    return res.status(400).json({ message: 'unitsDonated must be between 1 and 50' })
+  }
+
+  const expirationYmd = typeof expirationRaw === 'string' ? expirationRaw.trim() : ''
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expirationYmd)) {
+    return res.status(400).json({ message: 'expirationDate is required (YYYY-MM-DD)' })
+  }
+
+  const componentType = (() => {
+    const v = (compRaw || 'whole_blood').toString().toLowerCase()
+    if (v === 'platelets') return 'platelets'
+    if (v === 'plasma') return 'plasma'
+    return 'whole_blood'
+  })()
+
+  const adminId = req.user?.id || null
+
+  let conn
+  try {
+    conn = await pool.getConnection()
+    await conn.beginTransaction()
+
+    const [userRows] = await conn.query(
+      `SELECT id, blood_type FROM users WHERE id = ? AND role = 'donor' LIMIT 1 FOR UPDATE`,
+      [donorId],
+    )
+    if (userRows.length === 0) {
+      await conn.rollback()
+      return res.status(404).json({ message: 'Donor not found' })
+    }
+
+    const bloodType = userRows[0].blood_type
+    if (!bloodType) {
+      await conn.rollback()
+      return res.status(400).json({ message: 'Donor blood type is missing' })
+    }
+
+    const donationAt = new Date()
+    if (Number.isNaN(donationAt.getTime())) {
+      await conn.rollback()
+      return res.status(500).json({ message: 'Could not record donation time' })
+    }
+
+    const donationYmd = (() => {
+      const dt = new Date(donationAt)
+      const y = dt.getFullYear()
+      const m = String(dt.getMonth() + 1).padStart(2, '0')
+      const day = String(dt.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    })()
+
+    if (expirationYmd < donationYmd) {
+      await conn.rollback()
+      return res.status(400).json({ message: 'Expiration date must be on or after the donation date' })
+    }
+
+    const maxExp = new Date(donationAt)
+    maxExp.setDate(maxExp.getDate() + 400)
+    const maxYmd = (() => {
+      const dt = new Date(maxExp)
+      const y = dt.getFullYear()
+      const m = String(dt.getMonth() + 1).padStart(2, '0')
+      const day = String(dt.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    })()
+    if (expirationYmd > maxYmd) {
+      await conn.rollback()
+      return res.status(400).json({ message: 'Expiration date is too far in the future' })
+    }
+
+    let inventoryId = null
+    try {
+      const [invResult] = await conn.query(
+        `
+        INSERT INTO blood_inventory
+          (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
+        VALUES (?, ?, ?, ?, 'available', ?, NULL, ?)
+      `,
+        [bloodType, units, units, expirationYmd, adminId, componentType],
+      )
+      inventoryId = invResult.insertId
+    } catch (invErr) {
+      if (invErr && (invErr.code === 'ER_BAD_FIELD_ERROR' || invErr.message?.includes('component_type'))) {
+        const [invResult2] = await conn.query(
+          `
+          INSERT INTO blood_inventory
+            (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
+          VALUES (?, ?, ?, ?, 'available', ?, NULL)
+        `,
+          [bloodType, units, units, expirationYmd, adminId],
+        )
+        inventoryId = invResult2.insertId
+      } else {
+        throw invErr
+      }
+    }
+
+    let donationRowId = null
+    try {
+      const [donResult] = await conn.query(
+        `
+        INSERT INTO donations (
+          user_id, blood_type, donation_date, location, hospital_id, status, units_donated,
+          schedule_request_id, recorded_by, component_type, inventory_id
+        )
+        VALUES (?, ?, ?, NULL, NULL, 'completed', ?, NULL, ?, ?, ?)
+      `,
+        [donorId, bloodType, donationAt, units, adminId, componentType, inventoryId],
+      )
+      donationRowId = donResult.insertId
+    } catch (donErr) {
+      if (
+        donErr &&
+        (donErr.code === 'ER_BAD_FIELD_ERROR' ||
+          donErr.code === 'ER_NO_SUCH_COLUMN' ||
+          donErr.message?.includes('schedule_request_id'))
+      ) {
+        const [donResult2] = await conn.query(
+          `
+          INSERT INTO donations (user_id, blood_type, donation_date, location, hospital_id, status, units_donated)
+          VALUES (?, ?, ?, NULL, NULL, 'completed', ?)
+        `,
+          [donorId, bloodType, donationAt, units],
+        )
+        donationRowId = donResult2.insertId
+      } else {
+        throw donErr
+      }
+    }
+
+    await conn.query(`UPDATE users SET last_donation_date = ? WHERE id = ?`, [donationYmd, donorId])
+
+    await conn.query(
+      `
+      INSERT INTO notifications (user_id, title, message, type)
+      VALUES (?, ?, ?, 'success')
+    `,
+      [
+        donorId,
+        'Donation recorded',
+        `Your donation of ${units} unit(s) was recorded. Thank you for saving lives!`,
+      ],
+    )
+
+    await conn.commit()
+
+    return res.json({
+      message: 'Walk-in donation recorded and inventory updated',
+      donationId: donationRowId,
+      inventoryId,
+      actualDonationAt: donationAt.toISOString(),
+      expirationDate: expirationYmd,
+      unitsDonated: units,
+      componentType,
+    })
+  } catch (error) {
+    if (conn) await conn.rollback()
+    console.error('Record walk-in donation error:', error)
+    return res.status(500).json({ message: 'Failed to record donation' })
+  } finally {
+    if (conn) conn.release()
+  }
+}
+
 module.exports = {
   getDonorsController,
   createDonorController,
@@ -336,5 +605,6 @@ module.exports = {
   approveDonorProfileUpdateController,
   rejectDonorProfileUpdateController,
   deleteDonorController,
+  recordWalkInDonationController,
 }
 
