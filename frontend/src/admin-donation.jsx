@@ -13,6 +13,35 @@ function parseDonorPendingProfile(donor) {
   }
 }
 
+function todayYmdLocal() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Default expiry aligned with backend shelf-life hints (editable in the date picker). */
+function defaultExpirationYmd(componentType) {
+  const v = (componentType || 'whole_blood').toString().toLowerCase()
+  const days = v === 'platelets' ? 5 : v === 'plasma' ? 365 : 42
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  const y = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${mo}-${day}`
+}
+
+function maxExpirationYmdFromToday() {
+  const d = new Date()
+  d.setDate(d.getDate() + 400)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function AdminDonation() {
   const WHOLE_BLOOD_COOLDOWN_DAYS = 90
   const BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -32,6 +61,15 @@ function AdminDonation() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [adminNotes, setAdminNotes] = useState('')
+  const [recordDonationUnits, setRecordDonationUnits] = useState('1')
+  const [recordExpirationDate, setRecordExpirationDate] = useState('')
+  const [recordDonationSubmitting, setRecordDonationSubmitting] = useState(false)
+  const [isWalkInDonationModalOpen, setIsWalkInDonationModalOpen] = useState(false)
+  const [walkInDonor, setWalkInDonor] = useState(null)
+  const [walkInUnits, setWalkInUnits] = useState('1')
+  const [walkInExpiration, setWalkInExpiration] = useState('')
+  const [walkInComponent, setWalkInComponent] = useState('whole_blood')
+  const [walkInSubmitting, setWalkInSubmitting] = useState(false)
   const [isScheduleHistoryModalOpen, setIsScheduleHistoryModalOpen] = useState(false)
   const [scheduleHistory, setScheduleHistory] = useState([])
   const [isScheduleHistoryLoading, setIsScheduleHistoryLoading] = useState(false)
@@ -232,6 +270,12 @@ function AdminDonation() {
   useEffect(() => {
     if (selectedDonorDetails) setDonorDetailAvatarFailed(false)
   }, [selectedDonorDetails])
+
+  useEffect(() => {
+    if (!isDetailsModalOpen || !selectedRequest || selectedRequest.status !== 'approved') return
+    setRecordDonationUnits('1')
+    setRecordExpirationDate(defaultExpirationYmd(selectedRequest.component_type))
+  }, [isDetailsModalOpen, selectedRequest?.id, selectedRequest?.status, selectedRequest?.component_type])
 
   const donorNameForSearch = (donor) =>
     (
@@ -554,12 +598,36 @@ function AdminDonation() {
     }
   }
 
-  const handleComplete = async (requestId) => {
+  const handleRecordDonationComplete = async (requestId) => {
+    const u = parseInt(recordDonationUnits, 10)
+    if (Number.isNaN(u) || u < 1 || u > 50) {
+      showNotification('Units must be between 1 and 50', 'destructive')
+      return
+    }
+    const exp = (recordExpirationDate || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(exp)) {
+      showNotification('Select the unit expiration date', 'destructive')
+      return
+    }
+    const today = todayYmdLocal()
+    if (exp < today) {
+      showNotification('Expiration date cannot be before today', 'destructive')
+      return
+    }
+    const maxY = maxExpirationYmdFromToday()
+    if (exp > maxY) {
+      showNotification('Expiration date is too far in the future', 'destructive')
+      return
+    }
     try {
-      await apiRequest(`/api/admin/schedule-requests/${requestId}/complete`, {
+      setRecordDonationSubmitting(true)
+      const result = await apiRequest(`/api/admin/schedule-requests/${requestId}/complete`, {
         method: 'PATCH',
+        body: JSON.stringify({
+          unitsDonated: u,
+          expirationDate: exp,
+        }),
       })
-      // Reload both pending requests and history
       await loadScheduleRequests()
       if (isScheduleHistoryModalOpen) {
         await loadScheduleHistory()
@@ -568,16 +636,89 @@ function AdminDonation() {
       if (selectedRequest && selectedRequest.id === requestId) {
         setSelectedRequest(null)
       }
+      const extra =
+        result?.expirationDate && result?.inventoryId
+          ? ` Inventory batch #${result.inventoryId} expires ${result.expirationDate}.`
+          : ''
+      const recordedAt =
+        result?.actualDonationAt && !Number.isNaN(new Date(result.actualDonationAt).getTime())
+          ? ` Recorded at ${new Date(result.actualDonationAt).toLocaleString()}.`
+          : ''
       setFeedbackModal({
         open: true,
-        message: 'Schedule request completed successfully',
+        message: `Donation recorded (${u} unit${u === 1 ? '' : 's'}). Central inventory updated.${recordedAt}${extra}`,
       })
     } catch (err) {
-      console.error('Failed to complete request', err)
+      console.error('Failed to record donation', err)
       setFeedbackModal({
         open: true,
-        message: err.message || 'Failed to complete request',
+        message: err.message || 'Failed to record donation',
       })
+    } finally {
+      setRecordDonationSubmitting(false)
+    }
+  }
+
+  const openWalkInDonationModal = (donor) => {
+    setWalkInDonor(donor)
+    setWalkInUnits('1')
+    setWalkInComponent('whole_blood')
+    setWalkInExpiration(defaultExpirationYmd('whole_blood'))
+    setIsWalkInDonationModalOpen(true)
+    setOpenMenuDonorId(null)
+  }
+
+  const closeWalkInDonationModal = () => {
+    setIsWalkInDonationModalOpen(false)
+    setWalkInDonor(null)
+  }
+
+  const handleWalkInComponentChange = (e) => {
+    const v = e.target.value
+    setWalkInComponent(v)
+    setWalkInExpiration(defaultExpirationYmd(v))
+  }
+
+  const handleSubmitWalkInDonation = async (e) => {
+    e.preventDefault()
+    if (!walkInDonor?.id) return
+    const u = parseInt(walkInUnits, 10)
+    if (Number.isNaN(u) || u < 1 || u > 50) {
+      showNotification('Units must be between 1 and 50', 'destructive')
+      return
+    }
+    const exp = (walkInExpiration || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(exp)) {
+      showNotification('Select the unit expiration date', 'destructive')
+      return
+    }
+    const today = todayYmdLocal()
+    if (exp < today) {
+      showNotification('Expiration date cannot be before today', 'destructive')
+      return
+    }
+    if (exp > maxExpirationYmdFromToday()) {
+      showNotification('Expiration date is too far in the future', 'destructive')
+      return
+    }
+    try {
+      setWalkInSubmitting(true)
+      await apiRequest(`/api/admin/donors/${walkInDonor.id}/record-donation`, {
+        method: 'POST',
+        body: JSON.stringify({
+          unitsDonated: u,
+          expirationDate: exp,
+          componentType: walkInComponent,
+        }),
+      })
+      await loadDonors()
+      closeWalkInDonationModal()
+      showNotification('Walk-in donation recorded and inventory updated.', 'primary')
+    } catch (err) {
+      console.error('Walk-in donation failed', err)
+      showNotification(err.message || 'Failed to record donation', 'destructive')
+    } finally {
+      setWalkInSubmitting(false)
     }
   }
 
@@ -2088,7 +2229,7 @@ function AdminDonation() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpenMenuDonorId(null)} />
           <div
-            className="fixed z-50 w-44 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-slate-200 focus:outline-none"
+            className="fixed z-50 w-56 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-slate-200 focus:outline-none"
             style={{
               top: `${menuPosition.top}px`,
               right: `${menuPosition.right}px`,
@@ -2116,6 +2257,17 @@ function AdminDonation() {
                 role="menuitem"
                 onClick={() => {
                   const selectedDonor = donors.find((entry) => entry.id === openMenuDonorId)
+                  if (selectedDonor) openWalkInDonationModal(selectedDonor)
+                }}
+              >
+                Record walk-in donation
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                role="menuitem"
+                onClick={() => {
+                  const selectedDonor = donors.find((entry) => entry.id === openMenuDonorId)
                   if (selectedDonor) handleOpenEditDonorModal(selectedDonor)
                 }}
               >
@@ -2135,6 +2287,114 @@ function AdminDonation() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Walk-in donation (no schedule — e.g. admin-created donors) */}
+      {isWalkInDonationModalOpen && walkInDonor && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-labelledby="walk-in-donation-title"
+          >
+            <div className="flex items-center justify-between">
+              <h3 id="walk-in-donation-title" className="text-base font-semibold text-slate-900">
+                Record walk-in donation
+              </h3>
+              <button
+                type="button"
+                onClick={closeWalkInDonationModal}
+                className="text-slate-400 hover:text-slate-600"
+                disabled={walkInSubmitting}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-slate-600">
+              For donors without an online appointment (for example, profiles you added manually). This records the
+              donation time when you save and updates central inventory—same as completing an approved schedule.
+            </p>
+            <p className="mt-2 text-sm font-medium text-slate-900">
+              {walkInDonor.full_name ||
+                walkInDonor.fullName ||
+                walkInDonor.donor_name ||
+                walkInDonor.donorName ||
+                'Donor'}
+              <span className="ml-2 inline-flex align-middle">
+                <BloodTypeBadge type={walkInDonor.blood_type || walkInDonor.bloodType} className="text-xs" />
+              </span>
+            </p>
+            <form onSubmit={handleSubmitWalkInDonation} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="walk-in-component">
+                  Component type
+                </label>
+                <select
+                  id="walk-in-component"
+                  value={walkInComponent}
+                  onChange={handleWalkInComponentChange}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="whole_blood">Whole blood</option>
+                  <option value="platelets">Platelets</option>
+                  <option value="plasma">Plasma</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <label className="min-h-11 text-xs font-medium leading-snug text-slate-700" htmlFor="walk-in-units">
+                    Units donated
+                  </label>
+                  <input
+                    id="walk-in-units"
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={walkInUnits}
+                    onChange={(e) => setWalkInUnits(e.target.value)}
+                    className="box-border min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  />
+                </div>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <label
+                    className="min-h-11 text-xs font-medium leading-snug text-slate-700"
+                    htmlFor="walk-in-expiration"
+                  >
+                    Unit expiration date (inventory)
+                  </label>
+                  <input
+                    id="walk-in-expiration"
+                    type="date"
+                    value={walkInExpiration}
+                    min={todayYmdLocal()}
+                    max={maxExpirationYmdFromToday()}
+                    onChange={(e) => setWalkInExpiration(e.target.value)}
+                    className="box-border min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeWalkInDonationModal}
+                  disabled={walkInSubmitting}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={walkInSubmitting}
+                  className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {walkInSubmitting ? 'Recording…' : 'Record donation & update inventory'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Schedule Requests Modal */}
@@ -2732,8 +2992,49 @@ function AdminDonation() {
                     </div>
                   )}
 
+                  {selectedRequest.status === 'approved' && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
+                      <h4 className="text-sm font-semibold text-slate-900">Record donation (donor arrived)</h4>
+                      <p className="mt-1 text-[11px] text-slate-600">
+                        Donation date and time are saved when you click the button below.
+                      </p>
+                      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <label className="min-h-3 text-xs font-bold leading-snug text-slate-700">
+                            Units donated
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={recordDonationUnits}
+                            onChange={(e) => setRecordDonationUnits(e.target.value)}
+                            className="box-border min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1.5">
+                          <label
+                            className="min-h-3 text-xs font-bold leading-snug text-slate-700"
+                            htmlFor="record-expiration-date"
+                          >
+                            Unit expiration date (inventory)
+                          </label>
+                          <input
+                            id="record-expiration-date"
+                            type="date"
+                            value={recordExpirationDate}
+                            min={todayYmdLocal()}
+                            max={maxExpirationYmdFromToday()}
+                            onChange={(e) => setRecordExpirationDate(e.target.value)}
+                            className="box-border min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       Rejection Reason (Required for rejection)
                     </label>
                     <textarea
@@ -2745,7 +3046,7 @@ function AdminDonation() {
                     />
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-4">
+                  <div className="flex flex-wrap justify-end gap-2 pt-4">
                     <button
                       type="button"
                       onClick={() => handleReject(selectedRequest.id)}
@@ -2765,15 +3066,45 @@ function AdminDonation() {
                     {selectedRequest.status === 'approved' && (
                       <button
                         type="button"
-                        onClick={() => handleComplete(selectedRequest.id)}
-                        className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+                        disabled={recordDonationSubmitting}
+                        onClick={() => handleRecordDonationComplete(selectedRequest.id)}
+                        className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Complete
+                        {recordDonationSubmitting ? 'Recording…' : 'Record donation & update inventory'}
                       </button>
                     )}
                   </div>
                 </div>
               )}
+
+              {selectedRequest.status === 'completed' &&
+                (selectedRequest.actual_donation_at || selectedRequest.units_donated || selectedRequest.recorded_by_name) && (
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+                    <h4 className="text-sm font-semibold text-slate-900">Recorded donation</h4>
+                    <div className="mt-2 grid gap-2 text-sm text-slate-700">
+                      {selectedRequest.actual_donation_at && (
+                        <p>
+                          <span className="text-slate-500">Recorded at: </span>
+                          <span className="font-medium text-slate-900">
+                            {new Date(selectedRequest.actual_donation_at).toLocaleString()}
+                          </span>
+                        </p>
+                      )}
+                      {selectedRequest.units_donated != null && (
+                        <p>
+                          <span className="text-slate-500">Units: </span>
+                          <span className="font-medium text-slate-900">{selectedRequest.units_donated}</span>
+                        </p>
+                      )}
+                      {selectedRequest.recorded_by_name && (
+                        <p>
+                          <span className="text-slate-500">Recorded by: </span>
+                          <span className="font-medium text-slate-900">{selectedRequest.recorded_by_name}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
               {/* Show admin notes and rejection reason if already reviewed */}
               {selectedRequest.status !== 'pending' && (
@@ -2849,6 +3180,12 @@ function AdminDonation() {
                         Status
                       </th>
                       <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                        Actual donation
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
+                        Units
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                         Reviewed At
                       </th>
                       <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
@@ -2877,6 +3214,16 @@ function AdminDonation() {
                           >
                             {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                           </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                          {request.status === 'completed' && request.actual_donation_at
+                            ? new Date(request.actual_donation_at).toLocaleString()
+                            : '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
+                          {request.status === 'completed' && request.units_donated != null
+                            ? request.units_donated
+                            : '—'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
                           {request.reviewed_at
@@ -2935,7 +3282,7 @@ function AdminDonation() {
       {/* Donor Details Modal */}
       {isDonorDetailsOpen && selectedDonorDetails && (
         <div className="fixed inset-0 z-80 flex items-center justify-center bg-slate-900/40">
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-slate-900">
                 Donor Details
@@ -3066,6 +3413,45 @@ function AdminDonation() {
                   })}
                 </div>
               </div>
+
+              {Array.isArray(selectedDonorDetails.donationHistory) &&
+                selectedDonorDetails.donationHistory.length > 0 && (
+                  <div className="border-t border-slate-200 pt-3">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Donation history (admin-recorded)
+                    </h4>
+                    <ul className="max-h-52 space-y-2 overflow-y-auto pr-1 text-[11px]">
+                      {selectedDonorDetails.donationHistory.map((h) => (
+                        <li
+                          key={h.id}
+                          className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-slate-800"
+                        >
+                          <div className="flex flex-wrap items-baseline justify-between gap-1">
+                            <span className="font-semibold text-slate-900">
+                              {h.donationDate
+                                ? new Date(h.donationDate).toLocaleString()
+                                : '—'}
+                            </span>
+                            <span className="text-slate-600">
+                              {h.unitsDonated} unit{h.unitsDonated === 1 ? '' : 's'} ·{' '}
+                              {h.componentType === 'whole_blood'
+                                ? 'Whole blood'
+                                : h.componentType === 'platelets'
+                                  ? 'Platelets'
+                                  : 'Plasma'}
+                            </span>
+                          </div>
+                          {h.recordedByName && (
+                            <p className="mt-1 text-[10px] text-slate-500">
+                              Recorded by {h.recordedByName}
+                              {h.inventoryId ? ` · Inventory #${h.inventoryId}` : ''}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
             </div>
           </div>
         </div>

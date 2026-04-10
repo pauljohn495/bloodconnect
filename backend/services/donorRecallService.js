@@ -64,7 +64,7 @@ function toYmd(value) {
 async function getReferenceLastDonationDate(userId) {
   const [wbRows] = await pool.query(
     `
-    SELECT MAX(DATE(sr.reviewed_at)) AS wb_last
+    SELECT MAX(DATE(COALESCE(sr.actual_donation_at, sr.reviewed_at))) AS wb_last
     FROM schedule_requests sr
     WHERE sr.user_id = ?
       AND sr.status = 'completed'

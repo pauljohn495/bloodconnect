@@ -8,6 +8,7 @@ function AdminReports() {
   const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'
   const [componentFilter, setComponentFilter] = useState('all') // 'all' | 'whole_blood' | 'platelets' | 'plasma'
   const [usageTrendPeriodDays, setUsageTrendPeriodDays] = useState(30) // 7 | 30
+  const [donorAvailabilityHorizonDays, setDonorAvailabilityHorizonDays] = useState(30) // 7 | 30
   const [inventory, setInventory] = useState([])
   const [requests, setRequests] = useState([])
   const [donors, setDonors] = useState([])
@@ -450,113 +451,106 @@ function AdminReports() {
     return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
   }
 
-  // Wastage Monitoring
-  const inventoryWithUnits = inventory.map((item) => {
-    const raw = item.available_units ?? item.availableUnits ?? item.units ?? 0
-    const units = Number(raw || 0)
-    return { ...item, units: Number.isFinite(units) ? units : 0 }
-  })
+  const bloodUsageTrendSuggestion = bloodUsageTrendBaseSuggestion
 
-  // Wastage Forecast (next 7 days)
-  const forecastWindowDays = 7
+  // Donor Availability Prediction (recovery intervals aligned with admin donor details API)
+  const WHOLE_BLOOD_RECOVERY_DAYS = 90
+  const getRecoveryDaysForLastDonation = (donor) => {
+    const t = (donor.last_donation_type || donor.lastDonationType || 'whole_blood').toString().toLowerCase()
+    if (t === 'platelets') return 14
+    if (t === 'plasma') return 28
+    return WHOLE_BLOOD_RECOVERY_DAYS
+  }
 
-  const expiringNext7ByBloodType = inventoryWithUnits.reduce((acc, item) => {
-    if (item.status === 'expired') return acc
-    const ct = normalizeComponentType(item.component_type || item.componentType)
-    if (componentFilter !== 'all' && ct !== componentFilter) return acc
-    const bt = normalizeBloodType(item.blood_type || item.bloodType)
-    if (!bt) return acc
-    const expDate = item.expiration_date || item.expirationDate
-    if (!expDate) return acc
-    const daysLeft = diffInDays(expDate, now)
-    if (daysLeft > forecastWindowDays) return acc
-    const units = Number(item.units || 0)
-    if (units <= 0) return acc
-    acc[bt] = (acc[bt] || 0) + units
-    return acc
-  }, {})
+  const donorAvailabilityHorizonEnd = new Date(now.getTime() + donorAvailabilityHorizonDays * msPerDay)
+  const nextWeekEnd = new Date(now.getTime() + 7 * msPerDay)
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-  const predictedExpiredUnits7Days = Object.values(expiringNext7ByBloodType).reduce(
-    (sum, x) => sum + Number(x || 0),
-    0,
-  )
+  let donorAvailEligibleNow = 0
+  let donorAvailBecomingInHorizon = 0
+  let donorAvailBecomingNextWeek = 0
+  const donorAvailMonthBuckets = {}
 
-  const usageByBloodTypeOnly = usageRequestsInWindow.reduce((acc, req) => {
-    const bt = normalizeBloodType(req.blood_type || req.bloodType)
-    if (!bt) return acc
-    const units = Number(req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0)
-    acc[bt] = (acc[bt] || 0) + (Number.isFinite(units) ? units : 0)
-    return acc
-  }, {})
+  donors.forEach((donor) => {
+    const lastRaw = donor.last_donation_date || donor.lastDonationDate
+    if (!lastRaw) {
+      donorAvailEligibleNow += 1
+      return
+    }
+    const last = new Date(lastRaw)
+    if (Number.isNaN(last.getTime())) {
+      donorAvailEligibleNow += 1
+      return
+    }
+    const recovery = getRecoveryDaysForLastDonation(donor)
+    const nextEligible = new Date(last)
+    nextEligible.setDate(nextEligible.getDate() + recovery)
 
-  const allBloodTypes = new Set([
-    ...Object.keys(expiringNext7ByBloodType),
-    ...Object.keys(usageByBloodTypeOnly),
-  ])
-
-  const wastageForecastRows = Array.from(allBloodTypes).map((bt) => {
-    const expiringUnits = Number(expiringNext7ByBloodType[bt] || 0)
-    const usedUnitsWindow = Number(usageByBloodTypeOnly[bt] || 0)
-    const avgDailyUsage = usedUnitsWindow > 0 ? usedUnitsWindow / usageWindowDays : 0
-    const expectedUsageIn7Days = avgDailyUsage * forecastWindowDays
-    const potentialWastage = Math.max(0, expiringUnits - expectedUsageIn7Days)
-
-    let riskKey = 'low'
-    if (expiringUnits > 0) {
-      if (avgDailyUsage <= 0) riskKey = 'high'
-      else if (expiringUnits > expectedUsageIn7Days * 1.2) riskKey = 'high'
-      else if (expiringUnits > expectedUsageIn7Days * 0.6) riskKey = 'moderate'
-      else riskKey = 'low'
+    if (nextEligible <= now) {
+      donorAvailEligibleNow += 1
+      return
     }
 
-    return {
-      bloodType: bt,
-      expiringUnits,
-      avgDailyUsage,
-      expectedUsageIn7Days,
-      potentialWastage,
-      riskKey,
-    }
+    const ym = `${nextEligible.getFullYear()}-${String(nextEligible.getMonth() + 1).padStart(2, '0')}`
+    donorAvailMonthBuckets[ym] = (donorAvailMonthBuckets[ym] || 0) + 1
+
+    if (nextEligible <= donorAvailabilityHorizonEnd) donorAvailBecomingInHorizon += 1
+    if (nextEligible <= nextWeekEnd) donorAvailBecomingNextWeek += 1
   })
 
-  const riskRank = { high: 3, moderate: 2, low: 1 }
-  const highRiskBloodTypes = wastageForecastRows
-    .filter((r) => r.riskKey === 'high' && r.expiringUnits > 0)
-    .sort((a, b) => b.expiringUnits - a.expiringUnits)
-    .slice(0, 2)
-    .map((r) => r.bloodType)
+  const donorAvailTotal = donors.length
+  const donorAvailCanDonateWithinHorizon = donorAvailEligibleNow + donorAvailBecomingInHorizon
+  const donorAvailPctWithinHorizon =
+    donorAvailTotal > 0 ? Math.round((donorAvailCanDonateWithinHorizon / donorAvailTotal) * 100) : 0
 
-  const topRiskTypes = wastageForecastRows
-    .filter((r) => r.expiringUnits > 0)
-    .sort((a, b) => {
-      if (riskRank[b.riskKey] !== riskRank[a.riskKey]) return riskRank[b.riskKey] - riskRank[a.riskKey]
-      return b.expiringUnits - a.expiringUnits
-    })
-    .slice(0, 2)
-    .map((r) => r.bloodType)
+  const donorAvailPeakMonthEntry = Object.entries(donorAvailMonthBuckets)
+    .filter(([ym]) => ym >= currentMonthKey)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
 
-  const wastageForecastInsight =
-    predictedExpiredUnits7Days === 0
-      ? `No significant expirations are expected in the next ${forecastWindowDays} days.`
-      : topRiskTypes.length === 0
-        ? `Some units may expire in the next ${forecastWindowDays} days—monitor distribution closely.`
-        : `${topRiskTypes.join(' and ')} are likely to have the highest number of expirations in the next ${forecastWindowDays} days.`
+  const donorAvailPeakMonthLabel = donorAvailPeakMonthEntry
+    ? new Date(`${donorAvailPeakMonthEntry[0]}-01T12:00:00`).toLocaleString('en-US', { month: 'long' })
+    : null
 
-  const wastageForecastSuggestion =
-    predictedExpiredUnits7Days === 0
-      ? 'Keep current collection and distribution plans; continue FEFO (first-expire-first-out) handling.'
-      : (highRiskBloodTypes.length ? `Reduce incoming donations for ${highRiskBloodTypes.join(' and ')} and prioritize immediate distribution or transfers to avoid wastage.` : 'Prioritize immediate distribution of near-expiry units and apply FEFO handling to reduce wastage.')
+  let donorAvailabilityLevelKey = 'low'
+  if (donorAvailTotal === 0) donorAvailabilityLevelKey = 'low'
+  else if (donorAvailPctWithinHorizon >= 55 || donorAvailBecomingInHorizon >= Math.max(8, donorAvailTotal * 0.2)) {
+    donorAvailabilityLevelKey = 'high'
+  } else if (donorAvailPctWithinHorizon >= 30 || donorAvailBecomingInHorizon >= Math.max(3, donorAvailTotal * 0.08)) {
+    donorAvailabilityLevelKey = 'moderate'
+  }
 
-  const highWastageRiskSet = new Set(highRiskBloodTypes)
-  const demandTypesWithoutWastageConflict = highDemandTypes.filter((bt) => !highWastageRiskSet.has(bt))
-  const conflictedTypes = highDemandTypes.filter((bt) => highWastageRiskSet.has(bt))
+  const donorAvailabilityLabel =
+    donorAvailabilityLevelKey === 'high'
+      ? 'High Availability'
+      : donorAvailabilityLevelKey === 'moderate'
+        ? 'Moderate Availability'
+        : 'Low Availability'
 
-  const bloodUsageTrendSuggestion =
-    bloodUsageTrendRows.length === 0
-      ? bloodUsageTrendBaseSuggestion
-      : conflictedTypes.length > 0
-        ? `Immediately redistribute or prioritize usage of ${conflictedTypes.join(', ')} to prevent expiry. Temporarily reduce new donations until near-expiry stock is cleared.${demandTypesWithoutWastageConflict.length > 0 ? ` Increase ${demandTypesWithoutWastageConflict.join(', ')} collection to meet rising demand.` : ''}`
-        : bloodUsageTrendBaseSuggestion
+  const donorAvailabilityInsight =
+    donorAvailTotal === 0
+      ? 'Add donors to see availability forecasts.'
+      : donorAvailPeakMonthLabel && donorAvailPeakMonthEntry[1] > 0
+        ? `A ${donorAvailPeakMonthEntry[1] >= donorAvailTotal * 0.12 ? 'high' : 'notable'} number of donors are expected to become eligible in ${donorAvailPeakMonthLabel} based on last donation dates and recovery intervals (whole blood ${WHOLE_BLOOD_RECOVERY_DAYS} days). About ${donorAvailPctWithinHorizon}% of registered donors can donate within the next ${donorAvailabilityHorizonDays} days (already eligible or completing recovery in that window).`
+        : donorAvailBecomingInHorizon > 0
+          ? `Over the next ${donorAvailabilityHorizonDays} days, ${donorAvailBecomingInHorizon} donor${donorAvailBecomingInHorizon === 1 ? '' : 's'} will become newly eligible. Combined with donors already eligible, about ${donorAvailPctWithinHorizon}% of your donor base can participate in that period.`
+          : `Most active donors are either already eligible or still outside the selected ${donorAvailabilityHorizonDays}-day window—expect lower short-term turnout unless new donors join.`
+
+  const donorAvailabilityRecommendation =
+    donorAvailTotal === 0
+      ? 'Register donors and record donation dates so recovery-based forecasts can run.'
+      : donorAvailabilityLevelKey === 'high' && donorAvailPeakMonthLabel
+        ? `Schedule blood donation drives in ${donorAvailPeakMonthLabel} to maximize participation when the largest group finishes recovery.${donorAvailBecomingNextWeek >= 3 ? ` Send reminders to donors who become eligible in the next 7 days (${donorAvailBecomingNextWeek} donors).` : ''}`
+        : donorAvailBecomingNextWeek >= 3
+          ? `Send reminders to donors who will become eligible next week (${donorAvailBecomingNextWeek} donors) to fill appointment slots early.`
+          : donorAvailabilityLevelKey === 'low'
+            ? 'Run targeted outreach and consider mobile drives to grow the eligible pool; few donors unlock in the current window.'
+            : `Plan campaigns around the ${donorAvailabilityHorizonDays}-day window (${donorAvailCanDonateWithinHorizon} donors can donate) and keep nudging donors who are already eligible.`
+
+  const getDonorAvailabilityClasses = (levelKey) => {
+    if (levelKey === 'high') return 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+    if (levelKey === 'moderate') return 'bg-amber-50 text-amber-800 ring-amber-200'
+    return 'bg-rose-50 text-rose-800 ring-rose-200'
+  }
 
   // Blood Expiry Risk Detection
   const expiryThresholdDays = 7
@@ -1392,59 +1386,12 @@ function AdminReports() {
                 </div>
               </section>
 
-              {/* Wastage Forecast */}
-              <section className={adminReportSection.orange}>
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">🩸 Wastage Forecast</h2>
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      Predict likely expirations in the next {forecastWindowDays} days based on expiry dates and recent usage.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 text-xs text-slate-700 sm:grid-cols-2">
-                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-[11px] font-medium text-slate-600">Predicted Expired (7 days)</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900">
-                      {predictedExpiredUnits7Days} units
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                    <p className="text-[11px] font-medium text-slate-600">High Risk Blood Types</p>
-                    {highRiskBloodTypes.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {highRiskBloodTypes.map((bt) => (
-                          <BloodTypeBadge key={`wf-risk-${bt}`} type={bt} />
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-2xl font-semibold text-slate-900">—</p>
-                    )}
-                    <p className="mt-1 text-[11px] text-slate-600">
-                      🔴 High risk = Expiring soon
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
-                    <p className="text-[11px] font-semibold text-amber-800">⚠️ Insight</p>
-                    <p className="mt-1 text-xs text-amber-900">{wastageForecastInsight}</p>
-                  </div>
-                  <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200">
-                    <p className="text-[11px] font-semibold text-sky-800">💡 Suggestion</p>
-                    <p className="mt-1 text-xs text-sky-900">{wastageForecastSuggestion}</p>
-                  </div>
-                </div>
-              </section>
-
               {/* Blood Usage Trends */}
               <section className={adminReportSection.slate}>
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      📊 Blood Usage Trends
+                      📊 Blood Demand & Usage Trends
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Fulfilled-request usage by blood type and component—compare to the prior period and
@@ -1585,6 +1532,105 @@ function AdminReports() {
                     </div>
                   </div>
                 )}
+              </section>
+
+              {/* Donor Availability Prediction */}
+              <section className={adminReportSection.indigo}>
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      📅 Donor Availability Prediction
+                    </h2>
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      Estimates how many donors can donate soon using last donation dates and recovery
+                      intervals (whole blood {WHOLE_BLOOD_RECOVERY_DAYS} days). Peak month shows when the
+                      largest group becomes eligible again.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                    <div className="inline-flex rounded-lg bg-slate-100 p-1">
+                      {[7, 30].map((d) => (
+                        <button
+                          key={`donor-avail-${d}`}
+                          type="button"
+                          onClick={() => setDonorAvailabilityHorizonDays(d)}
+                          className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                            donorAvailabilityHorizonDays === d
+                              ? 'bg-white text-slate-900 ring-1 ring-slate-200'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Next {d} days
+                        </button>
+                      ))}
+                    </div>
+                    <span
+                      className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${getDonorAvailabilityClasses(
+                        donorAvailabilityLevelKey,
+                      )}`}
+                    >
+                      {donorAvailabilityLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 text-xs text-slate-700 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-[11px] font-medium text-slate-600">Eligible now</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">{donorAvailEligibleNow}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Ready to donate today</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-[11px] font-medium text-slate-600">
+                      Newly eligible ({donorAvailabilityHorizonDays}d)
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {donorAvailBecomingInHorizon}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-500">Finish recovery in this window</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-[11px] font-medium text-slate-600">Can donate in window</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {donorAvailCanDonateWithinHorizon}
+                    </p>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {donorAvailTotal > 0 ? `${donorAvailPctWithinHorizon}% of registered donors` : '—'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                    <p className="text-[11px] font-medium text-slate-600">Peak upcoming month</p>
+                    {donorAvailPeakMonthLabel && donorAvailPeakMonthEntry ? (
+                      <>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{donorAvailPeakMonthLabel}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          {donorAvailPeakMonthEntry[1]} donor{donorAvailPeakMonthEntry[1] === 1 ? '' : 's'}{' '}
+                          become eligible
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-base font-semibold text-slate-900">—</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-lg bg-indigo-50/80 px-3 py-2 text-[11px] text-indigo-900 ring-1 ring-indigo-100">
+                  <span className="font-semibold">Next 7 days: </span>
+                  {donorAvailBecomingNextWeek} donor{donorAvailBecomingNextWeek === 1 ? '' : 's'} become
+                  eligible — use this for reminder timing.
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
+                    <p className="text-[11px] font-semibold text-amber-800">⚠️ Insight</p>
+                    <p className="mt-1 text-xs text-amber-900">{donorAvailabilityInsight}</p>
+                  </div>
+                  <div className="rounded-xl bg-sky-50 p-4 ring-1 ring-sky-200">
+                    <p className="text-[11px] font-semibold text-sky-800">💡 Recommendation</p>
+                    <p className="mt-1 text-xs text-sky-900">{donorAvailabilityRecommendation}</p>
+                  </div>
+                </div>
+
               </section>
             </div>
           )}

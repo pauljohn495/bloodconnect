@@ -9,6 +9,7 @@ const {
   ensureExpiredUnitsTable,
   backfillExpiredUnitsFromInventory,
   ensureDonorRecallSmsLogTable,
+  ensureScheduleDonationTrackingColumns,
 } = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const authRoutes = require('./routes/authRoutes')
@@ -80,6 +81,7 @@ async function start() {
         await ensureExpiredUnitsTable()
         await backfillExpiredUnitsFromInventory()
         await ensureDonorRecallSmsLogTable()
+        await ensureScheduleDonationTrackingColumns()
         startHospitalInventoryAlertScheduler()
         startDonorRecallScheduler()
       } catch (migrationError) {

@@ -21,6 +21,7 @@ const {
   approveDonorProfileUpdateController,
   rejectDonorProfileUpdateController,
   deleteDonorController,
+  recordWalkInDonationController,
 } = require('../controllers/adminDonorController')
 const { postManualDonorRecallSmsController } = require('../controllers/donorRecallController')
 const {
@@ -100,6 +101,9 @@ router.post('/donors', createDonorController)
 
 // GET /api/admin/donors/:id/details - donation status & stats for a donor
 router.get('/donors/:id/details', getDonorDetailsController)
+
+// POST /api/admin/donors/:id/record-donation — walk-in donation (no schedule), updates inventory
+router.post('/donors/:id/record-donation', recordWalkInDonationController)
 
 // POST /api/admin/donors/:id/recall-sms - manual donor recall SMS (Semaphore)
 router.post('/donors/:id/recall-sms', postManualDonorRecallSmsController)

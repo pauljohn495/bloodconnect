@@ -200,7 +200,7 @@ async function getDonationEligibility(userId, cooldowns) {
     `
     SELECT 
       COALESCE(component_type, 'whole_blood') AS component_type,
-      MAX(reviewed_at) AS last_completed_at
+      MAX(COALESCE(actual_donation_at, reviewed_at)) AS last_completed_at
     FROM schedule_requests
     WHERE user_id = ? AND status = 'completed'
     GROUP BY COALESCE(component_type, 'whole_blood')
@@ -290,12 +290,12 @@ async function hasPendingScheduleRequest(userId) {
 async function getLastCompletedScheduleForComponent(userId, component) {
   const [rows] = await pool.query(
     `
-    SELECT reviewed_at
+    SELECT COALESCE(actual_donation_at, reviewed_at) AS reviewed_at
     FROM schedule_requests
     WHERE user_id = ? 
       AND status = 'completed'
       AND COALESCE(component_type, 'whole_blood') = ?
-    ORDER BY reviewed_at DESC
+    ORDER BY COALESCE(actual_donation_at, reviewed_at) DESC
     LIMIT 1
   `,
     [userId, component],
