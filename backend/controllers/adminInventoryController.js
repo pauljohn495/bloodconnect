@@ -21,6 +21,40 @@ const getInventoryController = async (req, res) => {
       component_type: row.component_type || 'whole_blood',
     }))
 
+    /** Rows linked via organization_donation_items → organization_donations → organizations */
+    let organizationDonationByInventoryId = new Map()
+    if (rowsWithComponent.length > 0) {
+      const inventoryIds = rowsWithComponent.map((r) => r.id)
+      try {
+        const [orgRows] = await pool.query(
+          `
+          SELECT odi.inventory_id, o.id AS organization_id, o.name AS organization_name, odi.units AS donation_units
+          FROM organization_donation_items odi
+          INNER JOIN organization_donations od ON od.id = odi.donation_id
+          INNER JOIN organizations o ON o.id = od.organization_id
+          WHERE odi.inventory_id IN (?)
+        `,
+          [inventoryIds],
+        )
+        organizationDonationByInventoryId = new Map(
+          orgRows.map((r) => [
+            r.inventory_id,
+            {
+              organization_id: r.organization_id,
+              organization_name: r.organization_name,
+              donation_units: Number(r.donation_units) || 0,
+            },
+          ]),
+        )
+      } catch (e) {
+        if (e && (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146)) {
+          organizationDonationByInventoryId = new Map()
+        } else {
+          throw e
+        }
+      }
+    }
+
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const sevenDaysFromNow = new Date(today)
@@ -77,9 +111,17 @@ const getInventoryController = async (req, res) => {
         }
 
         const requestedBlood = requestedBloodMap[row.blood_type] || null
+        const orgDonation = organizationDonationByInventoryId.get(row.id) || null
         return {
           ...row,
           status: displayStatus,
+          organization_donation: orgDonation
+            ? {
+                organization_id: orgDonation.organization_id,
+                organization_name: orgDonation.organization_name,
+                units: orgDonation.donation_units,
+              }
+            : null,
           requestedBlood: requestedBlood
             ? { bloodType: row.blood_type, units: requestedBlood.units, requestCount: requestedBlood.count }
             : null,

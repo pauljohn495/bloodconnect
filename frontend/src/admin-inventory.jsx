@@ -301,6 +301,9 @@ function AdminInventory() {
                     Blood Type
                   </th>
                   <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
+                    Org donation
+                  </th>
+                  <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
                     Available Units
                   </th>
                   <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.rose.th}`}>
@@ -317,7 +320,7 @@ function AdminInventory() {
               <tbody className={adminPanel.rose.tbody}>
                 {isLoading && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={5}>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={6}>
                       Loading inventory...
                     </td>
                   </tr>
@@ -325,7 +328,7 @@ function AdminInventory() {
 
                 {!isLoading && error && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={5}>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={6}>
                       {error}
                     </td>
                   </tr>
@@ -333,7 +336,7 @@ function AdminInventory() {
 
                 {!isLoading && !error && inventory.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
                       {expiredStocks.length > 0
                         ? 'No available or near-expiry units on hand. Use Expired Stocks to review expired units.'
                         : 'No inventory data available yet.'}
@@ -343,7 +346,7 @@ function AdminInventory() {
 
                 {!isLoading && !error && inventory.length > 0 && filteredInventory.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={6}>
                       {componentFilter !== 'all'
                         ? `No ${componentFilter === 'whole_blood' ? 'Whole Blood' : componentFilter === 'platelets' ? 'Platelets' : 'Plasma'} items found${statusFilter !== 'all' ? ` with status "${statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}"` : ''}.`
                         : `No items found with status "${statusFilter === 'near_expiry' ? 'Near Expiry' : statusFilter}".`}
@@ -357,6 +360,18 @@ function AdminInventory() {
                     <tr key={item.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         <BloodTypeBadge type={item.blood_type || item.bloodType} />
+                      </td>
+                      <td className="max-w-56 px-4 py-2 text-sm text-slate-700">
+                        {item.organization_donation?.organization_name ? (
+                          <span
+                            className="block truncate font-medium text-slate-900"
+                            title={item.organization_donation.organization_name}
+                          >
+                            {item.organization_donation.organization_name}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
