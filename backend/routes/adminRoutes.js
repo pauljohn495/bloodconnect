@@ -22,6 +22,7 @@ const {
   rejectDonorProfileUpdateController,
   deleteDonorController,
 } = require('../controllers/adminDonorController')
+const { postManualDonorRecallSmsController } = require('../controllers/donorRecallController')
 const {
   getInventoryController,
   createInventoryController,
@@ -99,6 +100,9 @@ router.post('/donors', createDonorController)
 
 // GET /api/admin/donors/:id/details - donation status & stats for a donor
 router.get('/donors/:id/details', getDonorDetailsController)
+
+// POST /api/admin/donors/:id/recall-sms - manual donor recall SMS (Semaphore)
+router.post('/donors/:id/recall-sms', postManualDonorRecallSmsController)
 
 // POST approve/reject donor-submitted profile changes (donor role)
 router.post('/donors/:id/profile-update/approve', approveDonorProfileUpdateController)

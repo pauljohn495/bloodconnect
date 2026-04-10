@@ -8,6 +8,7 @@ const {
   ensureHospitalLocationColumns,
   ensureExpiredUnitsTable,
   backfillExpiredUnitsFromInventory,
+  ensureDonorRecallSmsLogTable,
 } = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const authRoutes = require('./routes/authRoutes')
@@ -18,6 +19,7 @@ const notificationRoutes = require('./routes/notificationRoutes')
 const errorHandler = require('./middleware/errorHandler')
 const { successResponse, errorResponse } = require('./utils/response')
 const { startHospitalInventoryAlertScheduler } = require('./services/hospitalInventoryAlertService')
+const { startDonorRecallScheduler } = require('./services/donorRecallScheduler')
 
 dotenv.config()
 
@@ -77,7 +79,9 @@ async function start() {
         await ensureHospitalLocationColumns()
         await ensureExpiredUnitsTable()
         await backfillExpiredUnitsFromInventory()
+        await ensureDonorRecallSmsLogTable()
         startHospitalInventoryAlertScheduler()
+        startDonorRecallScheduler()
       } catch (migrationError) {
         console.error('❌ Schema migration failed:', migrationError.message)
         process.exit(1)

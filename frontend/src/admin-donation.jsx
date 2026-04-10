@@ -45,6 +45,9 @@ function AdminDonation() {
   const [donorEligibilityFilter, setDonorEligibilityFilter] = useState('all')
   const [organizationSearch, setOrganizationSearch] = useState('')
   const [notification, setNotification] = useState(null)
+  const [recallSmsLoadingId, setRecallSmsLoadingId] = useState(null)
+  const [isRecallConfirmModalOpen, setIsRecallConfirmModalOpen] = useState(false)
+  const [donorToRecall, setDonorToRecall] = useState(null)
   const [openMenuDonorId, setOpenMenuDonorId] = useState(null)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
   const buttonRefs = useRef({})
@@ -119,6 +122,7 @@ function AdminDonation() {
   const [rc143VolContact, setRc143VolContact] = useState('')
   const [rc143VolAddress, setRc143VolAddress] = useState('')
   const [rc143VolContactNumber, setRc143VolContactNumber] = useState('')
+  const [rc143ActVolunteerId, setRc143ActVolunteerId] = useState('')
   const [rc143ActTitle, setRc143ActTitle] = useState('')
   const [rc143ActDescription, setRc143ActDescription] = useState('')
   const [rc143ActDate, setRc143ActDate] = useState('')
@@ -685,6 +689,40 @@ function AdminDonation() {
     }
   }
 
+  const handleOpenRecallConfirmModal = (donor) => {
+    const phone = donor.phone || donor.contact_phone || donor.contactPhone
+    if (!phone || !String(phone).trim()) {
+      showNotification('This donor has no phone number for SMS.', 'destructive')
+      return
+    }
+    setDonorToRecall(donor)
+    setIsRecallConfirmModalOpen(true)
+  }
+
+  const handleCloseRecallConfirmModal = () => {
+    if (recallSmsLoadingId) return
+    setIsRecallConfirmModalOpen(false)
+    setDonorToRecall(null)
+  }
+
+  const handleConfirmRecallSms = async () => {
+    if (!donorToRecall) return
+    try {
+      setRecallSmsLoadingId(donorToRecall.id)
+      await apiRequest(`/api/admin/donors/${donorToRecall.id}/recall-sms`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+      showNotification('Recall SMS sent.', 'primary')
+      setIsRecallConfirmModalOpen(false)
+      setDonorToRecall(null)
+    } catch (err) {
+      showNotification(err.message || 'Failed to send recall SMS', 'destructive')
+    } finally {
+      setRecallSmsLoadingId(null)
+    }
+  }
+
   const openRc143VolunteerModal = () => {
     setRc143VolFullName('')
     setRc143VolOrganization('')
@@ -728,7 +766,12 @@ function AdminDonation() {
   }
 
   const openRc143ActivityModal = () => {
+    if (rc143Volunteers.length === 0) {
+      showNotification('Register at least one volunteer before assigning an activity.', 'destructive')
+      return
+    }
     const today = new Date().toISOString().split('T')[0]
+    setRc143ActVolunteerId(rc143Volunteers[0]?.id ? String(rc143Volunteers[0].id) : '')
     setRc143ActTitle('')
     setRc143ActDescription('')
     setRc143ActDate(today)
@@ -748,6 +791,15 @@ function AdminDonation() {
       showNotification('Please enter activity title.', 'destructive')
       return
     }
+    if (!rc143ActVolunteerId) {
+      showNotification('Select a registered volunteer to assign this activity.', 'destructive')
+      return
+    }
+    const volunteer = rc143Volunteers.find((v) => String(v.id) === String(rc143ActVolunteerId))
+    if (!volunteer) {
+      showNotification('Selected volunteer is no longer in the list. Refresh and try again.', 'destructive')
+      return
+    }
     const aid =
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
@@ -755,6 +807,8 @@ function AdminDonation() {
     setRc143Activities((prev) => [
       {
         id: aid,
+        volunteerId: volunteer.id,
+        volunteerName: volunteer.fullName,
         title,
         description: rc143ActDescription.trim(),
         date: rc143ActDate,
@@ -765,7 +819,7 @@ function AdminDonation() {
       ...prev,
     ])
     closeRc143ActivityModal()
-    showNotification('Activity request recorded.', 'primary')
+    showNotification(`Activity assigned to ${volunteer.fullName}.`, 'primary')
   }
 
   const rc143PriorityClass = (p) => {
@@ -787,7 +841,7 @@ function AdminDonation() {
         activeSection === 'organizations'
           ? 'View and manage registered organizations.'
           : activeSection === 'rc143'
-            ? 'Register volunteers and coordinate blood-drive activities.'
+            ? 'Register RC143 volunteers and assign blood-drive activities to them.'
             : 'View and manage registered blood donors.'
       }
     >
@@ -845,7 +899,7 @@ function AdminDonation() {
               <div>
                 <h2 className={adminPanel.emerald.title}>RC143 — Volunteers and activities</h2>
                 <p className={adminPanel.emerald.subtitle}>
-                  Register outreach volunteers and log activity requests for blood donation programs.
+                  Register outreach volunteers, then assign blood-drive activities to them.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -861,7 +915,7 @@ function AdminDonation() {
                   onClick={openRc143ActivityModal}
                   className="inline-flex min-h-11 items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 sm:min-h-0"
                 >
-                  Request Activity
+                  Assign activity
                 </button>
               </div>
             </div>
@@ -930,6 +984,9 @@ function AdminDonation() {
                     <thead className={adminPanel.emerald.thead}>
                       <tr>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Assigned volunteer
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                           Title
                         </th>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
@@ -949,13 +1006,17 @@ function AdminDonation() {
                     <tbody className={adminPanel.emerald.tbody}>
                       {rc143Activities.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
-                            No activity requests yet. Use &quot;Request Activity&quot; to create one.
+                          <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                            No activities assigned yet. Register a volunteer, then use &quot;Assign activity&quot; to
+                            link an activity to them.
                           </td>
                         </tr>
                       ) : (
                         rc143Activities.map((a) => (
                           <tr key={a.id} className="hover:bg-slate-50/60">
+                            <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                              {a.volunteerName || '—'}
+                            </td>
                             <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">{a.title}</td>
                             <td className="max-w-md px-4 py-2 text-sm text-slate-700">{a.description || '—'}</td>
                             <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">{a.date || '—'}</td>
@@ -1114,6 +1175,9 @@ function AdminDonation() {
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                         Profile update
                       </th>
+                      <th className={`whitespace-nowrap px-4 py-2 text-center text-[13px] ${adminPanel.emerald.th}`}>
+                        Recall
+                      </th>
                       <th className={`whitespace-nowrap px-4 py-2 text-right text-[13px] ${adminPanel.emerald.th}`}>
                         Actions
                       </th>
@@ -1139,7 +1203,7 @@ function AdminDonation() {
               <tbody className={adminPanel.emerald.tbody}>
                 {activeSection === 'donors' && isLoading && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={7}>
+                    <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={8}>
                       Loading donors...
                     </td>
                   </tr>
@@ -1147,7 +1211,7 @@ function AdminDonation() {
 
                 {activeSection === 'donors' && !isLoading && error && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={7}>
+                    <td className="px-4 py-6 text-center text-sm text-red-500" colSpan={8}>
                       {error}
                     </td>
                   </tr>
@@ -1155,7 +1219,7 @@ function AdminDonation() {
 
                 {activeSection === 'donors' && !isLoading && !error && donors.length === 0 && (
                   <tr>
-                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={7}>
+                    <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={8}>
                       No donors added yet.
                     </td>
                   </tr>
@@ -1223,6 +1287,19 @@ function AdminDonation() {
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-center text-sm">
+                        <button
+                          type="button"
+                          disabled={
+                            recallSmsLoadingId === donor.id ||
+                            !(donor.phone || donor.contact_phone || donor.contactPhone)
+                          }
+                          onClick={() => handleOpenRecallConfirmModal(donor)}
+                          className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {recallSmsLoadingId === donor.id ? 'Sending…' : 'Recall'}
+                        </button>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-right text-sm">
                         <div className="relative inline-block text-left">
@@ -1616,9 +1693,11 @@ function AdminDonation() {
             <div className="flex items-start justify-between gap-3 border-b border-red-100 pb-3">
               <div>
                 <h3 id="rc143-activity-title" className="text-base font-semibold text-red-950">
-                  Request Activity
+                  Assign activity to volunteer
                 </h3>
-                <p className="mt-0.5 text-xs text-slate-600">Schedule or propose a blood donation activity</p>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  Choose a registered volunteer and define the blood-drive activity they will handle.
+                </p>
               </div>
               <button
                 type="button"
@@ -1633,6 +1712,22 @@ function AdminDonation() {
             </div>
 
             <form onSubmit={handleSubmitRc143Activity} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Volunteer</label>
+                <select
+                  value={rc143ActVolunteerId}
+                  onChange={(e) => setRc143ActVolunteerId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  required
+                >
+                  {rc143Volunteers.map((v) => (
+                    <option key={v.id} value={String(v.id)}>
+                      {v.fullName}
+                      {v.organization ? ` (${v.organization})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700">Title</label>
                 <input
@@ -1700,7 +1795,7 @@ function AdminDonation() {
                   type="submit"
                   className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
-                  Submit request
+                  Assign activity
                 </button>
               </div>
             </form>
@@ -2222,6 +2317,61 @@ function AdminDonation() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isRecallConfirmModalOpen && donorToRecall && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Send recall SMS</h3>
+              <button
+                type="button"
+                onClick={handleCloseRecallConfirmModal}
+                className="text-slate-400 hover:text-slate-600"
+                disabled={Boolean(recallSmsLoadingId)}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-slate-700">
+              Send a Semaphore SMS to this donor now? Standard recall wording will be used.
+            </p>
+            <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/80 p-3">
+              <p className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Name:</span>{' '}
+                {donorToRecall.full_name ||
+                  donorToRecall.fullName ||
+                  donorToRecall.donor_name ||
+                  donorToRecall.donorName ||
+                  '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Phone:</span>{' '}
+                {donorToRecall.phone || donorToRecall.contact_phone || donorToRecall.contactPhone || '—'}
+              </p>
+            </div>
+            <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={handleCloseRecallConfirmModal}
+                disabled={Boolean(recallSmsLoadingId)}
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRecallSms}
+                disabled={Boolean(recallSmsLoadingId)}
+                className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {recallSmsLoadingId === donorToRecall.id ? 'Sending…' : 'Send SMS'}
+              </button>
+            </div>
           </div>
         </div>
       )}
