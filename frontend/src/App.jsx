@@ -15,6 +15,7 @@ import HospitalBloodRequest from './hospital-blood-request.jsx'
 import HospitalTransactionHistory from './hospital-transaction-history.jsx'
 import HospitalReports from './hospital-reports.jsx'
 import DonorRegistration from './donor-registration.jsx'
+import GoogleDonorProfileSetup from './google-donor-profile-setup.jsx'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/register" element={<DonorRegistration />} />
+        <Route path="/complete-google-donor-profile" element={<GoogleDonorProfileSetup />} />
         <Route path="/dashboard" element={<UserDashboard />} />
         <Route path="/profile" element={<ProfileSettings />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />

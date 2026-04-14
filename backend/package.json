@@ -17,6 +17,7 @@
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.12.0",
     "node-cron": "^4.2.1",

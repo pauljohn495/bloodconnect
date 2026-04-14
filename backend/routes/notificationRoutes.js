@@ -7,7 +7,7 @@ const { validateNotificationIdParam } = require('../validators/notificationValid
 const router = express.Router()
 
 // All notification routes require any authenticated user
-router.use(auth(['admin', 'hospital', 'donor', 'recipient']))
+router.use(auth(['admin', 'hospital', 'donor']))
 
 // GET /api/notifications
 router.get('/', listNotifications)

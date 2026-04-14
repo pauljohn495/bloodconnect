@@ -14,6 +14,7 @@ function ProfileSettings() {
   const [toast, setToast] = useState(null)
   const [pendingProfile, setPendingProfile] = useState(null)
   const [userRole, setUserRole] = useState('')
+  const [avatarStorageKey, setAvatarStorageKey] = useState('')
 
   const [profileData, setProfileData] = useState({
     name: '',
@@ -36,9 +37,11 @@ function ProfileSettings() {
           apiRequest('/api/user/me'),
           apiRequest('/api/notifications').catch(() => []),
         ])
-        const savedAvatar = localStorage.getItem('profileAvatar')
+        const perUserAvatarKey = data.id ? `profileAvatar:${data.id}` : ''
+        const savedAvatar = perUserAvatarKey ? localStorage.getItem(perUserAvatarKey) : null
         const serverAvatar = data.profile_image_url || data.profileImageUrl || null
         const avatar = serverAvatar || savedAvatar || null
+        setAvatarStorageKey(perUserAvatarKey)
 
         setUserRole(data.role || '')
         setPendingProfile(data.pending_profile || data.pendingProfile || null)
@@ -118,10 +121,12 @@ function ProfileSettings() {
         )
       } else {
         setProfileData({ ...editedData })
-        if (editedData.avatar) {
-          localStorage.setItem('profileAvatar', editedData.avatar)
-        } else {
-          localStorage.removeItem('profileAvatar')
+        if (avatarStorageKey) {
+          if (editedData.avatar) {
+            localStorage.setItem(avatarStorageKey, editedData.avatar)
+          } else {
+            localStorage.removeItem(avatarStorageKey)
+          }
         }
       }
 

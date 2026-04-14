@@ -1004,7 +1004,7 @@ function AdminDonation() {
                   : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'
               }`}
             >
-              Donors
+              Donors / Recipients
             </button>
             <button
               type="button"

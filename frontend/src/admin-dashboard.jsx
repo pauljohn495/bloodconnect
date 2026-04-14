@@ -3,6 +3,15 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 import HospitalSupplyMap from './HospitalSupplyMap.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 
 /** Small decorative icons for stat cards (stroke uses currentColor for theme contrast). */
 function IconUsers({ className }) {
@@ -68,9 +77,12 @@ function IconBuilding({ className }) {
 
 function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState(null)
-  const [recentStocks, setRecentStocks] = useState([])
   const [allStocks, setAllStocks] = useState([])
   const [recentTransfers, setRecentTransfers] = useState([])
+  const [stockTrendData, setStockTrendData] = useState([])
+  const [stockTrendRangeDays, setStockTrendRangeDays] = useState(30)
+  const [requestTrendData, setRequestTrendData] = useState([])
+  const [requestTrendRangeDays, setRequestTrendRangeDays] = useState(30)
   const [isLoading, setIsLoading] = useState(true)
   const [totalAvailableBlood, setTotalAvailableBlood] = useState(0)
   const [isViewAllModalOpen, setIsViewAllModalOpen] = useState(false)
@@ -79,10 +91,11 @@ function AdminDashboard() {
     const loadDashboardData = async () => {
       try {
         setIsLoading(true)
-        const [summaryData, inventoryData, transfersData] = await Promise.all([
+        const [summaryData, inventoryData, transfersData, requestsData] = await Promise.all([
           apiRequest('/api/admin/dashboard/summary'),
           apiRequest('/api/admin/inventory'),
           apiRequest('/api/admin/transfers?limit=10'),
+          apiRequest('/api/admin/requests'),
         ])
 
         setDashboardData(summaryData)
@@ -94,9 +107,6 @@ function AdminDashboard() {
 
         // Filter out expired stocks for the "Recent blood stocks" widget and modal
         const nonExpiredStocks = sortedStocks.filter((item) => item.status !== 'expired')
-
-        // Get recent stocks (last 10, non-expired only)
-        setRecentStocks(nonExpiredStocks.slice(0, 10))
 
         // Store all non-expired stocks for the modal
         setAllStocks(nonExpiredStocks)
@@ -110,6 +120,56 @@ function AdminDashboard() {
           return sum + units
         }, 0)
         setTotalAvailableBlood(total)
+
+        const dayBuckets = new Map()
+        for (const item of nonExpiredStocks) {
+          const rawDate = item.created_at || item.createdAt
+          if (!rawDate) continue
+          const date = new Date(rawDate)
+          if (Number.isNaN(date.getTime())) continue
+          const key = date.toISOString().slice(0, 10)
+          const units = Number(item.available_units ?? item.availableUnits ?? item.units ?? 0)
+          dayBuckets.set(key, (dayBuckets.get(key) || 0) + (Number.isFinite(units) ? units : 0))
+        }
+
+        const today = new Date()
+        const trend = []
+        for (let i = 29; i >= 0; i -= 1) {
+          const d = new Date(today)
+          d.setHours(0, 0, 0, 0)
+          d.setDate(d.getDate() - i)
+          const key = d.toISOString().slice(0, 10)
+          trend.push({
+            dateKey: key,
+            dateLabel: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            units: dayBuckets.get(key) || 0,
+          })
+        }
+        setStockTrendData(trend)
+
+        const requestBuckets = new Map()
+        for (const req of requestsData || []) {
+          const rawDate = req.request_date || req.requestDate || req.created_at || req.createdAt
+          if (!rawDate) continue
+          const date = new Date(rawDate)
+          if (Number.isNaN(date.getTime())) continue
+          const key = date.toISOString().slice(0, 10)
+          requestBuckets.set(key, (requestBuckets.get(key) || 0) + 1)
+        }
+
+        const requestTrend = []
+        for (let i = 29; i >= 0; i -= 1) {
+          const d = new Date(today)
+          d.setHours(0, 0, 0, 0)
+          d.setDate(d.getDate() - i)
+          const key = d.toISOString().slice(0, 10)
+          requestTrend.push({
+            dateKey: key,
+            dateLabel: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            count: requestBuckets.get(key) || 0,
+          })
+        }
+        setRequestTrendData(requestTrend)
       } catch (err) {
         console.error('Failed to load dashboard data', err)
       } finally {
@@ -210,109 +270,156 @@ function AdminDashboard() {
             {/* Main chart + recent stocks side panel */}
             <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,2.5fr)_minmax(0,1.2fr)]">
               {/* Supply Mapping container */}
-              <div className="min-w-0">
+              <div className="min-w-0 min-h-[580px] lg:min-h-[650px]">
                 <HospitalSupplyMap />
               </div>
 
-              {/* Recent blood stocks - right vertical card (full-panel rose tint) */}
-              <div className="flex min-h-[min(420px,55vh)] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90 lg:h-[420px] lg:min-h-[420px]">
-                <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-rose-50/40 to-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Recent blood stocks</h2>
-                    <p className="mt-0.5 text-xs text-slate-500">Latest non-expired inventory entries</p>
+              <div className="flex min-h-[580px] flex-col gap-4 lg:min-h-[650px]">
+                {/* Blood stock trend - top right card */}
+                <div className="flex min-h-[min(360px,45vh)] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90 lg:h-[360px] lg:min-h-[360px]">
+                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-linear-to-r from-rose-50/40 to-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
+                    <div>
+                      <h2 className="text-sm font-semibold text-slate-900">Blood stock trend</h2>
+                      <p className="mt-0.5 text-xs text-slate-500">Total available units over the last 7/30 days</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+                        <button
+                          type="button"
+                          onClick={() => setStockTrendRangeDays(7)}
+                          className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                            stockTrendRangeDays === 7
+                              ? 'bg-red-600 text-white'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          7D
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStockTrendRangeDays(30)}
+                          className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                            stockTrendRangeDays === 30
+                              ? 'bg-red-600 text-white'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          30D
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsViewAllModalOpen(true)}
+                        className="inline-flex min-h-10 shrink-0 items-center justify-center self-start rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 sm:self-auto sm:py-1.5"
+                      >
+                        View all
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsViewAllModalOpen(true)}
-                    className="inline-flex min-h-10 shrink-0 items-center justify-center self-start rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 sm:self-auto sm:py-1.5"
-                  >
-                    View all
-                  </button>
+
+                  <div className="min-h-0 flex-1 bg-slate-50/30 p-3 sm:p-4">
+                    {isLoading ? (
+                      <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                        Loading blood stock trend...
+                      </div>
+                    ) : stockTrendData.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                        No blood stock trend data yet.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={stockTrendData.slice(stockTrendData.length - stockTrendRangeDays)}
+                          margin={{ top: 12, right: 12, left: 0, bottom: 8 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                          <Tooltip
+                            formatter={(value) => [`${value} units`, 'Available blood']}
+                            labelFormatter={(label, payload) => payload?.[0]?.payload?.dateKey || label}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="units"
+                            stroke="#dc2626"
+                            strokeWidth={2.5}
+                            dot={{ r: 2, fill: '#dc2626' }}
+                            activeDot={{ r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain touch-pan-x bg-slate-50/30 [-webkit-overflow-scrolling:touch]">
-                  <table className="min-w-full divide-y divide-slate-100 text-xs">
-                    <thead className="bg-slate-50/95">
-                      <tr>
-                        <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                          Blood Type
-                        </th>
-                        <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                          Component
-                        </th>
-                        <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                          Units
-                        </th>
-                        <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                          Status
-                        </th>
-                        <th className="whitespace-nowrap px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
-                          Added Date
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {isLoading && (
-                        <tr>
-                          <td className="px-4 py-6 text-center text-xs text-slate-500" colSpan={5}>
-                            Loading recent stocks...
-                          </td>
-                        </tr>
-                      )}
+                {/* Request trend - bottom right card */}
+                <div className="flex min-h-[210px] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
+                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-linear-to-r from-sky-50/40 to-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
+                    <div>
+                      <h2 className="text-sm font-semibold text-slate-900">Request trend</h2>
+                      <p className="mt-0.5 text-xs text-slate-500">Hospital blood requests over the last 7/30 days</p>
+                    </div>
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+                      <button
+                        type="button"
+                        onClick={() => setRequestTrendRangeDays(7)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                          requestTrendRangeDays === 7
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        7D
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRequestTrendRangeDays(30)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                          requestTrendRangeDays === 30
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        30D
+                      </button>
+                    </div>
+                  </div>
 
-                      {!isLoading && recentStocks.length === 0 && (
-                        <tr>
-                          <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={5}>
-                            No recent blood stocks yet.
-                          </td>
-                        </tr>
-                      )}
-
-                      {!isLoading &&
-                        recentStocks.map((stock) => (
-                          <tr key={stock.id} className="hover:bg-slate-50/60">
-                            <td className="whitespace-nowrap px-4 py-2 text-xs font-medium text-slate-900">
-                              <BloodTypeBadge type={stock.blood_type || stock.bloodType} />
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
-                              {(() => {
-                                const component = stock.component_type || stock.componentType || 'whole_blood'
-                                if (component === 'platelets') return 'Platelets'
-                                if (component === 'plasma') return 'Plasma'
-                                return 'Whole Blood'
-                              })()}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
-                              <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
-                                {stock.available_units ?? stock.availableUnits ?? stock.units ?? 0}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-2 text-xs">
-                              <span
-                                className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold capitalize ring-1 ${
-                                  stock.status === 'available'
-                                    ? 'bg-green-50 text-green-700 ring-green-100'
-                                    : stock.status === 'near_expiry' || stock.status === 'Near Expiry'
-                                    ? 'bg-orange-50 text-orange-700 ring-orange-100'
-                                    : stock.status === 'expired'
-                                    ? 'bg-red-50 text-red-700 ring-red-100'
-                                    : stock.status === 'reserved'
-                                    ? 'bg-yellow-50 text-yellow-700 ring-yellow-100'
-                                    : 'bg-slate-50 text-slate-700 ring-slate-100'
-                                }`}
-                              >
-                                {stock.status === 'near_expiry' ? 'Near Expiry' : stock.status || 'available'}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
-                              {stock.created_at || stock.createdAt
-                                ? new Date(stock.created_at || stock.createdAt).toLocaleDateString()
-                                : '—'}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+                  <div className="min-h-0 flex-1 bg-slate-50/30 p-3 sm:p-4">
+                    {isLoading ? (
+                      <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                        Loading request trend...
+                      </div>
+                    ) : requestTrendData.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                        No request trend data yet.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={requestTrendData.slice(requestTrendData.length - requestTrendRangeDays)}
+                          margin={{ top: 12, right: 12, left: 0, bottom: 8 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                          <Tooltip
+                            formatter={(value) => [`${value} requests`, 'Request count']}
+                            labelFormatter={(label, payload) => payload?.[0]?.payload?.dateKey || label}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="count"
+                            stroke="#2563eb"
+                            strokeWidth={2.5}
+                            dot={{ r: 2, fill: '#2563eb' }}
+                            activeDot={{ r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
               </div>
             </section>
@@ -320,7 +427,7 @@ function AdminDashboard() {
             {/* Recent Transferred Table */}
             <section className="mt-6">
               <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
-                <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-sky-50/40 to-white px-4 py-3.5">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-linear-to-r from-sky-50/40 to-white px-4 py-3.5">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">Recent transfers</h2>
                     <p className="mt-0.5 text-xs text-slate-500">Blood stock transfers to partner hospitals</p>
@@ -411,7 +518,7 @@ function AdminDashboard() {
             aria-labelledby="dashboard-all-stocks-title"
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-200/80 bg-gradient-to-r from-red-50/50 via-white to-white px-6 py-4">
+            <div className="flex items-center justify-between border-b border-slate-200/80 bg-linear-to-r from-red-50/50 via-white to-white px-6 py-4">
               <div>
                 <h3 id="dashboard-all-stocks-title" className="text-lg font-semibold text-slate-900">
                   All Blood Stocks
@@ -435,7 +542,7 @@ function AdminDashboard() {
             {/* Modal Content - Table */}
             <div className="flex-1 overflow-auto px-6 py-4">
               <table className="min-w-full divide-y divide-slate-100 text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-sm">
+                <thead className="bg-slate-100/95">
                   <tr>
                     <th className="whitespace-nowrap px-4 py-3 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                       Blood Type

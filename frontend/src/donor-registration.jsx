@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 
@@ -14,6 +14,9 @@ function DonorRegistration() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [googleError, setGoogleError] = useState('')
+  const googleButtonRef = useRef(null)
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -37,6 +40,7 @@ function DonorRegistration() {
           password,
           phone,
           bloodType,
+          role: 'recipient',
         }),
       })
 
@@ -51,6 +55,59 @@ function DonorRegistration() {
       setIsSubmitting(false)
     }
   }
+
+  const handleGoogleSignup = useCallback(
+    async (credential) => {
+      try {
+        setGoogleError('')
+        setError('')
+
+        const data = await apiRequest('/api/auth/google', {
+          method: 'POST',
+          body: JSON.stringify({
+            credential,
+            role: 'recipient',
+          }),
+        })
+
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('role', data.user.role)
+        if (data.user.role === 'donor' && data.needsDonorProfileSetup) {
+          navigate('/complete-google-donor-profile')
+        } else {
+          navigate('/dashboard')
+        }
+      } catch (err) {
+        setGoogleError(err.message || 'Google signup failed')
+      }
+    },
+    [navigate],
+  )
+
+  useEffect(() => {
+    if (!googleClientId) return
+    if (!window.google?.accounts?.id || !googleButtonRef.current) return
+
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: (response) => {
+        if (!response?.credential) {
+          setGoogleError('Google signup failed. Please try again.')
+          return
+        }
+        handleGoogleSignup(response.credential)
+      },
+    })
+
+    googleButtonRef.current.innerHTML = ''
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      theme: 'outline',
+      size: 'large',
+      width: 320,
+      text: 'signup_with',
+      shape: 'pill',
+    })
+  }, [googleClientId, handleGoogleSignup])
 
   return (
     <div className="min-h-screen bg-linear-to-br from-red-100 via-white to-red-200">
@@ -67,7 +124,7 @@ function DonorRegistration() {
 
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
             Join BloodConnect
-            <span className="block text-red-600">Register as a Donor</span>
+            <span className="block text-red-600">Register as Donor / Recipient</span>
           </h1>
 
           <p className="max-w-md text-sm text-slate-600 sm:text-base">
@@ -79,7 +136,7 @@ function DonorRegistration() {
         {/* Right: Registration Form */}
         <div className="mt-10 w-full max-w-md lg:mt-0 lg:w-1/2">
           <div className="mx-auto rounded-2xl bg-white/95 p-6 shadow-xl shadow-red-100 ring-1 ring-red-100 backdrop-blur-sm sm:p-8">
-            <h2 className="mb-1 text-lg font-semibold text-slate-900">Create Donor Account</h2>
+            <h2 className="mb-1 text-lg font-semibold text-slate-900">Create Account</h2>
             <p className="mb-4 text-xs text-slate-500">
               Already have an account?{' '}
               <button
@@ -213,6 +270,24 @@ function DonorRegistration() {
               >
                 {isSubmitting ? 'Creating account...' : 'Create Account'}
               </button>
+
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[11px] uppercase tracking-wide text-slate-400">or</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              {!googleClientId ? (
+                <p className="text-xs text-amber-600">
+                  Google signup is unavailable. Set `VITE_GOOGLE_CLIENT_ID` in frontend env.
+                </p>
+              ) : (
+                <div className="flex justify-center">
+                  <div ref={googleButtonRef} />
+                </div>
+              )}
+
+              {googleError && <p className="text-xs font-medium text-red-600">{googleError}</p>}
             </form>
 
             <div className="mt-6 border-t border-slate-100 pt-4 text-[11px] text-slate-400">

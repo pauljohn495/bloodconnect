@@ -15,7 +15,7 @@ const { validateUpdateMe, validateScheduleRequest } = require('../validators/use
 const router = express.Router()
 
 // All user routes require any authenticated user
-router.use(auth(['admin', 'hospital', 'donor', 'recipient']))
+router.use(auth(['admin', 'hospital', 'donor']))
 
 // GET /api/user/me
 router.get('/me', getMe)

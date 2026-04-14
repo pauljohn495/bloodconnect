@@ -1057,7 +1057,6 @@ function AdminReports() {
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Blood</th>
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Component</th>
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Requested</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-500">On-hand</th>
                           <th className="px-3 py-2 text-left font-medium text-slate-500">Recommendation</th>
                         </tr>
                       </thead>
@@ -1125,7 +1124,6 @@ function AdminReports() {
                               {formatComponentType(rec.componentType)}
                             </td>
                             <td className="px-3 py-2 text-xs text-slate-700">{rec.unitsRequested}</td>
-                            <td className="px-3 py-2 text-xs text-slate-700">{rec.destinationOnHand}</td>
                             <td className="px-3 py-2">
                               <div
                                 className={
@@ -1485,7 +1483,9 @@ function AdminReports() {
                                 {formatComponentType(row.componentType)}
                               </td>
                               <td className="px-3 py-2 text-slate-700">{Math.round(row.currentUnits)}</td>
-                              <td className="px-3 py-2 text-slate-700">{row.averageDailyUsage.toFixed(1)}</td>
+                              <td className="px-3 py-2 text-slate-700">
+                                {row.averageDailyUsage.toFixed(2)}
+                              </td>
                               <td className="px-3 py-2 text-slate-700">
                                 {row.trendArrow}{' '}
                                 {row.trendKey === 'increasing'
@@ -1534,12 +1534,12 @@ function AdminReports() {
                 )}
               </section>
 
-              {/* Donor Availability Prediction */}
+              {/* Donor Availability Insights */}
               <section className={adminReportSection.indigo}>
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">
-                      📅 Donor Availability Prediction
+                      📅 Donor Availability Insights
                     </h2>
                     <p className="mt-1 text-[11px] text-slate-600">
                       Estimates how many donors can donate soon using last donation dates and recovery

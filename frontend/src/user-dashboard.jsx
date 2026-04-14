@@ -66,6 +66,15 @@ function UserDashboard() {
           apiRequest('/api/user/donation-eligibility').catch(() => null),
         ])
 
+        const username = (me.username || '').toLowerCase()
+        const needsProfileSetup =
+          (me.role === 'donor' || localStorage.getItem('role') === 'donor') &&
+          (!me.phone || !me.blood_type || username.startsWith('google_'))
+        if (needsProfileSetup) {
+          navigate('/complete-google-donor-profile')
+          return
+        }
+
         // Determine overall status from eligibility (if available)
         const overallStatus = (() => {
           if (!eligibilityData) return 'Available'
@@ -88,7 +97,8 @@ function UserDashboard() {
         ).length
         const totalDonations = donationCount + completedSchedules
 
-        const savedAvatar = localStorage.getItem('profileAvatar')
+        const avatarStorageKey = me.id ? `profileAvatar:${me.id}` : ''
+        const savedAvatar = avatarStorageKey ? localStorage.getItem(avatarStorageKey) : null
         const serverAvatar = me.profile_image_url || me.profileImageUrl || null
 
         setUserData({
@@ -150,7 +160,7 @@ function UserDashboard() {
     }
 
     loadData()
-  }, [])
+  }, [navigate])
 
   // Tick "now" while schedule modal is open so cooldown countdowns update
   useEffect(() => {

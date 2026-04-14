@@ -69,6 +69,12 @@ function formatCoordinatesInput(latitude, longitude) {
   return `${latitude}, ${longitude}`
 }
 
+/** Matches backend terminal flow: transfers use `delivered`, hospitals may mark `received`; legacy `fulfilled` still appears. */
+function isCompletedBloodRequestStatus(status) {
+  const s = (status || '').toString().toLowerCase()
+  return s === 'fulfilled' || s === 'delivered' || s === 'received'
+}
+
 function AdminPartner() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [hospitalName, setHospitalName] = useState('')
@@ -316,7 +322,13 @@ function AdminPartner() {
     setIsLoadingHistory(true)
     try {
       const requestsData = await apiRequest('/api/admin/requests')
-      const fulfilled = requestsData.filter((req) => req.status === 'fulfilled')
+      const fulfilled = requestsData
+        .filter((req) => isCompletedBloodRequestStatus(req.status))
+        .sort((a, b) => {
+          const da = new Date(a.request_date || a.updated_at || 0).getTime()
+          const db = new Date(b.request_date || b.updated_at || 0).getTime()
+          return db - da
+        })
       setFulfilledRequests(fulfilled)
     } catch (err) {
       console.error('Failed to load fulfilled requests', err)
@@ -1348,7 +1360,7 @@ function AdminPartner() {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Fulfilled Requests History</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  View all completed blood requests
+                  View completed blood requests across all partner hospitals (delivered, received, or fulfilled).
                 </p>
               </div>
               <button
@@ -1369,7 +1381,7 @@ function AdminPartner() {
                 </div>
               ) : fulfilledRequests.length === 0 ? (
                 <div className="py-10 text-center text-sm text-slate-500">
-                  No fulfilled requests found.
+                  No completed requests found.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1421,8 +1433,20 @@ function AdminPartner() {
                               : '—'}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-green-100">
-                              Fulfilled
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                                (request.status || '').toLowerCase() === 'received'
+                                  ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+                                  : (request.status || '').toLowerCase() === 'delivered'
+                                    ? 'bg-green-50 text-green-700 ring-green-100'
+                                    : 'bg-teal-50 text-teal-800 ring-teal-100'
+                              }`}
+                            >
+                              {(request.status || '').toLowerCase() === 'received'
+                                ? 'Received'
+                                : (request.status || '').toLowerCase() === 'delivered'
+                                  ? 'Delivered'
+                                  : 'Fulfilled'}
                             </span>
                           </td>
                         </tr>

@@ -228,7 +228,7 @@ function HospitalSupplyMap() {
     : [14.5995, 120.9842]
 
   return (
-    <div className="relative flex h-[min(520px,70vh)] min-h-[260px] w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 sm:h-[520px] sm:min-h-[520px]">
+    <div className="relative flex h-full min-h-full w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
       <div className="flex flex-col gap-2 border-b border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
         <div>
           <p className="text-sm font-semibold text-slate-900">Supply Mapping</p>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
@@ -10,11 +10,15 @@ function Home() {
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [googleError, setGoogleError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [activeSection, setActiveSection] = useState('')
   const [announcementsPanelOpen, setAnnouncementsPanelOpen] = useState(false)
+  const googleButtonRef = useRef(null)
 
   const navigate = useNavigate()
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  const isGoogleRole = activeRole === 'donor'
 
   const openAnnouncementsPanel = useCallback(() => {
     setAnnouncementsPanelOpen(true)
@@ -81,7 +85,11 @@ function Home() {
 
     try {
       const roleForApi =
-        activeRole === 'admin' ? 'admin' : activeRole === 'hospital' ? 'hospital' : 'donor'
+        activeRole === 'admin'
+          ? 'admin'
+          : activeRole === 'hospital'
+            ? 'hospital'
+            : 'donor'
 
       const data = await apiRequest('/api/auth/login', {
         method: 'POST',
@@ -108,6 +116,59 @@ function Home() {
       setIsSubmitting(false)
     }
   }
+
+  const handleGoogleLogin = useCallback(
+    async (credential) => {
+      try {
+        setGoogleError('')
+        setError('')
+
+        const data = await apiRequest('/api/auth/google', {
+          method: 'POST',
+          body: JSON.stringify({
+            credential,
+            role: 'donor',
+          }),
+        })
+
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('role', data.user.role)
+        if (data.user.role === 'donor' && data.needsDonorProfileSetup) {
+          navigate('/complete-google-donor-profile')
+        } else {
+          navigate('/dashboard')
+        }
+      } catch (err) {
+        setGoogleError(err.message || 'Google login failed')
+      }
+    },
+    [navigate],
+  )
+
+  useEffect(() => {
+    if (!isGoogleRole || !googleClientId) return
+    if (!window.google?.accounts?.id || !googleButtonRef.current) return
+
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: (response) => {
+        if (!response?.credential) {
+          setGoogleError('Google login failed. Please try again.')
+          return
+        }
+        handleGoogleLogin(response.credential)
+      },
+    })
+
+    googleButtonRef.current.innerHTML = ''
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      theme: 'outline',
+      size: 'large',
+      width: 320,
+      text: 'continue_with',
+      shape: 'pill',
+    })
+  }, [googleClientId, handleGoogleLogin, isGoogleRole])
 
   const navLinkClass = (id, options = {}) => {
     const { forceActive } = options
@@ -227,8 +288,7 @@ function Home() {
             </h1>
 
             <p className="mx-auto max-w-md text-sm text-slate-600 sm:text-base lg:mx-0">
-              BloodConnect links volunteer donors, patients, and accredited hospitals to ensure safe and rapid access to
-              blood when every second counts.
+            BloodConnect is a Blood Management System supporting the Red Cross by connecting donors and hospitals for fast, safe, and efficient blood supply, tracking, and distribution.
             </p>
           </div>
 
@@ -245,7 +305,7 @@ function Home() {
                       : 'hover:text-red-600'
                   }`}
                 >
-                  Donor/Recipient
+                  Donor / Recipient
                 </button>
                 <button
                   type="button"
@@ -320,6 +380,28 @@ function Home() {
                 >
                   {isSubmitting ? 'Logging in...' : 'Login'}
                 </button>
+
+                {isGoogleRole && (
+                  <>
+                    <div className="flex items-center gap-2 pt-1">
+                      <div className="h-px flex-1 bg-slate-200" />
+                      <span className="text-[11px] uppercase tracking-wide text-slate-400">or</span>
+                      <div className="h-px flex-1 bg-slate-200" />
+                    </div>
+
+                    {!googleClientId ? (
+                      <p className="text-xs text-amber-600">
+                        Google login is unavailable. Set `VITE_GOOGLE_CLIENT_ID` in frontend env.
+                      </p>
+                    ) : (
+                      <div className="flex justify-center">
+                        <div ref={googleButtonRef} />
+                      </div>
+                    )}
+
+                    {googleError && <p className="text-xs font-medium text-red-600">{googleError}</p>}
+                  </>
+                )}
 
                 <p className="text-center text-xs text-slate-500">
                   New to BloodConnect?{' '}
