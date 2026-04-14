@@ -93,6 +93,24 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
           <div className="flex-1 overflow-y-auto px-3 py-4">
             <NavLinks />
           </div>
+          <div className="px-3 pb-3">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-800"
+            >
+              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Log out</span>
+            </button>
+          </div>
           <div className="border-t border-slate-100 px-5 py-4">
             <p className="text-[11px] leading-relaxed text-slate-700">
               View stock, request blood, and monitor expiry. Sign out on shared workstations when finished.
@@ -135,10 +153,28 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
           <div className="flex-1 overflow-y-auto px-3 py-3">
             <NavLinks onNavigate={() => setMobileOpen(false)} />
           </div>
+          <div className="border-t border-slate-100 px-3 py-3">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-800"
+            >
+              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Log out</span>
+            </button>
+          </div>
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex min-h-[3.25rem] items-center justify-between gap-3 border-b border-slate-200/90 bg-white/90 px-3 py-2.5 backdrop-blur-md sm:gap-4 sm:px-6 sm:py-3">
+          <header className="z-30 flex min-h-[3.25rem] items-center justify-between gap-3 border-b border-slate-200/90 bg-white/90 px-3 py-2.5 backdrop-blur-md sm:gap-4 sm:px-6 sm:py-3">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <button
                 type="button"
@@ -162,15 +198,6 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
-              >
-                Log out
-              </button>
-            </div>
           </header>
 
           <main id="hospital-main" className="min-w-0 flex-1 px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8" tabIndex={-1}>

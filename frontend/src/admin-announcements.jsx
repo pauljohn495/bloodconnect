@@ -581,7 +581,7 @@ function AdminAnnouncements() {
             aria-labelledby="delete-ann-title"
             aria-describedby="delete-ann-desc"
           >
-            <div className="border-b border-red-100 bg-gradient-to-br from-red-50 to-white px-6 pb-5 pt-6">
+            <div className="border-b border-red-100 bg-white px-6 pb-5 pt-6">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-700 ring-2 ring-red-200/60">
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path

@@ -190,77 +190,77 @@ function AdminDashboard() {
               className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
               aria-label="Dashboard summary statistics"
             >
-              <article className="group rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/30 ring-1 ring-slate-100/90 transition hover:shadow-md">
+              <article className="group rounded-2xl border border-sky-300/40 bg-linear-to-br from-sky-400 via-sky-500 to-cyan-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(2,132,199,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(2,132,199,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-sky-50/95">
                       Active donors
                     </p>
-                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-3xl">
+                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-white sm:text-3xl">
                       {isLoading ? '—' : dashboardData?.counts?.totalDonors ?? 0}
                     </p>
-                    <p className="mt-1.5 text-xs text-slate-500">
+                    <p className="mt-1.5 text-xs text-sky-100/90">
                       {isLoading ? 'Loading...' : 'Registered in the system'}
                     </p>
                   </div>
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-700 ring-1 ring-red-100">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white ring-1 ring-white/30">
                     <IconUsers className="h-5 w-5" />
                   </div>
                 </div>
               </article>
 
-              <article className="group rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/30 ring-1 ring-slate-100/90 transition hover:shadow-md">
+              <article className="group rounded-2xl border border-orange-300/45 bg-linear-to-br from-orange-400 via-orange-500 to-amber-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(234,88,12,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(234,88,12,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-orange-50/95">
                       Available blood
                     </p>
-                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-3xl">
+                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-white sm:text-3xl">
                       {isLoading ? '—' : totalAvailableBlood}
                     </p>
-                    <p className="mt-1.5 text-xs text-slate-500">
+                    <p className="mt-1.5 text-xs text-orange-100/90">
                       {isLoading ? 'Loading...' : 'Total units in inventory'}
                     </p>
                   </div>
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700 ring-1 ring-rose-100">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white ring-1 ring-white/30">
                     <IconDroplet className="h-5 w-5" />
                   </div>
                 </div>
               </article>
 
-              <article className="group rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/30 ring-1 ring-slate-100/90 transition hover:shadow-md">
+              <article className="group rounded-2xl border border-violet-300/40 bg-linear-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(124,58,237,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(124,58,237,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-50/95">
                       Completed donations
                     </p>
-                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-3xl">
+                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-white sm:text-3xl">
                       {isLoading ? '—' : dashboardData?.counts?.completedDonations ?? 0}
                     </p>
-                    <p className="mt-1.5 text-xs text-slate-500">
+                    <p className="mt-1.5 text-xs text-violet-100/90">
                       {isLoading ? 'Loading...' : 'Successfully completed to date'}
                     </p>
                   </div>
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white ring-1 ring-white/30">
                     <IconCheckCircle className="h-5 w-5" />
                   </div>
                 </div>
               </article>
 
-              <article className="group rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/30 ring-1 ring-slate-100/90 transition hover:shadow-md">
+              <article className="group rounded-2xl border border-rose-300/40 bg-linear-to-br from-rose-500 via-red-500 to-red-600 p-5 text-white shadow-[0_18px_36px_-24px_rgba(225,29,72,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(225,29,72,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-50/95">
                       Partner hospitals
                     </p>
-                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-3xl">
+                    <p className="mt-2 text-2xl font-bold tabular-nums tracking-tight text-white sm:text-3xl">
                       {isLoading ? '—' : dashboardData?.counts?.partnerHospitals ?? 0}
                     </p>
-                    <p className="mt-1.5 text-xs text-slate-500">
+                    <p className="mt-1.5 text-xs text-rose-100/90">
                       {isLoading ? 'Loading...' : 'Active partner facilities'}
                     </p>
                   </div>
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-100">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white ring-1 ring-white/30">
                     <IconBuilding className="h-5 w-5" />
                   </div>
                 </div>
@@ -276,8 +276,8 @@ function AdminDashboard() {
 
               <div className="flex min-h-[580px] flex-col gap-4 lg:min-h-[650px]">
                 {/* Blood stock trend - top right card */}
-                <div className="flex min-h-[min(360px,45vh)] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90 lg:h-[360px] lg:min-h-[360px]">
-                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-linear-to-r from-rose-50/40 to-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
+                <div className="flex min-h-[min(360px,45vh)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_16px_34px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80 lg:h-[360px] lg:min-h-[360px]">
+                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
                     <div>
                       <h2 className="text-sm font-semibold text-slate-900">Blood stock trend</h2>
                       <p className="mt-0.5 text-xs text-slate-500">Total available units over the last 7/30 days</p>
@@ -317,7 +317,7 @@ function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="min-h-0 flex-1 bg-slate-50/30 p-3 sm:p-4">
+                  <div className="min-h-0 flex-1 bg-white p-3 sm:p-4">
                     {isLoading ? (
                       <div className="flex h-full items-center justify-center text-xs text-slate-500">
                         Loading blood stock trend...
@@ -354,8 +354,8 @@ function AdminDashboard() {
                 </div>
 
                 {/* Request trend - bottom right card */}
-                <div className="flex min-h-[210px] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
-                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-linear-to-r from-sky-50/40 to-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
+                <div className="flex min-h-[210px] flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_16px_34px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80">
+                  <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
                     <div>
                       <h2 className="text-sm font-semibold text-slate-900">Request trend</h2>
                       <p className="mt-0.5 text-xs text-slate-500">Hospital blood requests over the last 7/30 days</p>
@@ -386,7 +386,7 @@ function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="min-h-0 flex-1 bg-slate-50/30 p-3 sm:p-4">
+                  <div className="min-h-0 flex-1 bg-white p-3 sm:p-4">
                     {isLoading ? (
                       <div className="flex h-full items-center justify-center text-xs text-slate-500">
                         Loading request trend...
@@ -426,15 +426,15 @@ function AdminDashboard() {
 
             {/* Recent Transferred Table */}
             <section className="mt-6">
-              <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
-                <div className="flex items-center justify-between border-b border-slate-100 bg-linear-to-r from-sky-50/40 to-white px-4 py-3.5">
+              <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_16px_34px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3.5">
                   <div>
                     <h2 className="text-sm font-semibold text-slate-900">Recent transfers</h2>
                     <p className="mt-0.5 text-xs text-slate-500">Blood stock transfers to partner hospitals</p>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto overscroll-x-contain touch-pan-x bg-slate-50/30 [-webkit-overflow-scrolling:touch]">
+                <div className="overflow-x-auto overscroll-x-contain touch-pan-x bg-white [-webkit-overflow-scrolling:touch]">
                   <table className="min-w-full divide-y divide-slate-100 text-sm">
                     <thead className="bg-slate-50/95">
                       <tr>
@@ -512,13 +512,13 @@ function AdminDashboard() {
       {isViewAllModalOpen && (
       <div className="fixed inset-0 z-1000 flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-[2px]">
           <div
-            className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/15"
+            className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/15"
             role="dialog"
             aria-modal="true"
             aria-labelledby="dashboard-all-stocks-title"
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-200/80 bg-linear-to-r from-red-50/50 via-white to-white px-6 py-4">
+            <div className="flex items-center justify-between border-b border-slate-200/80 bg-white px-6 py-4">
               <div>
                 <h3 id="dashboard-all-stocks-title" className="text-lg font-semibold text-slate-900">
                   All Blood Stocks

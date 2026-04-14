@@ -183,7 +183,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-linear-to-br from-red-150 via-white to-red-300">
       {/* Sticky header */}
-      <header className="sticky top-0 z-50 border-b border-red-950/35 bg-red-900 shadow-md">
+      <header className="z-50 border-b border-red-950/35 bg-red-900 shadow-md">
         <div className="mx-auto flex min-h-12 max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:min-h-14 sm:px-6 lg:px-8">
           <button
             type="button"

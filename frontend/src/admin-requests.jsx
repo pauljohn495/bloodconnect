@@ -342,7 +342,7 @@ function AdminRequests() {
             aria-modal="true"
             aria-labelledby="requests-history-title"
           >
-            <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white px-5 py-4">
+            <div className="border-b border-slate-100 bg-white px-5 py-4">
               <h3 id="requests-history-title" className="text-base font-semibold text-slate-900">
                 Request history
               </h3>

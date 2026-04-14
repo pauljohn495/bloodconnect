@@ -2165,7 +2165,7 @@ function AdminDonation() {
               ) : rankingError ? (
                 <div className="py-10 text-center text-sm text-red-600">{rankingError}</div>
               ) : (
-                <div className="max-h-[65vh] overflow-y-auto rounded-xl border border-slate-200">
+                <div className="max-h-[65vh] overflow-y-auto rounded-2xl border border-slate-200">
                   <table className="min-w-full divide-y divide-slate-100 text-sm">
                     <thead className="bg-slate-50/60">
                       <tr>
@@ -2722,7 +2722,7 @@ function AdminDonation() {
               {!pending ? (
                 <p className="mt-4 text-sm text-red-600">Could not read pending profile data.</p>
               ) : (
-                <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                       <tr>
