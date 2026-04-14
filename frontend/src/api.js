@@ -1,4 +1,17 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+/**
+ * In Vite dev, default to same-origin + `/api` proxy (see vite.config.js) to avoid CORS.
+ * Set VITE_API_BASE_URL when the API is on another host (e.g. production).
+ */
+export function getApiBaseUrl() {
+  const raw = import.meta.env.VITE_API_BASE_URL
+  if (raw != null && String(raw).trim() !== '') {
+    return String(raw).replace(/\/$/, '')
+  }
+  if (import.meta.env.DEV) return ''
+  return 'http://localhost:3000'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 export async function apiRequest(path, options = {}) {
   const token = localStorage.getItem('token')

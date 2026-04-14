@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
 import { BrandLogo } from './BrandLogo.jsx'
+import { useFeatureFlags } from './featureFlagsContext.jsx'
 
 function Home() {
+  const { isFlagEnabled } = useFeatureFlags()
   const [activeRole, setActiveRole] = useState('donor') // 'donor' | 'hospital' | 'admin'
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -103,7 +105,7 @@ function Home() {
       localStorage.setItem('token', data.token)
       localStorage.setItem('role', data.user.role)
 
-      if (data.user.role === 'admin') {
+      if (data.user.role === 'admin' || data.user.role === 'super_admin') {
         navigate('/admin/dashboard')
       } else if (data.user.role === 'hospital') {
         navigate('/hospital/inventory')
@@ -200,23 +202,29 @@ function Home() {
           </button>
 
           <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
-            <button
-              type="button"
-              className={navLinkClass('announcements', {
-                forceActive: announcementsPanelOpen,
-              })}
-              onClick={openAnnouncementsPanel}
-              aria-expanded={announcementsPanelOpen}
-              aria-controls="announcements-side-panel"
-            >
-              Announcements
-            </button>
-            <button type="button" className={navLinkClass('donate')} onClick={() => scrollToSection('donate')}>
-              Donate
-            </button>
-            <button type="button" className={navLinkClass('about')} onClick={() => scrollToSection('about')}>
-              About
-            </button>
+            {isFlagEnabled('public', 'public.nav_announcements') && (
+              <button
+                type="button"
+                className={navLinkClass('announcements', {
+                  forceActive: announcementsPanelOpen,
+                })}
+                onClick={openAnnouncementsPanel}
+                aria-expanded={announcementsPanelOpen}
+                aria-controls="announcements-side-panel"
+              >
+                Announcements
+              </button>
+            )}
+            {isFlagEnabled('public', 'public.nav_donate') && (
+              <button type="button" className={navLinkClass('donate')} onClick={() => scrollToSection('donate')}>
+                Donate
+              </button>
+            )}
+            {isFlagEnabled('public', 'public.nav_about') && (
+              <button type="button" className={navLinkClass('about')} onClick={() => scrollToSection('about')}>
+                About
+              </button>
+            )}
           </nav>
 
           <button
@@ -245,34 +253,40 @@ function Home() {
             className="border-t border-red-950/40 bg-red-950/98 px-4 py-3 shadow-inner md:hidden"
           >
             <nav className="flex flex-col gap-1" aria-label="Mobile primary">
-              <button
-                type="button"
-                className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                  announcementsPanelOpen ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
-                }`}
-                onClick={openAnnouncementsPanel}
-                aria-expanded={announcementsPanelOpen}
-              >
-                Announcements
-              </button>
-              <button
-                type="button"
-                className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                  activeSection === 'donate' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
-                }`}
-                onClick={() => scrollToSection('donate')}
-              >
-                Donate
-              </button>
-              <button
-                type="button"
-                className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                  activeSection === 'about' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
-                }`}
-                onClick={() => scrollToSection('about')}
-              >
-                About Us
-              </button>
+              {isFlagEnabled('public', 'public.nav_announcements') && (
+                <button
+                  type="button"
+                  className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                    announcementsPanelOpen ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
+                  }`}
+                  onClick={openAnnouncementsPanel}
+                  aria-expanded={announcementsPanelOpen}
+                >
+                  Announcements
+                </button>
+              )}
+              {isFlagEnabled('public', 'public.nav_donate') && (
+                <button
+                  type="button"
+                  className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                    activeSection === 'donate' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
+                  }`}
+                  onClick={() => scrollToSection('donate')}
+                >
+                  Donate
+                </button>
+              )}
+              {isFlagEnabled('public', 'public.nav_about') && (
+                <button
+                  type="button"
+                  className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                    activeSection === 'about' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
+                  }`}
+                  onClick={() => scrollToSection('about')}
+                >
+                  About Us
+                </button>
+              )}
             </nav>
           </div>
         )}
@@ -403,16 +417,18 @@ function Home() {
                   </>
                 )}
 
-                <p className="text-center text-xs text-slate-500">
-                  New to BloodConnect?{' '}
-                  <button
-                    type="button"
-                    onClick={() => navigate('/register')}
-                    className="cursor-pointer font-semibold text-red-600 hover:text-red-700"
-                  >
-                    Create an account
-                  </button>
-                </p>
+                {isFlagEnabled('public', 'public.register') && (
+                  <p className="text-center text-xs text-slate-500">
+                    New to BloodConnect?{' '}
+                    <button
+                      type="button"
+                      onClick={() => navigate('/register')}
+                      className="cursor-pointer font-semibold text-red-600 hover:text-red-700"
+                    >
+                      Create an account
+                    </button>
+                  </p>
+                )}
               </form>
 
               <div className="mt-6 border-t border-slate-100 pt-4 text-[11px] text-slate-400">
@@ -423,52 +439,62 @@ function Home() {
         </div>
 
         {/* Donate */}
-        <section
-          id="donate"
-          className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-red-100/80 bg-white/90 py-28 shadow-sm sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
-        >
-          <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">Give blood, save lives</h2>
-            <p className="mx-auto mt-6 max-w-xl text-sm text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
-              Register as a donor to help hospitals maintain a safe blood supply. It only takes a few minutes to get
-              started.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate('/register')}
-              className="mt-12 inline-flex min-h-12 items-center justify-center rounded-full bg-red-600 px-10 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:mt-16"
-            >
-              Start donating
-            </button>
-          </div>
-        </section>
+        {isFlagEnabled('public', 'public.section_donate') && (
+          <section
+            id="donate"
+            className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-red-100/80 bg-white/90 py-28 shadow-sm sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
+          >
+            <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+                Give blood, save lives
+              </h2>
+              <p className="mx-auto mt-6 max-w-xl text-sm text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
+                Register as a donor to help hospitals maintain a safe blood supply. It only takes a few minutes to get
+                started.
+              </p>
+              {isFlagEnabled('public', 'public.register') && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/register')}
+                  className="mt-12 inline-flex min-h-12 items-center justify-center rounded-full bg-red-600 px-10 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:mt-16"
+                >
+                  Start donating
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* About */}
-        <section
-          id="about"
-          className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-slate-200/80 bg-slate-50/90 py-28 sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
-        >
-          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-              About BloodConnect
-            </h2>
-            <p className="mt-8 text-sm leading-relaxed text-slate-600 sm:mt-10 sm:text-base lg:mt-12 lg:text-lg">
-              BloodConnect is built for hospitals, donors, and administrators to coordinate blood requests, inventory,
-              and donation activity in one place. Our goal is to reduce delays in emergencies and keep the community
-              informed about drives and urgent needs—safely and transparently.
-            </p>
-            <p className="mt-6 text-sm leading-relaxed text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
-              Whether you are logging in to donate, manage hospital supply, or oversee the network, BloodConnect keeps
-              critical workflows clear and connected.
-            </p>
-          </div>
-        </section>
+        {isFlagEnabled('public', 'public.section_about') && (
+          <section
+            id="about"
+            className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-slate-200/80 bg-slate-50/90 py-28 sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
+          >
+            <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+              <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+                About BloodConnect
+              </h2>
+              <p className="mt-8 text-sm leading-relaxed text-slate-600 sm:mt-10 sm:text-base lg:mt-12 lg:text-lg">
+                BloodConnect is built for hospitals, donors, and administrators to coordinate blood requests, inventory,
+                and donation activity in one place. Our goal is to reduce delays in emergencies and keep the community
+                informed about drives and urgent needs—safely and transparently.
+              </p>
+              <p className="mt-6 text-sm leading-relaxed text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
+                Whether you are logging in to donate, manage hospital supply, or oversee the network, BloodConnect keeps
+                critical workflows clear and connected.
+              </p>
+            </div>
+          </section>
+        )}
       </main>
 
-      <DashboardAnnouncementsPanel
-        open={announcementsPanelOpen}
-        onClose={() => setAnnouncementsPanelOpen(false)}
-      />
+      {isFlagEnabled('public', 'public.nav_announcements') && (
+        <DashboardAnnouncementsPanel
+          open={announcementsPanelOpen}
+          onClose={() => setAnnouncementsPanelOpen(false)}
+        />
+      )}
     </div>
   )
 }

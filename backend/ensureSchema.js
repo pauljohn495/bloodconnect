@@ -198,11 +198,68 @@ async function ensureScheduleDonationTrackingColumns() {
   }
 }
 
+/** MySQL ENUM on users.role must list super_admin or inserts/updates with that role fail. */
+async function ensureUserRoleEnumIncludesSuperAdmin() {
+  const [rows] = await pool.query(
+    `SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'`,
+  )
+  const row = rows[0]
+  if (!row) return
+  const columnType = row.COLUMN_TYPE || ''
+  if (!columnType.toLowerCase().startsWith('enum')) return
+  if (columnType.includes('super_admin')) return
+
+  const newType = `${columnType.slice(0, -1)},'super_admin')`
+  const nullPart = row.IS_NULLABLE === 'YES' ? 'NULL' : 'NOT NULL'
+  let defaultPart = ''
+  if (row.COLUMN_DEFAULT !== null && row.COLUMN_DEFAULT !== undefined) {
+    const raw = row.COLUMN_DEFAULT
+    if (raw !== '' && String(raw).toUpperCase() !== 'NULL') {
+      defaultPart = ` DEFAULT '${String(raw).replace(/'/g, "''")}'`
+    }
+  }
+  await pool.query(`ALTER TABLE users MODIFY COLUMN role ${newType} ${nullPart}${defaultPart}`)
+  console.log('Schema: extended users.role enum with super_admin')
+}
+
+async function ensureFeatureFlagTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS feature_flag_overrides (
+      portal VARCHAR(32) NOT NULL,
+      flag_key VARCHAR(128) NOT NULL,
+      enabled TINYINT(1) NOT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      updated_by_user_id INT NULL,
+      PRIMARY KEY (portal, flag_key),
+      INDEX idx_feature_flag_overrides_updated (updated_at),
+      CONSTRAINT fk_feature_flag_updated_by FOREIGN KEY (updated_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS feature_flag_audit (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      user_id INT NOT NULL,
+      portal VARCHAR(32) NOT NULL,
+      flag_key VARCHAR(128) NOT NULL,
+      previous_enabled TINYINT(1) NULL,
+      new_enabled TINYINT(1) NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_feature_flag_audit_created (created_at),
+      CONSTRAINT fk_feature_flag_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured feature_flag_overrides / feature_flag_audit tables')
+}
+
 module.exports = {
+  ensureUserRoleEnumIncludesSuperAdmin,
   ensureDonorProfileColumns,
   ensureHospitalLocationColumns,
   ensureExpiredUnitsTable,
   backfillExpiredUnitsFromInventory,
   ensureDonorRecallSmsLogTable,
   ensureScheduleDonationTrackingColumns,
+  ensureFeatureFlagTables,
 }

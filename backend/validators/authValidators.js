@@ -10,7 +10,7 @@ function validateLogin(req, res, next) {
     })
   }
 
-  if (role && !['admin', 'hospital', 'donor', 'recipient'].includes(role)) {
+  if (role && !['admin', 'super_admin', 'hospital', 'donor', 'recipient'].includes(role)) {
     return errorResponse(res, {
       statusCode: 400,
       message: 'Invalid role value',

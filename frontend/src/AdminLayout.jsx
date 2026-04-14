@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BrandLogo } from './BrandLogo.jsx'
+import { useFeatureFlags } from './featureFlagsContext.jsx'
 
 const ADMIN_SIDEBAR_HOVER_KEY = 'adminSidebarHovered'
 const iconClassName = 'h-5 w-5 shrink-0'
@@ -73,22 +74,39 @@ function AnnouncementsIcon() {
   )
 }
 
-const sidebarItems = [
-  { name: 'Dashboard', path: '/admin/dashboard', icon: DashboardIcon },
-  { name: 'Requests', path: '/admin/requests', icon: RequestsIcon },
-  { name: 'Inventory', path: '/admin/inventory', icon: InventoryIcon },
-  { name: 'Donors / Organizations', path: '/admin/donations', icon: DonorsIcon },
-  { name: 'Hospitals', path: '/admin/partners', icon: HospitalIcon },
-  { name: 'Manage Users', path: '/admin/users', icon: UsersIcon },
-  { name: 'Reports & Analytics', path: '/admin/reports', icon: ReportsIcon },
-  { name: 'Announcements', path: '/admin/announcements', icon: AnnouncementsIcon },
+function SettingsIcon() {
+  return (
+    <svg className={iconClassName} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        {...navIconStroke}
+        d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-1.42 3.42 2 2 0 0 1-1.42-.58l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.84-2.84l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.84-2.84l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.84 2.84l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .68.41 1.29 1.04 1.55.21.09.44.14.67.15H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+      />
+    </svg>
+  )
+}
+
+/** Superadmin sidebar: only these two destinations. */
+const superAdminSidebarItems = [
+  { name: 'Module visibility', path: '/superadmin/feature-settings', icon: SettingsIcon, flagKey: null },
+  { name: 'Manage Users', path: '/admin/users', icon: UsersIcon, flagKey: 'admin.users' },
 ]
 
-function NavLinks({ onNavigate, isExpanded }) {
+const allSidebarItems = [
+  { name: 'Dashboard', path: '/admin/dashboard', icon: DashboardIcon, flagKey: 'admin.dashboard' },
+  { name: 'Requests', path: '/admin/requests', icon: RequestsIcon, flagKey: 'admin.requests' },
+  { name: 'Inventory', path: '/admin/inventory', icon: InventoryIcon, flagKey: 'admin.inventory' },
+  { name: 'Donors / Organizations', path: '/admin/donations', icon: DonorsIcon, flagKey: 'admin.donations' },
+  { name: 'Hospitals', path: '/admin/partners', icon: HospitalIcon, flagKey: 'admin.partners' },
+  { name: 'Manage Users', path: '/admin/users', icon: UsersIcon, flagKey: 'admin.users' },
+  { name: 'Reports & Analytics', path: '/admin/reports', icon: ReportsIcon, flagKey: 'admin.reports' },
+  { name: 'Announcements', path: '/admin/announcements', icon: AnnouncementsIcon, flagKey: 'admin.announcements' },
+]
+
+function NavLinks({ onNavigate, isExpanded, items }) {
   const location = useLocation()
   return (
     <nav className="space-y-1 text-sm" aria-label="Admin sections">
-      {sidebarItems.map((item) => {
+      {items.map((item) => {
         const isActive = location.pathname === item.path
         const Icon = item.icon
         return (
@@ -125,6 +143,21 @@ function NavLinks({ onNavigate, isExpanded }) {
 function AdminLayout({ children, pageTitle, pageDescription }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { isFlagEnabled } = useFeatureFlags()
+  const role = typeof localStorage !== 'undefined' ? localStorage.getItem('role') : null
+  const sidebarItems = useMemo(() => {
+    if (role === 'super_admin') {
+      return superAdminSidebarItems.filter((item) => {
+        if (!item.flagKey) return true
+        return isFlagEnabled('admin', item.flagKey)
+      })
+    }
+    return allSidebarItems.filter((item) => {
+      if (!item.flagKey) return true
+      return isFlagEnabled('admin', item.flagKey)
+    })
+  }, [isFlagEnabled, role])
+  const isSuperAdmin = role === 'super_admin'
   const [mobileOpen, setMobileOpen] = useState(false)
   const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -174,126 +207,128 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
       </a>
 
       <div className="flex min-h-screen">
-        {/* Tablet + desktop sidebar */}
-        <aside
-          className={`hidden shrink-0 flex-col border-r border-slate-900/20 bg-[#151821] transition-[width] duration-200 md:flex ${
-            desktopSidebarExpanded ? 'w-64' : 'w-20'
-          }`}
-          onMouseEnter={handleSidebarMouseEnter}
-          onMouseLeave={handleSidebarMouseLeave}
-          onFocus={handleSidebarMouseEnter}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget)) handleSidebarMouseLeave()
-          }}
-        >
-          <div className="border-b border-white/10 px-5 py-5">
-            <div className={`flex items-center ${desktopSidebarExpanded ? 'gap-3' : 'justify-center'}`}>
-              <BrandLogo className="h-10 w-10 rounded-xl ring-1 ring-white/20" roundedClass="rounded-xl" />
-              <div
-                className={`overflow-hidden whitespace-nowrap transition-all duration-200 ${
-                  desktopSidebarExpanded ? 'max-w-[170px] opacity-100' : 'max-w-0 opacity-0'
-                }`}
-              >
-                <p className="text-sm font-semibold tracking-tight text-white">BloodConnect</p>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-red-300">
-                  Admin console
+        <>
+            {/* Tablet + desktop sidebar */}
+            <aside
+              className={`hidden shrink-0 flex-col border-r border-slate-900/20 bg-[#151821] transition-[width] duration-200 md:flex ${
+                desktopSidebarExpanded ? 'w-64' : 'w-20'
+              }`}
+              onMouseEnter={handleSidebarMouseEnter}
+              onMouseLeave={handleSidebarMouseLeave}
+              onFocus={handleSidebarMouseEnter}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) handleSidebarMouseLeave()
+              }}
+            >
+              <div className="border-b border-white/10 px-5 py-5">
+                <div className={`flex items-center ${desktopSidebarExpanded ? 'gap-3' : 'justify-center'}`}>
+                  <BrandLogo className="h-10 w-10 rounded-xl ring-1 ring-white/20" roundedClass="rounded-xl" />
+                  <div
+                    className={`overflow-hidden whitespace-nowrap transition-all duration-200 ${
+                      desktopSidebarExpanded ? 'max-w-[170px] opacity-100' : 'max-w-0 opacity-0'
+                    }`}
+                  >
+                    <p className="text-sm font-semibold tracking-tight text-white">BloodConnect</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-red-300">
+                      {isSuperAdmin ? 'Superadmin' : 'Admin console'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 py-4">
+                <NavLinks items={sidebarItems} isExpanded={desktopSidebarExpanded} />
+              </div>
+              <div className="px-3 pb-3">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  title={!desktopSidebarExpanded ? 'Log out' : undefined}
+                  className={`flex min-h-[44px] w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-red-500/20 hover:text-white ${
+                    desktopSidebarExpanded ? 'gap-3' : 'justify-center'
+                  }`}
+                >
+                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span
+                    className={`whitespace-nowrap transition-all duration-200 ${
+                      desktopSidebarExpanded ? 'max-w-[180px] opacity-100' : 'max-w-0 overflow-hidden opacity-0'
+                    }`}
+                  >
+                    Log out
+                  </span>
+                </button>
+              </div>
+              <div className={`border-t border-white/10 px-5 py-4 ${desktopSidebarExpanded ? 'block' : 'hidden'}`}>
+                <p className="text-[11px] leading-relaxed text-slate-300">
+                  Secure access to donor and hospital operations. Log out when finished on shared devices.
                 </p>
               </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto px-3 py-4">
-            <NavLinks isExpanded={desktopSidebarExpanded} />
-          </div>
-          <div className="px-3 pb-3">
-            <button
-              type="button"
-              onClick={handleLogout}
-              title={!desktopSidebarExpanded ? 'Log out' : undefined}
-              className={`flex min-h-[44px] w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-red-500/20 hover:text-white ${
-                desktopSidebarExpanded ? 'gap-3' : 'justify-center'
+            </aside>
+
+            {/* Mobile overlay */}
+            {mobileOpen && (
+              <button
+                type="button"
+                className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[2px] md:hidden"
+                aria-label="Close menu"
+                onClick={() => setMobileOpen(false)}
+              />
+            )}
+
+            {/* Mobile drawer */}
+            <aside
+              id="mobile-admin-nav"
+              className={`fixed inset-y-0 left-0 z-50 flex w-[min(100%,280px)] flex-col border-r border-slate-900/20 bg-[#151821] shadow-xl transition-transform duration-200 ease-out md:hidden ${
+                mobileOpen ? 'translate-x-0' : '-translate-x-full'
               }`}
+              aria-hidden={!mobileOpen}
             >
-              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span
-                className={`whitespace-nowrap transition-all duration-200 ${
-                  desktopSidebarExpanded ? 'max-w-[180px] opacity-100' : 'max-w-0 overflow-hidden opacity-0'
-                }`}
-              >
-                Log out
-              </span>
-            </button>
-          </div>
-          <div className={`border-t border-white/10 px-5 py-4 ${desktopSidebarExpanded ? 'block' : 'hidden'}`}>
-            <p className="text-[11px] leading-relaxed text-slate-300">
-              Secure access to donor and hospital operations. Log out when finished on shared devices.
-            </p>
-          </div>
-        </aside>
-
-        {/* Mobile overlay */}
-        {mobileOpen && (
-          <button
-            type="button"
-            className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[2px] md:hidden"
-            aria-label="Close menu"
-            onClick={() => setMobileOpen(false)}
-          />
-        )}
-
-        {/* Mobile drawer */}
-        <aside
-          id="mobile-admin-nav"
-          className={`fixed inset-y-0 left-0 z-50 flex w-[min(100%,280px)] flex-col border-r border-slate-900/20 bg-[#151821] shadow-xl transition-transform duration-200 ease-out md:hidden ${
-            mobileOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-          aria-hidden={!mobileOpen}
-        >
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
-            <div className="flex items-center gap-2">
-              <BrandLogo className="h-9 w-9 rounded-lg" roundedClass="rounded-lg" />
-              <span className="text-sm font-semibold text-white">BloodConnect</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMobileOpen(false)}
-              className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/40"
-              aria-label="Close navigation"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-3 py-3">
-            <NavLinks onNavigate={() => setMobileOpen(false)} isExpanded />
-          </div>
-          <div className="border-t border-white/10 px-3 py-3">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-red-500/20 hover:text-white"
-            >
-              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path
-                  d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span>Log out</span>
-            </button>
-          </div>
-        </aside>
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+                <div className="flex items-center gap-2">
+                  <BrandLogo className="h-9 w-9 rounded-lg" roundedClass="rounded-lg" />
+                  <span className="text-sm font-semibold text-white">BloodConnect</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                  aria-label="Close navigation"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 py-3">
+                <NavLinks items={sidebarItems} onNavigate={() => setMobileOpen(false)} isExpanded />
+              </div>
+              <div className="border-t border-white/10 px-3 py-3">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-red-500/20 hover:text-white"
+                >
+                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>Log out</span>
+                </button>
+              </div>
+            </aside>
+        </>
 
         <div className="flex min-h-screen flex-1 flex-col">
           <header className="z-30 mx-3 mt-3 flex min-h-13 items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_8px_25px_-20px_rgba(15,23,42,0.45)] sm:mx-6 sm:mt-5 sm:gap-4 sm:px-6 sm:py-3 lg:mx-8">
@@ -320,7 +355,6 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
                 </p>
               </div>
             </div>
-
           </header>
 
           <main

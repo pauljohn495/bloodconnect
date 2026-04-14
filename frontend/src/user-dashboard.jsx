@@ -5,9 +5,15 @@ import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 import { BrandLogo } from './BrandLogo.jsx'
 import { responsiveTableContainer } from './admin-ui.jsx'
 import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
+import { useFeatureFlags } from './featureFlagsContext.jsx'
 
 function UserDashboard() {
   const navigate = useNavigate()
+  const { isFlagEnabled } = useFeatureFlags()
+  const showAnnouncements = isFlagEnabled('user', 'user.announcements')
+  const showNotifications = isFlagEnabled('user', 'user.notifications')
+  const showProfile = isFlagEnabled('user', 'user.profile')
+  const showSchedule = isFlagEnabled('user', 'user.schedule')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [announcementsPanelOpen, setAnnouncementsPanelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -321,8 +327,14 @@ function UserDashboard() {
     })
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('role')
+    navigate('/')
+  }
+
   return (
-    <div className="min-h-screen bg-[#f0f4f8]">
+    <div className="min-h-screen">
       {/* Top Header */}
       <header className="z-30 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
@@ -335,32 +347,35 @@ function UserDashboard() {
             </div>
           </div>
 
-          {/* Right: Announcements panel, notifications, profile, logout */}
+          {/* Right: Announcements panel, notifications, profile, Logout */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setAnnouncementsPanelOpen((o) => !o)}
-              className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:gap-2 sm:px-3 sm:pr-4 ${
-                announcementsPanelOpen
-                  ? 'border-red-200 bg-red-50 text-red-800'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-              aria-expanded={announcementsPanelOpen}
-              aria-controls="announcements-side-panel"
-              title="Announcements"
-            >
-              <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 5.882V19.24a1.76 1.76 0 001.759 1.759h.282a1.76 1.76 0 001.759-1.759V5.882M12 5.882V4.5M9.5 9h5"
-                />
-              </svg>
-              <span className="hidden text-xs font-semibold sm:inline">Announcements</span>
-            </button>
+            {showAnnouncements && (
+              <button
+                type="button"
+                onClick={() => setAnnouncementsPanelOpen((o) => !o)}
+                className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border transition focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:gap-2 sm:px-3 sm:pr-4 ${
+                  announcementsPanelOpen
+                    ? 'border-red-200 bg-red-50 text-red-800'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-expanded={announcementsPanelOpen}
+                aria-controls="announcements-side-panel"
+                title="Announcements"
+              >
+                <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5.882V19.24a1.76 1.76 0 001.759 1.759h.282a1.76 1.76 0 001.759-1.759V5.882M12 5.882V4.5M9.5 9h5"
+                  />
+                </svg>
+                <span className="hidden text-xs font-semibold sm:inline">Announcements</span>
+              </button>
+            )}
 
             {/* Notifications */}
+            {showNotifications && (
             <div className="relative">
               <button
                 type="button"
@@ -416,29 +431,48 @@ function UserDashboard() {
                 </div>
               )}
             </div>
+            )}
 
             {/* User Profile */}
+            {showProfile && (
+              <button
+                type="button"
+                onClick={() => navigate('/profile')}
+                className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:px-0"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white ring-1 ring-red-700/20">
+                  {userData.avatar ? (
+                    <img
+                      src={userData.avatar}
+                      alt={userData.name}
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    userData.name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <span className="hidden text-sm font-medium text-slate-700 sm:inline-block">
+                  {userData.name}
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => navigate('/profile')}
-              className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:px-0"
+              onClick={handleLogout}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
+              title="Logout"
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white ring-1 ring-red-700/20">
-                {userData.avatar ? (
-                  <img
-                    src={userData.avatar}
-                    alt={userData.name}
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  userData.name.charAt(0).toUpperCase()
-                )}
-              </div>
-              <span className="hidden text-sm font-medium text-slate-700 sm:inline-block">
-                {userData.name}
-              </span>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              <span className="hidden sm:inline-block">Logout</span>
             </button>
-
           </div>
         </div>
       </header>
@@ -541,7 +575,7 @@ function UserDashboard() {
         </section>
 
         {/* Schedule Request Section */}
-        {scheduleRequest && (
+        {showSchedule && scheduleRequest && (
           <section className="mb-8">
             <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm ring-1 ring-slate-100/90">
               <div className="flex items-center justify-between">
@@ -579,22 +613,24 @@ function UserDashboard() {
         )}
 
         {/* Set Schedule Button */}
-        <section className="mb-8">
-          <button
-            type="button"
-            onClick={handleOpenScheduleModal}
-            disabled={scheduleRequest && scheduleRequest.status === 'pending'}
-            className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition sm:w-auto sm:py-2 ${
-              scheduleRequest && scheduleRequest.status === 'pending'
-                ? 'cursor-not-allowed bg-slate-400'
-                : 'bg-red-600 hover:bg-red-700'
-            }`}
-          >
-            {scheduleRequest && scheduleRequest.status === 'pending'
-              ? 'Schedule Request Pending'
-              : 'Set Schedule'}
-          </button>
-        </section>
+        {showSchedule && (
+          <section className="mb-8">
+            <button
+              type="button"
+              onClick={handleOpenScheduleModal}
+              disabled={scheduleRequest && scheduleRequest.status === 'pending'}
+              className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition sm:w-auto sm:py-2 ${
+                scheduleRequest && scheduleRequest.status === 'pending'
+                  ? 'cursor-not-allowed bg-slate-400'
+                  : 'bg-red-600 hover:bg-red-700'
+              }`}
+            >
+              {scheduleRequest && scheduleRequest.status === 'pending'
+                ? 'Schedule Request Pending'
+                : 'Set Schedule'}
+            </button>
+          </section>
+        )}
 
         {/* Main Content Section - Donation History */}
         <section>
@@ -695,10 +731,12 @@ function UserDashboard() {
         </div>
       </main>
 
-      <DashboardAnnouncementsPanel open={announcementsPanelOpen} onClose={() => setAnnouncementsPanelOpen(false)} />
+      {showAnnouncements && (
+        <DashboardAnnouncementsPanel open={announcementsPanelOpen} onClose={() => setAnnouncementsPanelOpen(false)} />
+      )}
 
       {/* Schedule Request Modal */}
-      {isScheduleModalOpen && (
+      {showSchedule && isScheduleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
             <div className="mb-4 flex items-center justify-between">

@@ -60,10 +60,24 @@ async function login(req, res, next) {
     }
 
     const normalizedRole = role === 'recipient' ? 'donor' : role
-    if (normalizedRole && user.role !== normalizedRole) {
-      const error = new Error('User does not have the requested role')
-      error.statusCode = 403
-      throw error
+    if (normalizedRole) {
+      if (normalizedRole === 'admin') {
+        if (user.role !== 'admin') {
+          const error = new Error('Use the superadmin sign-in page for this account type')
+          error.statusCode = 403
+          throw error
+        }
+      } else if (normalizedRole === 'super_admin') {
+        if (user.role !== 'super_admin') {
+          const error = new Error('This sign-in is only for super administrator accounts')
+          error.statusCode = 403
+          throw error
+        }
+      } else if (user.role !== normalizedRole) {
+        const error = new Error('User does not have the requested role')
+        error.statusCode = 403
+        throw error
+      }
     }
 
     if (user.status !== 'active') {

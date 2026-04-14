@@ -95,6 +95,12 @@ async function updateAdminController(req, res, next) {
       throw error
     }
 
+    if (admin.role === 'super_admin' && req.user.role === 'admin') {
+      const error = new Error('Admin not found')
+      error.statusCode = 404
+      throw error
+    }
+
     // Basic validation
     if (!fullName || !email || !username) {
       const error = new Error('Full name, email, and username are required')
@@ -170,6 +176,12 @@ async function deleteAdminController(req, res, next) {
     // Check if admin exists
     const admin = await findAdminById(id)
     if (!admin) {
+      const error = new Error('Admin not found')
+      error.statusCode = 404
+      throw error
+    }
+
+    if (admin.role === 'super_admin' && req.user.role === 'admin') {
       const error = new Error('Admin not found')
       error.statusCode = 404
       throw error

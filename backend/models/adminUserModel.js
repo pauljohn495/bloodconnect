@@ -7,7 +7,7 @@ async function getAllAdmins() {
     SELECT id, username, email, full_name, role, status, created_at
     FROM users
     WHERE role IN ('admin', 'super_admin')
-    ORDER BY created_at DESC
+    ORDER BY FIELD(role, 'super_admin', 'admin'), created_at DESC
   `,
   )
   return rows

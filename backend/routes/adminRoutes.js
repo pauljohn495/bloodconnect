@@ -66,6 +66,11 @@ const {
   updateAnnouncementController,
   deleteAnnouncementController,
 } = require('../controllers/adminAnnouncementController')
+const {
+  getAdminFeatureFlagsController,
+  putAdminFeatureFlagsController,
+} = require('../controllers/featureFlagController')
+const requireSuperAdmin = require('../middleware/requireSuperAdmin')
 
 const router = express.Router()
 
@@ -233,6 +238,11 @@ router.put('/announcements/:id', updateAnnouncementController)
 
 // DELETE /api/admin/announcements/:id
 router.delete('/announcements/:id', deleteAnnouncementController)
+
+// ===== Feature flags (module visibility) — read: admin/super_admin; write: super_admin only =====
+
+router.get('/feature-flags', getAdminFeatureFlagsController)
+router.put('/feature-flags', requireSuperAdmin, putAdminFeatureFlagsController)
 
 module.exports = router
 
