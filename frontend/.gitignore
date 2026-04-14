@@ -32,3 +32,5 @@ dist-ssr
 
 frontend/.env
 backend/.env
+
+echo backend/.env >> .gitignore

@@ -35,3 +35,5 @@ backend/.env
 
 .env
 backend/.env
+
+echo backend/.env >> .gitignore
