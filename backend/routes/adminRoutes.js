@@ -67,6 +67,12 @@ const {
   deleteAnnouncementController,
 } = require('../controllers/adminAnnouncementController')
 const {
+  getHomePostsController,
+  createHomePostController,
+  updateHomePostController,
+  deleteHomePostController,
+} = require('../controllers/adminHomePostController')
+const {
   getAdminFeatureFlagsController,
   putAdminFeatureFlagsController,
 } = require('../controllers/featureFlagController')
@@ -238,6 +244,12 @@ router.put('/announcements/:id', updateAnnouncementController)
 
 // DELETE /api/admin/announcements/:id
 router.delete('/announcements/:id', deleteAnnouncementController)
+
+// ===== Home Posts =====
+router.get('/home-posts', getHomePostsController)
+router.post('/home-posts', createHomePostController)
+router.put('/home-posts/:id', updateHomePostController)
+router.delete('/home-posts/:id', deleteHomePostController)
 
 // ===== Feature flags (module visibility) — read: admin/super_admin; write: super_admin only =====
 

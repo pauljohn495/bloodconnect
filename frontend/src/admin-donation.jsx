@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 import { adminPanel } from './admin-ui.jsx'
@@ -126,7 +126,7 @@ function AdminDonation() {
   const [rankingError, setRankingError] = useState('')
 
   const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
-  const RC143_ACTIVITIES_KEY = 'bloodconnect_rc143_activities'
+  const RC143_REQUESTS_KEY = 'bloodconnect_rc143_activity_requests'
 
   const [rc143Volunteers, setRc143Volunteers] = useState(() => {
     try {
@@ -140,9 +140,14 @@ function AdminDonation() {
     }
     return []
   })
-  const [rc143Activities, setRc143Activities] = useState(() => {
+  const [isRc143VolunteerModalOpen, setIsRc143VolunteerModalOpen] = useState(false)
+  const [editingRc143VolunteerId, setEditingRc143VolunteerId] = useState(null)
+  const [isDeleteRc143VolunteerModalOpen, setIsDeleteRc143VolunteerModalOpen] = useState(false)
+  const [rc143VolunteerToDelete, setRc143VolunteerToDelete] = useState(null)
+  const [isRc143HistoryModalOpen, setIsRc143HistoryModalOpen] = useState(false)
+  const [rc143Requests, setRc143Requests] = useState(() => {
     try {
-      const raw = localStorage.getItem(RC143_ACTIVITIES_KEY)
+      const raw = localStorage.getItem(RC143_REQUESTS_KEY)
       if (raw) {
         const p = JSON.parse(raw)
         if (Array.isArray(p)) return p
@@ -152,21 +157,13 @@ function AdminDonation() {
     }
     return []
   })
-  const [isRc143VolunteerModalOpen, setIsRc143VolunteerModalOpen] = useState(false)
-  const [isRc143ActivityModalOpen, setIsRc143ActivityModalOpen] = useState(false)
+  const [rc143VolunteerUserId, setRc143VolunteerUserId] = useState('')
   const [rc143VolFullName, setRc143VolFullName] = useState('')
   const [rc143VolOrganization, setRc143VolOrganization] = useState('')
   const [rc143VolOccupation, setRc143VolOccupation] = useState('')
   const [rc143VolContact, setRc143VolContact] = useState('')
   const [rc143VolAddress, setRc143VolAddress] = useState('')
   const [rc143VolContactNumber, setRc143VolContactNumber] = useState('')
-  const [rc143ActVolunteerId, setRc143ActVolunteerId] = useState('')
-  const [rc143ActTitle, setRc143ActTitle] = useState('')
-  const [rc143ActDescription, setRc143ActDescription] = useState('')
-  const [rc143ActDate, setRc143ActDate] = useState('')
-  const [rc143ActLocation, setRc143ActLocation] = useState('')
-  const [rc143ActPriority, setRc143ActPriority] = useState('Normal')
-
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
     setTimeout(() => {
@@ -253,11 +250,34 @@ function AdminDonation() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(RC143_ACTIVITIES_KEY, JSON.stringify(rc143Activities))
+      localStorage.setItem(RC143_REQUESTS_KEY, JSON.stringify(rc143Requests))
     } catch {
       /* quota / private mode */
     }
-  }, [rc143Activities])
+  }, [rc143Requests])
+
+  useEffect(() => {
+    const syncRc143RequestsFromStorage = () => {
+      try {
+        const raw = localStorage.getItem(RC143_REQUESTS_KEY)
+        const parsed = raw ? JSON.parse(raw) : []
+        setRc143Requests(Array.isArray(parsed) ? parsed : [])
+      } catch {
+        setRc143Requests([])
+      }
+    }
+
+    // Refresh whenever admin opens/switches to RC143 and when storage changes.
+    if (activeSection === 'rc143') {
+      syncRc143RequestsFromStorage()
+    }
+    window.addEventListener('storage', syncRc143RequestsFromStorage)
+    window.addEventListener('focus', syncRc143RequestsFromStorage)
+    return () => {
+      window.removeEventListener('storage', syncRc143RequestsFromStorage)
+      window.removeEventListener('focus', syncRc143RequestsFromStorage)
+    }
+  }, [activeSection])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -288,6 +308,57 @@ function AdminDonation() {
     )
       .toString()
       .toLowerCase()
+
+  const donorDisplayName = (donor) =>
+    (
+      donor?.full_name ||
+      donor?.fullName ||
+      donor?.donor_name ||
+      donor?.donorName ||
+      donor?.username ||
+      ''
+    )
+      .toString()
+      .trim()
+
+  const rc143AssignableUsers = donors
+    .filter((donor) => donor?.id != null)
+    .map((donor) => {
+      const roleRaw = (donor?.role || donor?.user_role || 'donor').toString().toLowerCase()
+      const roleLabel = roleRaw === 'recipient' ? 'Recipient' : roleRaw === 'donor' ? 'Donor' : 'User'
+      return {
+        id: String(donor.id),
+        fullName: donorDisplayName(donor) || `User #${donor.id}`,
+        role: roleRaw,
+        roleLabel,
+        organization: (donor?.organization || donor?.organization_name || '').toString().trim(),
+        occupation: (donor?.occupation || donor?.profession || '').toString().trim(),
+        contact:
+          (donor?.email || donor?.phone || donor?.contact_phone || donor?.contactPhone || '')
+            .toString()
+            .trim(),
+        address: (donor?.address || donor?.full_address || '').toString().trim(),
+        contactNumber:
+          (donor?.phone || donor?.contact_phone || donor?.contactPhone || '')
+            .toString()
+            .trim(),
+      }
+    })
+
+  const fillRc143VolunteerFromUser = useCallback(
+    (userId) => {
+      const selected = rc143AssignableUsers.find((u) => String(u.id) === String(userId))
+      if (!selected) return
+      setRc143VolunteerUserId(String(selected.id))
+      setRc143VolFullName(selected.fullName)
+      setRc143VolOrganization(selected.organization)
+      setRc143VolOccupation(selected.occupation)
+      setRc143VolContact(selected.contact)
+      setRc143VolAddress(selected.address)
+      setRc143VolContactNumber(selected.contactNumber)
+    },
+    [rc143AssignableUsers],
+  )
 
   const getWholeBloodEligibility = (donor) => {
     const raw = donor?.last_donation_date || donor?.lastDonationDate
@@ -865,24 +936,113 @@ function AdminDonation() {
   }
 
   const openRc143VolunteerModal = () => {
+    if (rc143AssignableUsers.length === 0) {
+      showNotification('No donor/recipient users available to assign.', 'destructive')
+      return
+    }
+    setEditingRc143VolunteerId(null)
+    const firstUserId = rc143AssignableUsers[0]?.id ? String(rc143AssignableUsers[0].id) : ''
+    setRc143VolunteerUserId(firstUserId)
     setRc143VolFullName('')
     setRc143VolOrganization('')
     setRc143VolOccupation('')
     setRc143VolContact('')
     setRc143VolAddress('')
     setRc143VolContactNumber('')
+    if (firstUserId) fillRc143VolunteerFromUser(firstUserId)
     setIsRc143VolunteerModalOpen(true)
   }
 
   const closeRc143VolunteerModal = () => {
     setIsRc143VolunteerModalOpen(false)
+    setEditingRc143VolunteerId(null)
+  }
+
+  const openEditRc143VolunteerModal = (volunteer) => {
+    if (rc143AssignableUsers.length === 0) {
+      showNotification('No donor/recipient users available to assign.', 'destructive')
+      return
+    }
+    setEditingRc143VolunteerId(volunteer.id)
+    const preferredId = volunteer.sourceUserId ? String(volunteer.sourceUserId) : String(rc143AssignableUsers[0].id)
+    setRc143VolunteerUserId(preferredId)
+    fillRc143VolunteerFromUser(preferredId)
+    setRc143VolOrganization((volunteer.organization || '').toString())
+    setRc143VolOccupation((volunteer.occupation || '').toString())
+    setRc143VolContact((volunteer.contact || '').toString())
+    setRc143VolAddress((volunteer.address || '').toString())
+    setRc143VolContactNumber((volunteer.contactNumber || '').toString())
+    setIsRc143VolunteerModalOpen(true)
+  }
+
+  const handleOpenDeleteRc143VolunteerModal = (volunteerId) => {
+    const target = rc143Volunteers.find((v) => String(v.id) === String(volunteerId))
+    if (!target) return
+    setRc143VolunteerToDelete(target)
+    setIsDeleteRc143VolunteerModalOpen(true)
+  }
+
+  const handleCloseDeleteRc143VolunteerModal = () => {
+    setIsDeleteRc143VolunteerModalOpen(false)
+    setRc143VolunteerToDelete(null)
+  }
+
+  const handleConfirmDeleteRc143Volunteer = () => {
+    if (!rc143VolunteerToDelete) return
+    const volunteerId = String(rc143VolunteerToDelete.id)
+    setRc143Volunteers((prev) => prev.filter((v) => String(v.id) !== volunteerId))
+    setRc143Requests((prev) => prev.filter((r) => String(r.volunteerId) !== volunteerId))
+    handleCloseDeleteRc143VolunteerModal()
+    showNotification('Volunteer deleted.', 'primary')
+  }
+
+  const handleUpdateRc143RequestStatus = (requestId, nextStatus) => {
+    setRc143Requests((prev) =>
+      prev.map((r) =>
+        String(r.id) === String(requestId)
+          ? { ...r, status: nextStatus, reviewedAt: new Date().toISOString() }
+          : r,
+      ),
+    )
+    showNotification(`Request marked as ${nextStatus}.`, 'primary')
   }
 
   const handleSubmitRc143Volunteer = (e) => {
     e.preventDefault()
+    if (!rc143VolunteerUserId) {
+      showNotification('Please select an existing donor/recipient user.', 'destructive')
+      return
+    }
+    const selectedUser = rc143AssignableUsers.find((u) => String(u.id) === String(rc143VolunteerUserId))
+    if (!selectedUser) {
+      showNotification('Selected user no longer exists. Refresh and try again.', 'destructive')
+      return
+    }
     const fullName = rc143VolFullName.trim()
     if (!fullName) {
       showNotification('Please enter full name.', 'destructive')
+      return
+    }
+    const baseVolunteer = {
+      fullName,
+      sourceUserId: selectedUser.id,
+      sourceUserRole: selectedUser.role,
+      organization: rc143VolOrganization.trim(),
+      occupation: rc143VolOccupation.trim(),
+      contact: rc143VolContact.trim(),
+      address: rc143VolAddress.trim(),
+      contactNumber: rc143VolContactNumber.trim(),
+    }
+    if (editingRc143VolunteerId) {
+      setRc143Volunteers((prev) =>
+        prev.map((v) =>
+          String(v.id) === String(editingRc143VolunteerId)
+            ? { ...v, ...baseVolunteer, updatedAt: new Date().toISOString() }
+            : v,
+        ),
+      )
+      closeRc143VolunteerModal()
+      showNotification('Volunteer updated.', 'primary')
       return
     }
     const rid =
@@ -892,12 +1052,7 @@ function AdminDonation() {
     setRc143Volunteers((prev) => [
       {
         id: rid,
-        fullName,
-        organization: rc143VolOrganization.trim(),
-        occupation: rc143VolOccupation.trim(),
-        contact: rc143VolContact.trim(),
-        address: rc143VolAddress.trim(),
-        contactNumber: rc143VolContactNumber.trim(),
+        ...baseVolunteer,
         registeredAt: new Date().toISOString(),
       },
       ...prev,
@@ -906,68 +1061,28 @@ function AdminDonation() {
     showNotification('Volunteer registered.', 'primary')
   }
 
-  const openRc143ActivityModal = () => {
-    if (rc143Volunteers.length === 0) {
-      showNotification('Register at least one volunteer before assigning an activity.', 'destructive')
-      return
-    }
-    const today = new Date().toISOString().split('T')[0]
-    setRc143ActVolunteerId(rc143Volunteers[0]?.id ? String(rc143Volunteers[0].id) : '')
-    setRc143ActTitle('')
-    setRc143ActDescription('')
-    setRc143ActDate(today)
-    setRc143ActLocation('')
-    setRc143ActPriority('Normal')
-    setIsRc143ActivityModalOpen(true)
+  const openRc143HistoryModal = () => {
+    setIsRc143HistoryModalOpen(true)
   }
 
-  const closeRc143ActivityModal = () => {
-    setIsRc143ActivityModalOpen(false)
+  const closeRc143HistoryModal = () => {
+    setIsRc143HistoryModalOpen(false)
   }
 
-  const handleSubmitRc143Activity = (e) => {
-    e.preventDefault()
-    const title = rc143ActTitle.trim()
-    if (!title) {
-      showNotification('Please enter activity title.', 'destructive')
-      return
-    }
-    if (!rc143ActVolunteerId) {
-      showNotification('Select a registered volunteer to assign this activity.', 'destructive')
-      return
-    }
-    const volunteer = rc143Volunteers.find((v) => String(v.id) === String(rc143ActVolunteerId))
-    if (!volunteer) {
-      showNotification('Selected volunteer is no longer in the list. Refresh and try again.', 'destructive')
-      return
-    }
-    const aid =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `a-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    setRc143Activities((prev) => [
-      {
-        id: aid,
-        volunteerId: volunteer.id,
-        volunteerName: volunteer.fullName,
-        title,
-        description: rc143ActDescription.trim(),
-        date: rc143ActDate,
-        location: rc143ActLocation.trim(),
-        priority: rc143ActPriority,
-        requestedAt: new Date().toISOString(),
-      },
-      ...prev,
-    ])
-    closeRc143ActivityModal()
-    showNotification(`Activity assigned to ${volunteer.fullName}.`, 'primary')
-  }
-
-  const rc143PriorityClass = (p) => {
-    if (p === 'Critical') return 'bg-red-100 text-red-800 ring-red-200'
-    if (p === 'Urgent') return 'bg-amber-100 text-amber-900 ring-amber-200'
-    return 'bg-slate-100 text-slate-700 ring-slate-200'
-  }
+  const rc143RequestHistory = rc143Requests
+    .filter((r) => r.status === 'approved' || r.status === 'rejected')
+    .sort((a, b) => {
+      const aTs = new Date(a.reviewedAt || a.requestedAt || 0).getTime()
+      const bTs = new Date(b.reviewedAt || b.requestedAt || 0).getTime()
+      return bTs - aTs
+    })
+  const rc143ActiveRequests = rc143Requests
+    .filter((r) => String(r.status || 'pending').toLowerCase() === 'pending')
+    .sort((a, b) => {
+      const aTs = new Date(a.requestedAt || 0).getTime()
+      const bTs = new Date(b.requestedAt || 0).getTime()
+      return bTs - aTs
+    })
 
   return (
     <AdminLayout
@@ -982,7 +1097,7 @@ function AdminDonation() {
         activeSection === 'organizations'
           ? 'View and manage registered organizations.'
           : activeSection === 'rc143'
-            ? 'Register RC143 volunteers and assign blood-drive activities to them.'
+            ? 'Register volunteers and review their activity requests.'
             : 'View and manage registered blood donors.'
       }
     >
@@ -1038,9 +1153,9 @@ function AdminDonation() {
           <div className={adminPanel.emerald.outer}>
             <div className={adminPanel.emerald.header}>
               <div>
-                <h2 className={adminPanel.emerald.title}>RC143 — Volunteers and activities</h2>
+                <h2 className={adminPanel.emerald.title}>RC143 — Volunteers</h2>
                 <p className={adminPanel.emerald.subtitle}>
-                  Register outreach volunteers, then assign blood-drive activities to them.
+                  Register volunteers and review their requested blood donation activities.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1053,10 +1168,10 @@ function AdminDonation() {
                 </button>
                 <button
                   type="button"
-                  onClick={openRc143ActivityModal}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 sm:min-h-0"
+                  onClick={openRc143HistoryModal}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-0"
                 >
-                  Assign activity
+                  History
                 </button>
               </div>
             </div>
@@ -1089,12 +1204,15 @@ function AdminDonation() {
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                           Contact number
                         </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className={adminPanel.emerald.tbody}>
                       {rc143Volunteers.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                          <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
                             No volunteers registered yet. Use &quot;Register New Volunteer&quot; to add one.
                           </td>
                         </tr>
@@ -1107,6 +1225,24 @@ function AdminDonation() {
                             <td className="px-4 py-2 text-sm text-slate-700">{v.contact || '—'}</td>
                             <td className="max-w-xs px-4 py-2 text-sm text-slate-700">{v.address || '—'}</td>
                             <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">{v.contactNumber || '—'}</td>
+                            <td className="whitespace-nowrap px-4 py-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditRc143VolunteerModal(v)}
+                                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenDeleteRc143VolunteerModal(v.id)}
+                                  className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))
                       )}
@@ -1118,56 +1254,82 @@ function AdminDonation() {
               <div>
                 <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
                   <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-                  Activities
+                  Volunteer activity requests
                 </h3>
                 <div className={adminPanel.emerald.tableScroll}>
                   <table className="min-w-full divide-y divide-slate-100 text-sm">
                     <thead className={adminPanel.emerald.thead}>
                       <tr>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                          Assigned volunteer
+                          Volunteer
                         </th>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                           Title
                         </th>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                          Description
-                        </th>
-                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                          Date
+                          Details
                         </th>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                           Location
                         </th>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                          Priority
+                          Status
+                        </th>
+                        <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
+                          Review
                         </th>
                       </tr>
                     </thead>
                     <tbody className={adminPanel.emerald.tbody}>
-                      {rc143Activities.length === 0 ? (
+                      {rc143ActiveRequests.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
-                            No activities assigned yet. Register a volunteer, then use &quot;Assign activity&quot; to
-                            link an activity to them.
+                            No pending activity requests.
                           </td>
                         </tr>
                       ) : (
-                        rc143Activities.map((a) => (
-                          <tr key={a.id} className="hover:bg-slate-50/60">
+                        rc143ActiveRequests.map((r) => (
+                          <tr key={r.id} className="hover:bg-slate-50/60">
                             <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                              {a.volunteerName || '—'}
+                              {r.volunteerName || '—'}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">{a.title}</td>
-                            <td className="max-w-md px-4 py-2 text-sm text-slate-700">{a.description || '—'}</td>
-                            <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">{a.date || '—'}</td>
-                            <td className="px-4 py-2 text-sm text-slate-700">{a.location || '—'}</td>
+                            <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                              {r.title || '—'}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-slate-700">{r.details || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-slate-700">{r.location || '—'}</td>
                             <td className="whitespace-nowrap px-4 py-2 text-sm">
                               <span
-                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${rc143PriorityClass(a.priority)}`}
+                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                                  r.status === 'approved'
+                                    ? 'bg-emerald-100 text-emerald-800 ring-emerald-200'
+                                    : r.status === 'rejected'
+                                      ? 'bg-red-100 text-red-800 ring-red-200'
+                                      : 'bg-amber-100 text-amber-800 ring-amber-200'
+                                }`}
                               >
-                                {a.priority}
+                                {String(r.status || 'pending').toUpperCase()}
                               </span>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateRc143RequestStatus(r.id, 'approved')}
+                                  disabled={r.status === 'approved'}
+                                  className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateRc143RequestStatus(r.id, 'rejected')}
+                                  disabled={r.status === 'rejected'}
+                                  className="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Reject
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -1176,6 +1338,7 @@ function AdminDonation() {
                   </table>
                 </div>
               </div>
+
             </div>
           </div>
         ) : (
@@ -1724,7 +1887,7 @@ function AdminDonation() {
             <div className="flex items-start justify-between gap-3 border-b border-red-100 pb-3">
               <div>
                 <h3 id="rc143-volunteer-title" className="text-base font-semibold text-red-950">
-                  Register New Volunteer
+                  {editingRc143VolunteerId ? 'Edit Volunteer' : 'Register New Volunteer'}
                 </h3>
                 <p className="mt-0.5 text-xs text-slate-600">RC143 outreach — blood donation programs</p>
               </div>
@@ -1741,6 +1904,24 @@ function AdminDonation() {
             </div>
 
             <form onSubmit={handleSubmitRc143Volunteer} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Select existing user (donor/recipient)</label>
+                <select
+                  value={rc143VolunteerUserId}
+                  onChange={(e) => fillRc143VolunteerFromUser(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                  required
+                >
+                  <option value="" disabled>
+                    Select user
+                  </option>
+                  {rc143AssignableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName} ({u.roleLabel})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700">Full name</label>
                 <input
@@ -1816,127 +1997,7 @@ function AdminDonation() {
                   type="submit"
                   className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
-                  Save volunteer
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {isRc143ActivityModalOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
-          <div
-            className="w-full max-w-lg rounded-2xl border border-red-100 bg-white p-5 shadow-xl ring-1 ring-red-100/80"
-            role="dialog"
-            aria-labelledby="rc143-activity-title"
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-red-100 pb-3">
-              <div>
-                <h3 id="rc143-activity-title" className="text-base font-semibold text-red-950">
-                  Assign activity to volunteer
-                </h3>
-                <p className="mt-0.5 text-xs text-slate-600">
-                  Choose a registered volunteer and define the blood-drive activity they will handle.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeRc143ActivityModal}
-                className="shrink-0 text-slate-400 hover:text-slate-600"
-                aria-label="Close"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitRc143Activity} className="mt-4 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Volunteer</label>
-                <select
-                  value={rc143ActVolunteerId}
-                  onChange={(e) => setRc143ActVolunteerId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                  required
-                >
-                  {rc143Volunteers.map((v) => (
-                    <option key={v.id} value={String(v.id)}>
-                      {v.fullName}
-                      {v.organization ? ` (${v.organization})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Title</label>
-                <input
-                  type="text"
-                  value={rc143ActTitle}
-                  onChange={(e) => setRc143ActTitle(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                  placeholder="Activity name"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Description</label>
-                <textarea
-                  rows={3}
-                  value={rc143ActDescription}
-                  onChange={(e) => setRc143ActDescription(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                  placeholder="Goals, audience, resources needed..."
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Date</label>
-                  <input
-                    type="date"
-                    value={rc143ActDate}
-                    onChange={(e) => setRc143ActDate(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700">Priority</label>
-                  <select
-                    value={rc143ActPriority}
-                    onChange={(e) => setRc143ActPriority(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                  >
-                    <option value="Normal">Normal</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="Critical">Critical</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700">Location</label>
-                <input
-                  type="text"
-                  value={rc143ActLocation}
-                  onChange={(e) => setRc143ActLocation(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                  placeholder="Venue or address"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={closeRc143ActivityModal}
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
-                >
-                  Assign activity
+                  {editingRc143VolunteerId ? 'Save changes' : 'Save volunteer'}
                 </button>
               </div>
             </form>
@@ -2685,6 +2746,127 @@ function AdminDonation() {
         </div>
       )}
 
+      {isDeleteRc143VolunteerModalOpen && rc143VolunteerToDelete && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Delete Volunteer</h3>
+              <button
+                type="button"
+                onClick={handleCloseDeleteRc143VolunteerModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-slate-900">
+              Are you sure you want to delete this RC143 volunteer? Assigned activities will also be removed.
+            </p>
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Name:</span> {rc143VolunteerToDelete.fullName || '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-700">
+                <span className="font-semibold text-slate-900">Contact:</span> {rc143VolunteerToDelete.contactNumber || rc143VolunteerToDelete.contact || '—'}
+              </p>
+            </div>
+            <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={handleCloseDeleteRc143VolunteerModal}
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteRc143Volunteer}
+                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+              >
+                Delete Volunteer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRc143HistoryModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-semibold text-slate-900">RC143 Request History</h3>
+              <button
+                type="button"
+                onClick={closeRc143HistoryModal}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mt-4 max-h-[65vh] overflow-y-auto rounded-xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-100 text-sm">
+                <thead className="bg-slate-50/95">
+                  <tr>
+                    <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold uppercase tracking-wide text-slate-600">
+                      Volunteer
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold uppercase tracking-wide text-slate-600">
+                      Title
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold uppercase tracking-wide text-slate-600">
+                      Details
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold uppercase tracking-wide text-slate-600">
+                      Location
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold uppercase tracking-wide text-slate-600">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {rc143RequestHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                        No approved or rejected requests yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    rc143RequestHistory.map((r) => (
+                      <tr key={`history-${r.id}`} className="hover:bg-slate-50/60">
+                        <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                          {r.volunteerName || '—'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
+                          {r.title || '—'}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-slate-700">{r.details || '—'}</td>
+                        <td className="px-4 py-2 text-sm text-slate-700">{r.location || '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+                              r.status === 'approved'
+                                ? 'bg-emerald-100 text-emerald-800 ring-emerald-200'
+                                : 'bg-red-100 text-red-800 ring-red-200'
+                            }`}
+                          >
+                            {String(r.status || '').toUpperCase()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {profileDiffDonor && (() => {
         const pending = parseDonorPendingProfile(profileDiffDonor)
         const currentName = profileDiffDonor.full_name || profileDiffDonor.fullName || '—'
@@ -2807,6 +2989,7 @@ function AdminDonation() {
                   {profileReviewLoadingId === profileDiffDonor.id ? '…' : 'Approve'}
                 </button>
               </div>
+
             </div>
           </div>
         )

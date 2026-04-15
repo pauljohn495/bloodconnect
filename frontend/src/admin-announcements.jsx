@@ -15,6 +15,12 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed' },
 ]
 
+const POST_CATEGORY_OPTIONS = [
+  { value: 'top_donors', label: 'Top 10 Donors' },
+  { value: 'top_organizers', label: 'Top 10 Organizers' },
+  { value: 'top_municipality', label: 'Top Municipality' },
+]
+
 function typeLabel(type) {
   const t = TYPE_OPTIONS.find((o) => o.value === type)
   return t ? t.label : type
@@ -23,6 +29,11 @@ function typeLabel(type) {
 function statusLabel(status) {
   const s = STATUS_OPTIONS.find((o) => o.value === status)
   return s ? s.label : status
+}
+
+function postCategoryLabel(category) {
+  const c = POST_CATEGORY_OPTIONS.find((o) => o.value === category)
+  return c ? c.label : category
 }
 
 function toDatetimeLocalValue(value) {
@@ -104,15 +115,28 @@ const emptyForm = () => ({
   status: 'upcoming',
 })
 
+const emptyPostForm = () => ({
+  title: '',
+  body: '',
+  isPublished: true,
+})
+
 function AdminAnnouncements() {
   const [items, setItems] = useState([])
+  const [posts, setPosts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [postError, setPostError] = useState('')
   const [notification, setNotification] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [postForm, setPostForm] = useState(emptyPostForm)
+  const [editingPost, setEditingPost] = useState(null)
+  const [savingPost, setSavingPost] = useState(false)
+  const [postModalOpen, setPostModalOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState('mbd')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -129,8 +153,20 @@ function AdminAnnouncements() {
     }
   }
 
+  const loadPosts = async () => {
+    try {
+      setPostError('')
+      const data = await apiRequest('/api/admin/home-posts')
+      setPosts(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setPostError(err.message || 'Failed to load posts')
+      setPosts([])
+    }
+  }
+
   useEffect(() => {
     load()
+    loadPosts()
   }, [])
 
   const showNotification = (message, type = 'primary') => {
@@ -229,8 +265,83 @@ function AdminAnnouncements() {
     }
   }
 
+  const resetPostForm = () => {
+    setEditingPost(null)
+    setPostForm(emptyPostForm())
+  }
+
+  const openCreatePost = () => {
+    resetPostForm()
+    setPostModalOpen(true)
+  }
+
+  const closePostModal = () => {
+    if (savingPost) return
+    setPostModalOpen(false)
+    resetPostForm()
+  }
+
+  const submitPost = async (e) => {
+    e.preventDefault()
+    if (!postForm.title.trim() || !postForm.body.trim()) {
+      showNotification('Please add title and content for post', 'destructive')
+      return
+    }
+    setSavingPost(true)
+    try {
+      const payload = {
+        title: postForm.title.trim(),
+        body: postForm.body,
+        isPublished: postForm.isPublished,
+      }
+      if (editingPost) {
+        await apiRequest(`/api/admin/home-posts/${editingPost.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        })
+        showNotification('Post updated successfully!', 'primary')
+      } else {
+        await apiRequest('/api/admin/home-posts', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+        showNotification('Post created successfully!', 'primary')
+      }
+      setPostModalOpen(false)
+      resetPostForm()
+      await loadPosts()
+    } catch (err) {
+      showNotification(err.message || 'Failed to save post', 'destructive')
+    } finally {
+      setSavingPost(false)
+    }
+  }
+
+  const openEditPost = (post) => {
+    setEditingPost(post)
+    setPostForm({
+      title: post.title || '',
+      body: post.body || '',
+      isPublished: !!post.is_published,
+    })
+    setPostModalOpen(true)
+  }
+
+  const removePost = async (post) => {
+    try {
+      await apiRequest(`/api/admin/home-posts/${post.id}`, { method: 'DELETE' })
+      showNotification('Post deleted successfully!', 'primary')
+      if (editingPost?.id === post.id) resetPostForm()
+      await loadPosts()
+    } catch (err) {
+      showNotification(err.message || 'Failed to delete post', 'destructive')
+    }
+  }
+
   const mapsUrl = (loc) =>
     loc ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc)}` : null
+
+  const mbdItems = items
 
   return (
     <AdminLayout
@@ -243,29 +354,66 @@ function AdminAnnouncements() {
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Announcements</h2>
           </div>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 sm:w-auto"
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Announcement
-          </button>
+          {activeSection === 'mbd' && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 sm:w-auto"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add MBD
+            </button>
+          )}
         </div>
 
-        {isLoading && (
+        <div className="flex items-center justify-start">
+          <div
+            className="inline-flex items-center gap-0.5 rounded-lg bg-slate-100/95 p-1 ring-1 ring-slate-200/70"
+            role="tablist"
+            aria-label="Announcements section"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSection === 'mbd'}
+              onClick={() => setActiveSection('mbd')}
+              className={`rounded-md px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 ${
+                activeSection === 'mbd'
+                  ? 'border border-slate-200/90 bg-white text-red-900 shadow-sm shadow-slate-200/80'
+                  : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              MBD
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSection === 'post'}
+              onClick={() => setActiveSection('post')}
+              className={`rounded-md px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 ${
+                activeSection === 'post'
+                  ? 'border border-slate-200/90 bg-white text-red-900 shadow-sm shadow-slate-200/80'
+                  : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              Post
+            </button>
+          </div>
+        </div>
+
+        {activeSection === 'mbd' && isLoading && (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-500 shadow-sm">
             Loading announcements…
           </div>
         )}
 
-        {!isLoading && error && (
+        {activeSection === 'mbd' && !isLoading && error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
         )}
 
-        {!isLoading && !error && items.length === 0 && (
+        {activeSection === 'mbd' && !isLoading && !error && items.length === 0 && (
           <div className={adminPanel.amber.outer}>
             <div className="px-4 py-14 text-center sm:px-6">
               <p className="text-sm font-medium text-slate-600">No announcements yet.</p>
@@ -274,124 +422,216 @@ function AdminAnnouncements() {
           </div>
         )}
 
-        {!isLoading && !error && items.length > 0 && (
-          <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            {items.map((a) => {
-              const urgent = a.announcement_type === 'urgent_need'
-              return (
-                <li
-                  key={a.id}
-                  className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90 transition hover:shadow-lg hover:ring-slate-200/90"
-                >
-                  <div
-                    className={`relative flex flex-1 flex-col px-5 pb-5 pt-5 ${
-                      urgent ? 'bg-gradient-to-br from-red-50/50 via-white to-white' : 'bg-white'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide shadow-sm ring-1 ${typeBadgeClasses(
-                              a.announcement_type,
-                            )}`}
-                          >
-                            <TypeIcon type={a.announcement_type} className="h-3.5 w-3.5" />
-                            {typeLabel(a.announcement_type)}
-                          </span>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1 ${statusBadgeClasses(
-                              a.status,
-                            )}`}
-                          >
-                            {statusLabel(a.status)}
-                          </span>
-                        </div>
-                        <h3
-                          className={`mt-3 text-lg font-bold leading-snug tracking-tight ${
-                            urgent ? 'text-red-950' : 'text-slate-900'
+        {activeSection === 'mbd' && !isLoading && !error && items.length > 0 && (
+          <div className="space-y-8">
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold tracking-tight text-slate-900">MBD</h3>
+                <span className="text-xs font-medium text-slate-500">{mbdItems.length} item{mbdItems.length === 1 ? '' : 's'}</span>
+              </div>
+              {mbdItems.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 shadow-sm">
+                  No MBD announcements yet.
+                </div>
+              ) : (
+                <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  {mbdItems.map((a) => {
+                    const urgent = a.announcement_type === 'urgent_need'
+                    return (
+                      <li
+                        key={a.id}
+                        className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90 transition hover:shadow-lg hover:ring-slate-200/90"
+                      >
+                        <div
+                          className={`relative flex flex-1 flex-col px-5 pb-5 pt-5 ${
+                            urgent ? 'bg-gradient-to-br from-red-50/50 via-white to-white' : 'bg-white'
                           }`}
                         >
-                          {a.title}
-                        </h3>
-                      </div>
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(a)}
-                          className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(a)}
-                          className="rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-
-                    {a.description ? (
-                      <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-slate-600">{a.description}</p>
-                    ) : (
-                      <p className="mt-3 text-sm italic text-slate-400">No description</p>
-                    )}
-
-                    <div className="mt-5 grid gap-3 border-t border-slate-100/90 pt-4 sm:grid-cols-2">
-                      <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/90 p-3 ring-1 ring-slate-100/80">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200/60">
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.75}
-                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">When</p>
-                          <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatEventDisplay(a.event_starts_at)}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/90 p-3 ring-1 ring-slate-100/80 sm:col-span-1">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200/60">
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.75}
-                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                            />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Where</p>
-                          <p className="mt-0.5 text-sm font-semibold text-slate-900">
-                            {a.location ? (
-                              <a
-                                href={mapsUrl(a.location)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-red-700 underline decoration-red-200 underline-offset-2 transition hover:text-red-800"
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide shadow-sm ring-1 ${typeBadgeClasses(
+                                    a.announcement_type,
+                                  )}`}
+                                >
+                                  <TypeIcon type={a.announcement_type} className="h-3.5 w-3.5" />
+                                  {typeLabel(a.announcement_type)}
+                                </span>
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1 ${statusBadgeClasses(
+                                    a.status,
+                                  )}`}
+                                >
+                                  {statusLabel(a.status)}
+                                </span>
+                              </div>
+                              <h3
+                                className={`mt-3 text-lg font-bold leading-snug tracking-tight ${
+                                  urgent ? 'text-red-950' : 'text-slate-900'
+                                }`}
                               >
-                                {a.location}
-                              </a>
-                            ) : (
-                              <span className="font-medium text-slate-400">—</span>
-                            )}
-                          </p>
+                                {a.title}
+                              </h3>
+                            </div>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEdit(a)}
+                                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTarget(a)}
+                                className="rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+
+                          {a.description ? (
+                            <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-slate-600">{a.description}</p>
+                          ) : (
+                            <p className="mt-3 text-sm italic text-slate-400">No description</p>
+                          )}
+
+                          <div className="mt-5 grid gap-3 border-t border-slate-100/90 pt-4 sm:grid-cols-2">
+                            <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/90 p-3 ring-1 ring-slate-100/80">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200/60">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1.75}
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">When</p>
+                                <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatEventDisplay(a.event_starts_at)}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/90 p-3 ring-1 ring-slate-100/80 sm:col-span-1">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200/60">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1.75}
+                                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                  />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Where</p>
+                                <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                                  {a.location ? (
+                                    <a
+                                      href={mapsUrl(a.location)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-red-700 underline decoration-red-200 underline-offset-2 transition hover:text-red-800"
+                                    >
+                                      {a.location}
+                                    </a>
+                                  ) : (
+                                    <span className="font-medium text-slate-400">—</span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+
+          </div>
+        )}
+
+        {activeSection === 'post' && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold tracking-tight text-slate-900">Post</h3>
+              <span className="text-xs font-medium text-slate-500">
+                {posts.length} item{posts.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
+            {postError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{postError}</div>
+            )}
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">Post Management</h4>
+                  <p className="mt-1 text-xs text-slate-500">Create and publish homepage ranking posts from a modal form.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openCreatePost}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Post
+                </button>
+              </div>
+            </div>
+
+            {posts.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 shadow-sm">
+                No posts yet.
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {posts.map((post) => (
+                  <li key={post.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
+                        {postCategoryLabel(post.category)}
+                      </span>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                          post.is_published ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {post.is_published ? 'Published' : 'Draft'}
+                      </span>
                     </div>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+                    <h4 className="mt-3 text-base font-semibold text-slate-900">{post.title}</h4>
+                    <p className="mt-2 line-clamp-5 whitespace-pre-line text-sm text-slate-600">{post.body}</p>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditPost(post)}
+                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removePost(post)}
+                        className="rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         )}
 
       </div>
@@ -566,6 +806,103 @@ function AdminAnnouncements() {
                   className="min-h-11 rounded-2xl bg-red-600 px-5 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:opacity-60"
                 >
                   {saving ? 'Saving…' : editing ? 'Save changes' : 'Publish announcement'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {postModalOpen && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="Close post dialog"
+            onClick={closePostModal}
+          />
+          <div
+            className="relative z-10 flex max-h-[min(94vh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.25rem] bg-white shadow-2xl shadow-slate-900/20 ring-1 ring-slate-200/90 sm:max-h-[min(90vh,720px)] sm:rounded-3xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="post-modal-title"
+          >
+            <div className="relative overflow-hidden bg-gradient-to-br from-red-600 via-red-600 to-rose-800 px-5 pb-6 pt-4 sm:rounded-t-3xl sm:pt-5">
+              <div className="relative flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-red-100">
+                    {editingPost ? 'Update post' : 'New post'}
+                  </p>
+                  <h3 id="post-modal-title" className="mt-1 text-xl font-bold tracking-tight text-white sm:text-2xl">
+                    {editingPost ? 'Edit post' : 'Create post'}
+                  </h3>
+                  <p className="mt-1 max-w-sm text-sm text-red-100/95">
+                    Publish Top Donors, Organizers, or Municipality to show on home page.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePostModal}
+                  className="shrink-0 rounded-xl bg-white/15 p-2 text-white ring-1 ring-white/25 transition hover:bg-white/25 disabled:opacity-50"
+                  disabled={savingPost}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+              <form className="space-y-3 overflow-y-auto bg-slate-50/40 px-4 py-5 sm:px-6" onSubmit={submitPost}>
+              <div>
+                <label htmlFor="post-title" className="block text-xs font-semibold text-slate-700">
+                  Title
+                </label>
+                <input
+                  id="post-title"
+                  value={postForm.title}
+                  onChange={(e) => setPostForm((f) => ({ ...f, title: e.target.value }))}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                  placeholder="e.g. Top 10 Donors - April 2026"
+                />
+              </div>
+              <div>
+                <label htmlFor="post-body" className="block text-xs font-semibold text-slate-700">
+                  Content
+                </label>
+                <textarea
+                  id="post-body"
+                  rows={8}
+                  value={postForm.body}
+                  onChange={(e) => setPostForm((f) => ({ ...f, body: e.target.value }))}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                  placeholder="1. Name - value&#10;2. Name - value&#10;..."
+                />
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={postForm.isPublished}
+                  onChange={(e) => setPostForm((f) => ({ ...f, isPublished: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                />
+                Publish on home page
+              </label>
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-white px-0 py-4 sm:flex-row sm:justify-end sm:gap-3">
+                <button
+                  type="button"
+                  onClick={closePostModal}
+                  disabled={savingPost}
+                  className="min-h-11 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPost}
+                  className="min-h-11 rounded-2xl bg-red-600 px-5 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:opacity-60"
+                >
+                  {savingPost ? 'Saving…' : editingPost ? 'Save post' : 'Publish post'}
                 </button>
               </div>
             </form>

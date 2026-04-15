@@ -12,8 +12,10 @@ const {
   ensureDonorRecallSmsLogTable,
   ensureScheduleDonationTrackingColumns,
   ensureFeatureFlagTables,
+  ensureHomePostsTable,
 } = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
+const { getPublicHomePostsController } = require('./controllers/adminHomePostController')
 const { getPublicFeatureFlagsController } = require('./controllers/featureFlagController')
 const authRoutes = require('./routes/authRoutes')
 const adminRoutes = require('./routes/adminRoutes')
@@ -77,6 +79,7 @@ app.get('/api/health', async (req, res) => {
 
 // Public announcements (donors / landing — no auth)
 app.get('/api/announcements', getPublicAnnouncementsController)
+app.get('/api/home-posts', getPublicHomePostsController)
 
 // Effective feature flags for all portals (no auth; safe visibility only)
 app.get('/api/feature-flags', getPublicFeatureFlagsController)
@@ -113,6 +116,7 @@ async function start() {
         await ensureDonorRecallSmsLogTable()
         await ensureScheduleDonationTrackingColumns()
         await ensureFeatureFlagTables()
+        await ensureHomePostsTable()
         startHospitalInventoryAlertScheduler()
         startDonorRecallScheduler()
       } catch (migrationError) {

@@ -253,6 +253,24 @@ async function ensureFeatureFlagTables() {
   console.log('Schema: ensured feature_flag_overrides / feature_flag_audit tables')
 }
 
+async function ensureHomePostsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS home_posts (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      category ENUM('top_donors', 'top_organizers', 'top_municipality') NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      body MEDIUMTEXT NOT NULL,
+      is_published TINYINT(1) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_home_posts_category (category),
+      INDEX idx_home_posts_published (is_published),
+      INDEX idx_home_posts_updated_at (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured home_posts table')
+}
+
 module.exports = {
   ensureUserRoleEnumIncludesSuperAdmin,
   ensureDonorProfileColumns,
@@ -262,4 +280,5 @@ module.exports = {
   ensureDonorRecallSmsLogTable,
   ensureScheduleDonationTrackingColumns,
   ensureFeatureFlagTables,
+  ensureHomePostsTable,
 }

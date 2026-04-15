@@ -7,6 +7,9 @@ import { responsiveTableContainer } from './admin-ui.jsx'
 import { DashboardAnnouncementsPanel } from './AnnouncementFeed.jsx'
 import { useFeatureFlags } from './featureFlagsContext.jsx'
 
+const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
+const RC143_REQUESTS_KEY = 'bloodconnect_rc143_activity_requests'
+
 function UserDashboard() {
   const navigate = useNavigate()
   const { isFlagEnabled } = useFeatureFlags()
@@ -25,6 +28,16 @@ function UserDashboard() {
   const [cooldownModal, setCooldownModal] = useState({ open: false, message: '' })
   const [notifications, setNotifications] = useState([])
   const [scheduleRequest, setScheduleRequest] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState('')
+  const [isRc143Volunteer, setIsRc143Volunteer] = useState(false)
+  const [rc143MyRequests, setRc143MyRequests] = useState([])
+  const [isRequestActivityModalOpen, setIsRequestActivityModalOpen] = useState(false)
+  const [isRequestHistoryModalOpen, setIsRequestHistoryModalOpen] = useState(false)
+  const [activityRequestForm, setActivityRequestForm] = useState({
+    title: '',
+    details: '',
+    location: '',
+  })
 
   const [userData, setUserData] = useState({
     name: '',
@@ -146,6 +159,37 @@ function UserDashboard() {
 
         setDonationHistory(combinedHistory)
 
+        const meId = me?.id ? String(me.id) : ''
+        setCurrentUserId(meId)
+
+        // Volunteer requests are stored locally from admin-donations RC143.
+        let volunteerEntries = []
+        let allRequests = []
+        try {
+          const rawVolunteers = localStorage.getItem(RC143_VOLUNTEERS_KEY)
+          const parsedVolunteers = rawVolunteers ? JSON.parse(rawVolunteers) : []
+          volunteerEntries = Array.isArray(parsedVolunteers) ? parsedVolunteers : []
+        } catch {
+          volunteerEntries = []
+        }
+        try {
+          const rawRequests = localStorage.getItem(RC143_REQUESTS_KEY)
+          const parsedRequests = rawRequests ? JSON.parse(rawRequests) : []
+          allRequests = Array.isArray(parsedRequests) ? parsedRequests : []
+        } catch {
+          allRequests = []
+        }
+        const matchedVolunteer = volunteerEntries.find((v) => String(v.sourceUserId || '') === meId)
+        setIsRc143Volunteer(Boolean(matchedVolunteer))
+        if (matchedVolunteer) {
+          const mine = allRequests
+            .filter((r) => String(r.volunteerId) === String(matchedVolunteer.id))
+            .sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0))
+          setRc143MyRequests(mine)
+        } else {
+          setRc143MyRequests([])
+        }
+
         // Set latest schedule request (including pending)
         if (scheduleRequests && scheduleRequests.length > 0) {
           setScheduleRequest(scheduleRequests[0])
@@ -167,6 +211,44 @@ function UserDashboard() {
 
     loadData()
   }, [navigate])
+
+  useEffect(() => {
+    const syncMyRc143Requests = () => {
+      if (!currentUserId) return
+      let volunteerEntries = []
+      let allRequests = []
+      try {
+        const rawVolunteers = localStorage.getItem(RC143_VOLUNTEERS_KEY)
+        const parsedVolunteers = rawVolunteers ? JSON.parse(rawVolunteers) : []
+        volunteerEntries = Array.isArray(parsedVolunteers) ? parsedVolunteers : []
+      } catch {
+        volunteerEntries = []
+      }
+      try {
+        const rawRequests = localStorage.getItem(RC143_REQUESTS_KEY)
+        const parsedRequests = rawRequests ? JSON.parse(rawRequests) : []
+        allRequests = Array.isArray(parsedRequests) ? parsedRequests : []
+      } catch {
+        allRequests = []
+      }
+      const matchedVolunteer = volunteerEntries.find((v) => String(v.sourceUserId || '') === String(currentUserId))
+      if (!matchedVolunteer) {
+        setRc143MyRequests([])
+        return
+      }
+      const mine = allRequests
+        .filter((r) => String(r.volunteerId) === String(matchedVolunteer.id))
+        .sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0))
+      setRc143MyRequests(mine)
+    }
+
+    window.addEventListener('storage', syncMyRc143Requests)
+    window.addEventListener('focus', syncMyRc143Requests)
+    return () => {
+      window.removeEventListener('storage', syncMyRc143Requests)
+      window.removeEventListener('focus', syncMyRc143Requests)
+    }
+  }, [currentUserId])
 
   // Tick "now" while schedule modal is open so cooldown countdowns update
   useEffect(() => {
@@ -282,6 +364,12 @@ function UserDashboard() {
     }
   }
 
+  const getRc143RequestStatusColor = (status) => {
+    if (status === 'approved') return 'bg-emerald-100 text-emerald-700 ring-emerald-200'
+    if (status === 'rejected') return 'bg-red-100 text-red-700 ring-red-200'
+    return 'bg-amber-100 text-amber-700 ring-amber-200'
+  }
+
   const formatCooldownRemaining = (nextEligibleAt) => {
     if (!nextEligibleAt) return null
     const diffMs = new Date(nextEligibleAt).getTime() - nowTs
@@ -332,6 +420,84 @@ function UserDashboard() {
     localStorage.removeItem('role')
     navigate('/')
   }
+
+  const openRequestActivityModal = () => {
+    setActivityRequestForm({
+      title: '',
+      details: '',
+      location: '',
+    })
+    setIsRequestActivityModalOpen(true)
+  }
+
+  const closeRequestActivityModal = () => {
+    setIsRequestActivityModalOpen(false)
+  }
+
+  const openRequestHistoryModal = () => {
+    setIsRequestHistoryModalOpen(true)
+  }
+
+  const closeRequestHistoryModal = () => {
+    setIsRequestHistoryModalOpen(false)
+  }
+
+  const handleSubmitActivityRequest = (e) => {
+    e.preventDefault()
+    const title = activityRequestForm.title.trim()
+    if (!title) {
+      setError('Please provide a request title.')
+      return
+    }
+    let volunteerEntries = []
+    try {
+      const rawVolunteers = localStorage.getItem(RC143_VOLUNTEERS_KEY)
+      const parsedVolunteers = rawVolunteers ? JSON.parse(rawVolunteers) : []
+      volunteerEntries = Array.isArray(parsedVolunteers) ? parsedVolunteers : []
+    } catch {
+      volunteerEntries = []
+    }
+    const matchedVolunteer = volunteerEntries.find((v) => String(v.sourceUserId || '') === String(currentUserId))
+    if (!matchedVolunteer) {
+      setError('Your account is not currently assigned as RC143 volunteer.')
+      return
+    }
+    let allRequests = []
+    try {
+      const rawRequests = localStorage.getItem(RC143_REQUESTS_KEY)
+      const parsedRequests = rawRequests ? JSON.parse(rawRequests) : []
+      allRequests = Array.isArray(parsedRequests) ? parsedRequests : []
+    } catch {
+      allRequests = []
+    }
+    const requestId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `rq-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    const nextRequest = {
+      id: requestId,
+      volunteerId: matchedVolunteer.id,
+      volunteerName: matchedVolunteer.fullName || userData.name,
+      title,
+      details: activityRequestForm.details.trim(),
+      location: activityRequestForm.location.trim(),
+      status: 'pending',
+      requestedAt: new Date().toISOString(),
+    }
+    const updatedRequests = [nextRequest, ...allRequests]
+    localStorage.setItem(RC143_REQUESTS_KEY, JSON.stringify(updatedRequests))
+    setRc143MyRequests((prev) => [nextRequest, ...prev])
+    setError('')
+    closeRequestActivityModal()
+  }
+
+  const rc143RequestHistory = rc143MyRequests
+    .filter((req) => req.status === 'approved' || req.status === 'rejected')
+    .sort((a, b) => {
+      const aTs = new Date(a.reviewedAt || a.requestedAt || 0).getTime()
+      const bTs = new Date(b.reviewedAt || b.requestedAt || 0).getTime()
+      return bTs - aTs
+    })
 
   return (
     <div className="min-h-screen">
@@ -615,20 +781,84 @@ function UserDashboard() {
         {/* Set Schedule Button */}
         {showSchedule && (
           <section className="mb-8">
-            <button
-              type="button"
-              onClick={handleOpenScheduleModal}
-              disabled={scheduleRequest && scheduleRequest.status === 'pending'}
-              className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition sm:w-auto sm:py-2 ${
-                scheduleRequest && scheduleRequest.status === 'pending'
-                  ? 'cursor-not-allowed bg-slate-400'
-                  : 'bg-red-600 hover:bg-red-700'
-              }`}
-            >
-              {scheduleRequest && scheduleRequest.status === 'pending'
-                ? 'Schedule Request Pending'
-                : 'Set Schedule'}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleOpenScheduleModal}
+                disabled={scheduleRequest && scheduleRequest.status === 'pending'}
+                className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition sm:w-auto sm:py-2 ${
+                  scheduleRequest && scheduleRequest.status === 'pending'
+                    ? 'cursor-not-allowed bg-slate-400'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {scheduleRequest && scheduleRequest.status === 'pending'
+                  ? 'Schedule Request Pending'
+                  : 'Set Schedule'}
+              </button>
+              {isRc143Volunteer && (
+                <>
+                  <button
+                    type="button"
+                    onClick={openRequestActivityModal}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 sm:w-auto sm:py-2"
+                  >
+                    Request Activity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openRequestHistoryModal}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto sm:py-2"
+                  >
+                    Request History
+                  </button>
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        {isRc143Volunteer && (
+          <section className="mb-8">
+            <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
+              <div className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
+                <h2 className="text-base font-semibold text-slate-900 sm:text-lg">My RC143 Activity Requests</h2>
+                <p className="mt-1 text-sm text-slate-500">Track approval status of your blood drive/program requests.</p>
+              </div>
+              <div className={`${responsiveTableContainer}`}>
+                <table className="min-w-[680px] divide-y divide-slate-100 sm:min-w-full">
+                  <thead className="bg-slate-50/95">
+                    <tr>
+                      <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">
+                        Title
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">
+                        Location
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {rc143MyRequests.length === 0 ? (
+                      <tr>
+                        <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={2}>
+                          No activity requests yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      rc143MyRequests.map((req) => (
+                        <tr key={req.id} className="transition hover:bg-slate-50/50">
+                          <td className="px-4 py-4 text-sm text-slate-900 sm:px-6">
+                            <p className="font-medium">{req.title || '—'}</p>
+                            <p className="mt-1 line-clamp-2 text-xs text-slate-500">{req.details || 'No details provided.'}</p>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-slate-700 sm:px-6">{req.location || '—'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </section>
         )}
 
@@ -1039,6 +1269,132 @@ function UserDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {isRequestActivityModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Request Activity</h3>
+              <button
+                type="button"
+                onClick={closeRequestActivityModal}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form onSubmit={handleSubmitActivityRequest} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Title</label>
+                <input
+                  type="text"
+                  required
+                  value={activityRequestForm.title}
+                  onChange={(e) => setActivityRequestForm((prev) => ({ ...prev, title: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                  placeholder="Ex: Community Blood Drive - July 2026"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Details</label>
+                <textarea
+                  rows={3}
+                  value={activityRequestForm.details}
+                  onChange={(e) => setActivityRequestForm((prev) => ({ ...prev, details: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                  placeholder="Describe target participants and support needed."
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Location</label>
+                <input
+                  type="text"
+                  value={activityRequestForm.location}
+                  onChange={(e) => setActivityRequestForm((prev) => ({ ...prev, location: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                  placeholder="Venue or address"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRequestActivityModal}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                >
+                  Submit Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isRequestHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-3xl rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">Request History</h3>
+              <button
+                type="button"
+                onClick={closeRequestHistoryModal}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[65vh] overflow-y-auto rounded-xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50/95">
+                  <tr>
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      Title
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      Details
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      Location
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {rc143RequestHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-500">
+                        No approved or rejected requests yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    rc143RequestHistory.map((req) => (
+                      <tr key={req.id} className="hover:bg-slate-50/50">
+                        <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900">{req.title || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700">{req.details || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700">{req.location || '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-sm">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getRc143RequestStatusColor(req.status)}`}>
+                            {String(req.status || '').toUpperCase()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
