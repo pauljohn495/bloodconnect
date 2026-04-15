@@ -200,9 +200,11 @@ async function getDonationEligibility(userId, cooldowns) {
     `
     SELECT 
       COALESCE(component_type, 'whole_blood') AS component_type,
-      MAX(COALESCE(actual_donation_at, reviewed_at)) AS last_completed_at
+      MAX(actual_donation_at) AS last_completed_at
     FROM schedule_requests
-    WHERE user_id = ? AND status = 'completed'
+    WHERE user_id = ? 
+      AND status = 'completed'
+      AND actual_donation_at IS NOT NULL
     GROUP BY COALESCE(component_type, 'whole_blood')
   `,
     [userId],
@@ -261,6 +263,7 @@ async function getUserScheduleRequests(userId) {
       preferred_date,
       preferred_time,
       component_type,
+      requested_blood_type,
       last_donation_date,
       weight,
       health_screening_answers,
@@ -269,6 +272,8 @@ async function getUserScheduleRequests(userId) {
       admin_notes,
       rejection_reason,
       reviewed_at,
+      actual_donation_at,
+      units_donated,
       created_at
     FROM schedule_requests
     WHERE user_id = ?
@@ -290,12 +295,13 @@ async function hasPendingScheduleRequest(userId) {
 async function getLastCompletedScheduleForComponent(userId, component) {
   const [rows] = await pool.query(
     `
-    SELECT COALESCE(actual_donation_at, reviewed_at) AS reviewed_at
+    SELECT actual_donation_at AS reviewed_at
     FROM schedule_requests
     WHERE user_id = ? 
       AND status = 'completed'
       AND COALESCE(component_type, 'whole_blood') = ?
-    ORDER BY COALESCE(actual_donation_at, reviewed_at) DESC
+      AND actual_donation_at IS NOT NULL
+    ORDER BY actual_donation_at DESC
     LIMIT 1
   `,
     [userId, component],
@@ -312,6 +318,7 @@ async function createScheduleRequest({
   weight,
   healthScreeningAnswers,
   notes,
+  requestedBloodType,
 }) {
   const component = componentType || 'whole_blood'
 
@@ -320,14 +327,15 @@ async function createScheduleRequest({
     const [result1] = await pool.query(
       `
       INSERT INTO schedule_requests 
-        (user_id, preferred_date, preferred_time, component_type, last_donation_date, weight, health_screening_answers, notes, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        (user_id, preferred_date, preferred_time, component_type, requested_blood_type, last_donation_date, weight, health_screening_answers, notes, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `,
       [
         userId,
         preferredDate,
         preferredTime,
         component,
+        requestedBloodType || null,
         lastDonationDate || null,
         weight,
         JSON.stringify(healthScreeningAnswers),
@@ -336,24 +344,71 @@ async function createScheduleRequest({
     )
     result = result1
   } catch (error) {
-    if (error.code === 'ER_BAD_FIELD_ERROR' || (error.message && error.message.includes('component_type'))) {
-      const [result2] = await pool.query(
-        `
+    const isBadField = error.code === 'ER_BAD_FIELD_ERROR'
+    const msg = String(error.message || '')
+
+    if (isBadField && msg.includes('component_type')) {
+      try {
+        const [result2] = await pool.query(
+          `
         INSERT INTO schedule_requests 
-          (user_id, preferred_date, preferred_time, last_donation_date, weight, health_screening_answers, notes, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+          (user_id, preferred_date, preferred_time, requested_blood_type, last_donation_date, weight, health_screening_answers, notes, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
       `,
+          [
+            userId,
+            preferredDate,
+            preferredTime,
+            requestedBloodType || null,
+            lastDonationDate || null,
+            weight,
+            JSON.stringify(healthScreeningAnswers),
+            notes || null,
+          ],
+        )
+        result = result2
+      } catch (err2) {
+        if (err2.code === 'ER_BAD_FIELD_ERROR' && String(err2.message || '').includes('requested_blood_type')) {
+          const [result3] = await pool.query(
+            `
+          INSERT INTO schedule_requests 
+            (user_id, preferred_date, preferred_time, last_donation_date, weight, health_screening_answers, notes, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        `,
+            [
+              userId,
+              preferredDate,
+              preferredTime,
+              lastDonationDate || null,
+              weight,
+              JSON.stringify(healthScreeningAnswers),
+              notes || null,
+            ],
+          )
+          result = result3
+        } else {
+          throw err2
+        }
+      }
+    } else if (isBadField && msg.includes('requested_blood_type')) {
+      const [result4] = await pool.query(
+        `
+      INSERT INTO schedule_requests 
+        (user_id, preferred_date, preferred_time, component_type, last_donation_date, weight, health_screening_answers, notes, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    `,
         [
           userId,
           preferredDate,
           preferredTime,
+          component,
           lastDonationDate || null,
           weight,
           JSON.stringify(healthScreeningAnswers),
           notes || null,
         ],
       )
-      result = result2
+      result = result4
     } else {
       throw error
     }

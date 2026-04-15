@@ -152,10 +152,11 @@ const getDonorDetailsController = async (req, res) => {
           SELECT 
             COALESCE(sr.component_type, 'whole_blood') AS component_type,
             COUNT(*) AS completed_count,
-            MAX(COALESCE(sr.actual_donation_at, sr.reviewed_at)) AS last_completed_at
+            MAX(sr.actual_donation_at) AS last_completed_at
           FROM schedule_requests sr
           LEFT JOIN donations d ON d.schedule_request_id = sr.id
           WHERE sr.user_id = ? AND sr.status = 'completed' AND d.id IS NULL
+            AND sr.actual_donation_at IS NOT NULL
           GROUP BY COALESCE(sr.component_type, 'whole_blood')
         `,
           [donorId],

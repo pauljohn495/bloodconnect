@@ -159,6 +159,7 @@ async function createScheduleRequestController(req, res, next) {
     weight,
     healthScreeningAnswers,
     notes,
+    bloodType,
   } = req.validatedScheduleRequest
 
   try {
@@ -172,34 +173,38 @@ async function createScheduleRequestController(req, res, next) {
 
     const component = componentType || 'whole_blood'
 
-    const cooldownDays = DONATION_COOLDOWNS[component] || 0
-    if (cooldownDays > 0) {
-      const last = await getLastCompletedScheduleForComponent(req.user.id, component)
-      if (last && last.reviewed_at) {
-        const lastDate = new Date(last.reviewed_at)
-        const nextEligible = new Date(lastDate)
-        nextEligible.setDate(nextEligible.getDate() + cooldownDays)
-        const now = new Date()
+    /* Blood-request submissions (required bloodType) are not donor donations — do not apply donation cooldown. */
+    const isBloodRequestOnly = Boolean(bloodType && String(bloodType).trim())
+    if (!isBloodRequestOnly) {
+      const cooldownDays = DONATION_COOLDOWNS[component] || 0
+      if (cooldownDays > 0) {
+        const last = await getLastCompletedScheduleForComponent(req.user.id, component)
+        if (last && last.reviewed_at) {
+          const lastDate = new Date(last.reviewed_at)
+          const nextEligible = new Date(lastDate)
+          nextEligible.setDate(nextEligible.getDate() + cooldownDays)
+          const now = new Date()
 
-        if (nextEligible > now) {
-          const humanComponent =
-            component === 'whole_blood'
-              ? 'Whole Blood'
-              : component === 'platelets'
-              ? 'Platelets'
-              : component === 'plasma'
-              ? 'Plasma'
-              : component
+          if (nextEligible > now) {
+            const humanComponent =
+              component === 'whole_blood'
+                ? 'Whole Blood'
+                : component === 'platelets'
+                ? 'Platelets'
+                : component === 'plasma'
+                ? 'Plasma'
+                : component
 
-          const error = new Error(
-            `You are still in cooldown for ${humanComponent}. You can donate this type again on ${nextEligible.toLocaleDateString()}.`,
-          )
-          error.statusCode = 400
-          error.errors = {
-            componentType: component,
-            nextEligibleDate: nextEligible.toISOString(),
+            const error = new Error(
+              `You are still in cooldown for ${humanComponent}. You can donate this type again on ${nextEligible.toLocaleDateString()}.`,
+            )
+            error.statusCode = 400
+            error.errors = {
+              componentType: component,
+              nextEligibleDate: nextEligible.toISOString(),
+            }
+            throw error
           }
-          throw error
         }
       }
     }
@@ -213,6 +218,7 @@ async function createScheduleRequestController(req, res, next) {
       weight,
       healthScreeningAnswers,
       notes,
+      requestedBloodType: bloodType,
     })
 
     return successResponse(res, {

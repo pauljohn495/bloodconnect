@@ -61,8 +61,6 @@ function AdminDonation() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [adminNotes, setAdminNotes] = useState('')
-  const [recordDonationUnits, setRecordDonationUnits] = useState('1')
-  const [recordExpirationDate, setRecordExpirationDate] = useState('')
   const [recordDonationSubmitting, setRecordDonationSubmitting] = useState(false)
   const [isWalkInDonationModalOpen, setIsWalkInDonationModalOpen] = useState(false)
   const [walkInDonor, setWalkInDonor] = useState(null)
@@ -290,12 +288,6 @@ function AdminDonation() {
   useEffect(() => {
     if (selectedDonorDetails) setDonorDetailAvatarFailed(false)
   }, [selectedDonorDetails])
-
-  useEffect(() => {
-    if (!isDetailsModalOpen || !selectedRequest || selectedRequest.status !== 'approved') return
-    setRecordDonationUnits('1')
-    setRecordExpirationDate(defaultExpirationYmd(selectedRequest.component_type))
-  }, [isDetailsModalOpen, selectedRequest?.id, selectedRequest?.status, selectedRequest?.component_type])
 
   const donorNameForSearch = (donor) =>
     (
@@ -670,34 +662,37 @@ function AdminDonation() {
   }
 
   const handleRecordDonationComplete = async (requestId) => {
-    const u = parseInt(recordDonationUnits, 10)
-    if (Number.isNaN(u) || u < 1 || u > 50) {
-      showNotification('Units must be between 1 and 50', 'destructive')
-      return
+    const requestedBloodType = (selectedRequest?.requested_blood_type || '').toString().trim()
+    const isBloodRequest = requestedBloodType.length > 0
+
+    let body
+    if (isBloodRequest) {
+      body = {}
+    } else {
+      const u = 1
+      const exp = defaultExpirationYmd(selectedRequest?.component_type)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(exp)) {
+        showNotification('Select the unit expiration date', 'destructive')
+        return
+      }
+      const today = todayYmdLocal()
+      if (exp < today) {
+        showNotification('Expiration date cannot be before today', 'destructive')
+        return
+      }
+      const maxY = maxExpirationYmdFromToday()
+      if (exp > maxY) {
+        showNotification('Expiration date is too far in the future', 'destructive')
+        return
+      }
+      body = { unitsDonated: u, expirationDate: exp }
     }
-    const exp = (recordExpirationDate || '').trim()
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(exp)) {
-      showNotification('Select the unit expiration date', 'destructive')
-      return
-    }
-    const today = todayYmdLocal()
-    if (exp < today) {
-      showNotification('Expiration date cannot be before today', 'destructive')
-      return
-    }
-    const maxY = maxExpirationYmdFromToday()
-    if (exp > maxY) {
-      showNotification('Expiration date is too far in the future', 'destructive')
-      return
-    }
+
     try {
       setRecordDonationSubmitting(true)
       const result = await apiRequest(`/api/admin/schedule-requests/${requestId}/complete`, {
         method: 'PATCH',
-        body: JSON.stringify({
-          unitsDonated: u,
-          expirationDate: exp,
-        }),
+        body: JSON.stringify(body),
       })
       await loadScheduleRequests()
       if (isScheduleHistoryModalOpen) {
@@ -707,18 +702,27 @@ function AdminDonation() {
       if (selectedRequest && selectedRequest.id === requestId) {
         setSelectedRequest(null)
       }
-      const extra =
-        result?.expirationDate && result?.inventoryId
-          ? ` Inventory batch #${result.inventoryId} expires ${result.expirationDate}.`
-          : ''
-      const recordedAt =
-        result?.actualDonationAt && !Number.isNaN(new Date(result.actualDonationAt).getTime())
-          ? ` Recorded at ${new Date(result.actualDonationAt).toLocaleString()}.`
-          : ''
-      setFeedbackModal({
-        open: true,
-        message: `Donation recorded (${u} unit${u === 1 ? '' : 's'}). Central inventory updated.${recordedAt}${extra}`,
-      })
+
+      if (result?.mode === 'blood_request' || isBloodRequest) {
+        setFeedbackModal({
+          open: true,
+          message: 'Blood request marked complete. No donation or inventory was recorded.',
+        })
+      } else {
+        const u = parseInt(String(body.unitsDonated ?? ''), 10) || 1
+        const extra =
+          result?.expirationDate && result?.inventoryId
+            ? ` Inventory batch #${result.inventoryId} expires ${result.expirationDate}.`
+            : ''
+        const recordedAt =
+          result?.actualDonationAt && !Number.isNaN(new Date(result.actualDonationAt).getTime())
+            ? ` Recorded at ${new Date(result.actualDonationAt).toLocaleString()}.`
+            : ''
+        setFeedbackModal({
+          open: true,
+          message: `Donation recorded (${u} unit${u === 1 ? '' : 's'}). Central inventory updated.${recordedAt}${extra}`,
+        })
+      }
     } catch (err) {
       console.error('Failed to record donation', err)
       setFeedbackModal({
@@ -2488,7 +2492,7 @@ function AdminDonation() {
                         Donor Name
                       </th>
                       <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                        Component Type
+                        Blood Type
                       </th>
                       <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
                         Status
@@ -2508,7 +2512,7 @@ function AdminDonation() {
                           {request.donor_name || '—'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                          {request.component_type === 'whole_blood' ? 'Whole Blood' : request.component_type === 'platelets' ? 'Platelets' : request.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
+                          {request.requested_blood_type || request.blood_type || '—'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-sm">
                           <span
@@ -3028,7 +3032,7 @@ function AdminDonation() {
             <div className="space-y-4">
               {/* Donor Info */}
               <div className="border-b border-slate-200 pb-4">
-                <h4 className="text-sm font-semibold text-slate-900 mb-2">Donor Information</h4>
+                <h4 className="text-sm font-semibold text-slate-900 mb-2">User Information</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-slate-500">Name:</span>
@@ -3064,9 +3068,9 @@ function AdminDonation() {
                     <span className="ml-2 font-medium text-slate-900">{selectedRequest.preferred_time}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500">Component Type:</span>
+                    <span className="text-slate-500">Requested Blood Type:</span>
                     <span className="ml-2 font-medium text-slate-900">
-                      {selectedRequest.component_type === 'whole_blood' ? 'Whole Blood' : selectedRequest.component_type === 'platelets' ? 'Platelets' : selectedRequest.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
+                      {selectedRequest.requested_blood_type || selectedRequest.blood_type || '—'}
                     </span>
                   </div>
                   <div>
@@ -3175,68 +3179,31 @@ function AdminDonation() {
                     </div>
                   )}
 
-                  {selectedRequest.status === 'approved' && (
-                    <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-4">
-                      <h4 className="text-sm font-semibold text-slate-900">Record donation (donor arrived)</h4>
-                      <p className="mt-1 text-[11px] text-slate-600">
-                        Donation date and time are saved when you click the button below.
-                      </p>
-                      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                          <label className="min-h-3 text-xs font-bold leading-snug text-slate-700">
-                            Units donated
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={50}
-                            value={recordDonationUnits}
-                            onChange={(e) => setRecordDonationUnits(e.target.value)}
-                            className="box-border min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                          />
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                          <label
-                            className="min-h-3 text-xs font-bold leading-snug text-slate-700"
-                            htmlFor="record-expiration-date"
-                          >
-                            Unit expiration date (inventory)
-                          </label>
-                          <input
-                            id="record-expiration-date"
-                            type="date"
-                            value={recordExpirationDate}
-                            min={todayYmdLocal()}
-                            max={maxExpirationYmdFromToday()}
-                            onChange={(e) => setRecordExpirationDate(e.target.value)}
-                            className="box-border min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                          />
-                        </div>
-                      </div>
+                  {selectedRequest.status === 'pending' && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Rejection Reason (Required for rejection)
+                      </label>
+                      <textarea
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                        placeholder="Provide reason for rejection..."
+                      />
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Rejection Reason (Required for rejection)
-                    </label>
-                    <textarea
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                      placeholder="Provide reason for rejection..."
-                    />
-                  </div>
-
                   <div className="flex flex-wrap justify-end gap-2 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => handleReject(selectedRequest.id)}
-                      className="inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
-                    >
-                      Reject
-                    </button>
+                    {selectedRequest.status === 'pending' && (
+                      <button
+                        type="button"
+                        onClick={() => handleReject(selectedRequest.id)}
+                        className="inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                      >
+                        Reject
+                      </button>
+                    )}
                     {selectedRequest.status === 'pending' && (
                       <button
                         type="button"
@@ -3253,7 +3220,7 @@ function AdminDonation() {
                         onClick={() => handleRecordDonationComplete(selectedRequest.id)}
                         className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {recordDonationSubmitting ? 'Recording…' : 'Record donation & update inventory'}
+                        {recordDonationSubmitting ? 'Recording…' : 'Complete'}
                       </button>
                     )}
                   </div>

@@ -334,13 +334,17 @@ function Home() {
     const active = forceActive != null ? forceActive : activeSection === id
     return `rounded-lg px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-red-900 ${
       active
-        ? 'bg-red-950/55 text-white underline decoration-white/90 decoration-2 underline-offset-4'
-        : 'text-white/95 hover:bg-red-800/45 hover:text-white hover:underline hover:decoration-white/70 hover:underline-offset-4'
+        ? 'bg-red-950/55 text-white'
+        : 'text-white/95 hover:bg-red-800/45 hover:text-white'
     }`
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(241,245,249,0.82)_40%,rgba(255,255,255,0.95)_100%)]"
+      />
       <div className="relative z-10">
       {/* Sticky header */}
       <header className="sticky top-0 z-50 border-b border-red-950/35 bg-red-900/95 shadow-md backdrop-blur supports-backdrop-filter:bg-red-900/85">
@@ -348,12 +352,12 @@ function Home() {
           <button
             type="button"
             onClick={scrollToTop}
-            className="flex min-h-10 min-w-0 shrink-0 items-center gap-2 rounded-lg py-1 text-left text-white transition hover:bg-red-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            className="flex min-h-10 min-w-0 shrink-0 items-center gap-2 rounded-xl px-1 py-1 text-left text-white transition hover:bg-red-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           >
             <BrandLogo tone="hero" className="h-9 w-9 shrink-0 rounded-lg" roundedClass="rounded-lg" />
             <span className="leading-tight">
               <span className="block text-sm font-bold tracking-tight sm:text-base">BloodConnect</span>
-              <span className="hidden text-[10px] font-medium uppercase tracking-wider text-red-100 sm:block">
+              <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-red-100 sm:block">
                 Blood management
               </span>
             </span>
@@ -445,75 +449,157 @@ function Home() {
         )}
       </header>
 
-      <main className="pt-4 sm:pt-6">
-        <div className="mx-auto min-h-[calc(100vh-3.25rem)] max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
-              Connecting Lives
-              <span className="block text-red-600">Through Blood Donation</span>
-            </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-sm text-slate-600 sm:text-base">
-              BloodConnect is a Blood Management System supporting the Red Cross by connecting donors and hospitals for fast, safe, and efficient blood supply, tracking, and distribution.
-            </p>
-          </div>
-
-          <div className="mt-8 grid grid-cols-1 gap-4 rounded-3xl border border-white/65 bg-white/60 p-4 shadow-[0_30px_80px_-30px_rgba(15,23,42,0.35)] ring-1 ring-red-100/70 backdrop-blur-xl sm:p-6 lg:grid-cols-2">
-            <div className="flex h-full flex-col rounded-2xl border border-white/80 bg-white/85 p-4 shadow-lg shadow-red-100/50 ring-1 ring-slate-100/60">
-              <div className="mb-3">
-                <h2 className="text-base font-semibold text-slate-900">Blood Donation Schedule</h2>
-                <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
-              </div>
-              <ul className="flex-1 space-y-2 overflow-y-auto pr-1">
-                {mbdItems.length === 0 && (
-                  <li className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
-                    No active MBD yet.
-                  </li>
-                )}
-                {mbdItems.map((item) => (
-                  <li key={item.id}>
+      <main className="pt-2 sm:pt-3">
+        <div className="mx-auto min-h-[calc(100vh-3.25rem)] max-w-6xl px-4 pt-4 pb-10 sm:px-6 lg:px-8 lg:pt-5 lg:pb-12">
+          <section className="relative -mx-4 overflow-hidden rounded-none border-y border-white/25 bg-[linear-gradient(125deg,#7f1d1d_0%,#dc2626_45%,#f43f5e_100%)] px-7 pb-7 pt-5 text-white shadow-[0_35px_90px_-35px_rgba(127,29,29,0.8)] sm:-mx-6 sm:rounded-4xl sm:border sm:border-white/70 sm:px-10 sm:pb-10 sm:pt-6 lg:-mx-8 lg:pt-7">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-20 -left-16 h-72 w-72 rounded-full bg-white/20 blur-3xl"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-20 right-0 h-80 w-80 rounded-full bg-amber-200/25 blur-3xl"
+            />
+            <div className="relative z-10 grid grid-cols-1 gap-7 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <div>
+                <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
+                  Connecting Lives
+                  <span className="block text-rose-100">Through Blood Donation</span>
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm leading-relaxed text-red-50/95 sm:text-base">
+                  BloodConnect powers fast, transparent, and coordinated blood services for donors, recipients, hospitals, and administrators.
+                </p>
+                <div className="mt-7 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection('login')}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-red-700 shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-rose-50"
+                  >
+                    Get Started
+                  </button>
+                  {isFlagEnabled('public', 'public.register') && (
                     <button
                       type="button"
-                      onClick={() => setSelectedMbd(item)}
-                      className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-red-300 hover:bg-red-50/40"
+                      onClick={() => navigate('/register')}
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-white/20"
                     >
-                      <p className="text-[12px] font-black uppercase tracking-wide text-red-700">
-                        {mbdTypeLabel(item.announcement_type)} • {mbdStatusLabel(item.status)}
-                      </p>
-                      <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-900">{item.title}</p>
-                      <p className="mt-1 text-xs text-slate-500">{formatMbdDate(item.event_starts_at)}</p>
+                      Create Account
                     </button>
-                  </li>
-                ))}
-              </ul>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-wide text-white/70">Active Schedules</p>
+                  <p className="mt-2 text-2xl font-bold">{mbdItems.length}</p>
+                </div>
+                <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-wide text-white/70">Published Posts</p>
+                  <p className="mt-2 text-2xl font-bold">{homePosts.length}</p>
+                </div>
+              </div>
             </div>
+          </section>
 
-            <div className="flex h-full flex-col rounded-2xl border border-white/80 bg-white/85 p-4 shadow-lg shadow-red-100/50 ring-1 ring-slate-100/60">
-              <div className="mb-3">
-                <h2 className="text-base font-semibold text-slate-900">Announcements</h2>
-                <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
+          <section className="mt-8 rounded-[1.75rem] border border-red-100/80 bg-white/85 p-4 shadow-[0_28px_75px_-45px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Live Updates</h2>
+                <p className="mt-1 text-xs text-slate-500">Upcoming schedules and latest announcements</p>
               </div>
-              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-                {homePosts.length === 0 && (
-                  <p className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
-                    No published posts yet.
-                  </p>
-                )}
-                {homePosts.map((post) => (
-                  <button
-                    key={post.id}
-                    type="button"
-                    onClick={() => setSelectedPost(post)}
-                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-red-300 hover:bg-red-50/40"
-                  >
-                    <h3 className="text-sm font-semibold text-slate-900">{post.title}</h3>
-                  </button>
-                ))}
+              <span className="rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
+                Real-time feed
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-linear-to-b from-white to-red-50/30 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div className="mb-3">
+                  <h2 className="text-base font-semibold text-slate-900">Blood Donation Schedule</h2>
+                  <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
+                </div>
+                <ul className="flex-1 space-y-2 overflow-y-auto pr-1">
+                  {mbdItems.length === 0 && (
+                    <li className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+                      No active MBD yet.
+                    </li>
+                  )}
+                  {mbdItems.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMbd(item)}
+                        className="w-full rounded-xl border border-slate-200/90 bg-white/90 p-3 text-left transition duration-200 hover:border-red-300 hover:bg-red-50/70"
+                      >
+                        <p className="text-[12px] font-black uppercase tracking-wide text-red-700">
+                          {mbdTypeLabel(item.announcement_type)} • {mbdStatusLabel(item.status)}
+                        </p>
+                        <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-900">{item.title}</p>
+                        <p className="mt-1 text-xs text-slate-500">{formatMbdDate(item.event_starts_at)}</p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-linear-to-b from-white to-indigo-50/40 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                <div className="mb-3">
+                  <h2 className="text-base font-semibold text-slate-900">Announcements</h2>
+                  <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
+                </div>
+                <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                  {homePosts.length === 0 && (
+                    <p className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+                      No published posts yet.
+                    </p>
+                  )}
+                  {homePosts.map((post) => (
+                    <button
+                      key={post.id}
+                      type="button"
+                      onClick={() => setSelectedPost(post)}
+                      className="w-full rounded-xl border border-slate-200/90 bg-white/90 p-3 text-left transition duration-200 hover:border-red-300 hover:bg-red-50/70"
+                    >
+                      <h3 className="text-sm font-semibold text-slate-900">{post.title}</h3>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          </section>
+
+          <section className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_14px_36px_-24px_rgba(220,38,38,0.6)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_50px_-28px_rgba(220,38,38,0.6)]">
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-red-100">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m4-4H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">Emergency Response Ready</h3>
+              <p className="mt-2 text-sm text-slate-600">Coordinate urgent requests quickly with clear, centralized updates across teams.</p>
+            </div>
+            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_14px_36px_-24px_rgba(244,63,94,0.6)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_50px_-28px_rgba(244,63,94,0.6)]">
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600 ring-1 ring-rose-100">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">Reliable Tracking</h3>
+              <p className="mt-2 text-sm text-slate-600">Monitor donation records, schedules, and request statuses in one place.</p>
+            </div>
+            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_14px_36px_-24px_rgba(14,165,233,0.6)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_50px_-28px_rgba(14,165,233,0.6)]">
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h5M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">Secure Access</h3>
+              <p className="mt-2 text-sm text-slate-600">Role-based login for donors, hospitals, and administrators.</p>
+            </div>
+          </section>
+
         </div>
 
-        <section id="login" className="border-t border-red-100/80 bg-linear-to-b from-white/88 to-rose-50/65 py-16 backdrop-blur-[2px]">
+        <section id="login" className="border-t border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(254,242,242,0.65)_100%)] py-16 backdrop-blur-[2px]">
           <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
             <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">
               <div className="text-center lg:text-left">
@@ -527,7 +613,7 @@ function Home() {
               </div>
 
               <div className="mx-auto w-full max-w-md">
-                <div className="rounded-2xl bg-white p-6 shadow-xl shadow-red-100 ring-1 ring-red-100 sm:p-8">
+                <div className="rounded-3xl bg-white p-6 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70 sm:p-8">
                   <div className="mb-6 flex rounded-full bg-slate-100 p-1 text-xs font-medium text-slate-600">
                     <button
                       type="button"
@@ -659,7 +745,7 @@ function Home() {
         {isFlagEnabled('public', 'public.section_donate') && (
           <section
             id="donate"
-            className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-red-100/80 bg-linear-to-b from-white/85 to-red-50/60 py-28 shadow-sm sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
+            className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.86)_0%,rgba(239,246,255,0.65)_100%)] py-24 sm:min-h-[72vh] sm:py-28 lg:min-h-[80vh] lg:py-32"
           >
             <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
@@ -686,7 +772,7 @@ function Home() {
         {isFlagEnabled('public', 'public.section_about') && (
           <section
             id="about"
-            className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-slate-200/80 bg-linear-to-b from-slate-50/88 to-indigo-50/65 py-28 sm:min-h-[72vh] sm:py-36 lg:min-h-[80vh] lg:py-44"
+            className="scroll-mt-22 border-t border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.9)_100%)] py-24 sm:py-28 lg:py-32"
           >
             <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
               <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
@@ -704,6 +790,33 @@ function Home() {
             </div>
           </section>
         )}
+        <footer className="border-t border-slate-200/90 bg-slate-900 py-8 text-slate-200">
+          <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[1.45fr_1fr_1fr] lg:gap-8 lg:px-8">
+            <div>
+              <p className="text-sm font-semibold text-white">BloodConnect</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                A coordinated platform for blood donation campaigns, requests, and life-saving response.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Navigation</p>
+              <div className="mt-3 space-y-2 text-sm text-slate-300">
+                <button type="button" onClick={() => scrollToSection('login')} className="block hover:text-white">Login</button>
+                <button type="button" onClick={() => scrollToSection('donate')} className="block hover:text-white">Donate</button>
+                <button type="button" onClick={() => scrollToSection('about')} className="block hover:text-white">About</button>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Status</p>
+              <p className="mt-3 text-sm text-slate-300">
+                Active MBD: <span className="font-semibold text-white">{mbdItems.length}</span>
+              </p>
+              <p className="mt-1 text-sm text-slate-300">
+                Announcements: <span className="font-semibold text-white">{homePosts.length}</span>
+              </p>
+            </div>
+          </div>
+        </footer>
       </main>
 
       {selectedMbd && <MbdDetailModal item={selectedMbd} onClose={() => setSelectedMbd(null)} />}

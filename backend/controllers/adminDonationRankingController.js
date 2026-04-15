@@ -79,7 +79,7 @@ const getDonorDonationRankingController = async (req, res) => {
               COUNT(*) as total_units_donated
             FROM schedule_requests sr
             JOIN users u ON u.id = sr.user_id
-            WHERE u.role = 'donor' AND sr.status = 'completed'
+            WHERE u.role = 'donor' AND sr.status = 'completed' AND sr.actual_donation_at IS NOT NULL
             GROUP BY u.id, u.full_name, u.username, u.blood_type
             ORDER BY total_units_donated DESC, donor_name ASC
             LIMIT ?

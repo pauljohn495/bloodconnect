@@ -13,6 +13,8 @@ function validateUpdateMe(req, res, next) {
   return next()
 }
 
+const SCHEDULE_REQUEST_BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+
 function validateScheduleRequest(req, res, next) {
   const {
     preferredDate,
@@ -22,12 +24,20 @@ function validateScheduleRequest(req, res, next) {
     weight,
     healthScreeningAnswers,
     notes,
+    bloodType,
   } = req.body
 
   if (!preferredDate || !preferredTime || !weight || !healthScreeningAnswers) {
     return errorResponse(res, {
       statusCode: 400,
       message: 'preferredDate, preferredTime, weight, and healthScreeningAnswers are required',
+    })
+  }
+
+  if (!bloodType || !SCHEDULE_REQUEST_BLOOD_TYPES.includes(String(bloodType).trim())) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'bloodType is required and must be a valid ABO/Rh type (A+, A-, B+, B-, AB+, AB-, O+, O-)',
     })
   }
 
@@ -48,6 +58,7 @@ function validateScheduleRequest(req, res, next) {
     weight: numericWeight,
     healthScreeningAnswers,
     notes: notes || null,
+    bloodType: String(bloodType).trim(),
   }
 
   return next()

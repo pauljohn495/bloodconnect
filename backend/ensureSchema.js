@@ -196,6 +196,10 @@ async function ensureScheduleDonationTrackingColumns() {
     await pool.query('ALTER TABLE schedule_requests ADD COLUMN recorded_by INT NULL')
     console.log('Schema: added schedule_requests.recorded_by')
   }
+  if (!(await columnExists('schedule_requests', 'requested_blood_type'))) {
+    await pool.query('ALTER TABLE schedule_requests ADD COLUMN requested_blood_type VARCHAR(8) NULL')
+    console.log('Schema: added schedule_requests.requested_blood_type')
+  }
 }
 
 /** MySQL ENUM on users.role must list super_admin or inserts/updates with that role fail. */

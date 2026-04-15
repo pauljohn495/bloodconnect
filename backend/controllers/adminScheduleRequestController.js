@@ -29,6 +29,7 @@ const getScheduleRequestsController = async (req, res) => {
         sr.preferred_date,
         sr.preferred_time,
         sr.component_type,
+        sr.requested_blood_type,
         sr.status,
         sr.created_at,
         sr.actual_donation_at,
@@ -196,16 +197,6 @@ const completeScheduleRequestController = async (req, res) => {
   const { id } = req.params
   const { unitsDonated, expirationDate: expirationDateRaw } = req.body || {}
 
-  const units = parseInt(String(unitsDonated ?? ''), 10)
-  if (Number.isNaN(units) || units < 1 || units > 50) {
-    return res.status(400).json({ message: 'unitsDonated must be between 1 and 50' })
-  }
-
-  const expirationYmd = typeof expirationDateRaw === 'string' ? expirationDateRaw.trim() : ''
-  if (!isValidYmd(expirationYmd)) {
-    return res.status(400).json({ message: 'expirationDate is required (YYYY-MM-DD)' })
-  }
-
   const adminId = req.user?.id || null
 
   let conn
@@ -216,6 +207,7 @@ const completeScheduleRequestController = async (req, res) => {
     const [rows] = await conn.query(
       `
       SELECT sr.id, sr.user_id, sr.status, sr.component_type,
+             sr.requested_blood_type,
              u.blood_type AS donor_blood_type
       FROM schedule_requests sr
       INNER JOIN users u ON sr.user_id = u.id
@@ -236,6 +228,65 @@ const completeScheduleRequestController = async (req, res) => {
       return res
         .status(400)
         .json({ message: 'Only approved appointments can be recorded as donations' })
+    }
+
+    const requestedType =
+      row.requested_blood_type != null ? String(row.requested_blood_type).trim() : ''
+    const isBloodRequestFulfillment = requestedType.length > 0
+
+    if (isBloodRequestFulfillment) {
+      const completedAt = new Date()
+      if (Number.isNaN(completedAt.getTime())) {
+        await conn.rollback()
+        return res.status(500).json({ message: 'Could not record completion time' })
+      }
+
+      await conn.query(
+        `
+        UPDATE schedule_requests
+        SET status = 'completed',
+            reviewed_by = COALESCE(reviewed_by, ?),
+            reviewed_at = ?,
+            actual_donation_at = NULL,
+            units_donated = NULL,
+            recorded_by = NULL
+        WHERE id = ?
+      `,
+        [adminId, completedAt, id],
+      )
+
+      const userId = row.user_id
+      await conn.query(
+        `
+        INSERT INTO notifications (user_id, title, message, type)
+        VALUES (?, ?, ?, 'success')
+      `,
+        [
+          userId,
+          'Blood request completed',
+          `Your blood request (${requestedType}) has been marked complete.`,
+        ],
+      )
+
+      await conn.commit()
+
+      return res.json({
+        message: 'Blood request marked complete',
+        mode: 'blood_request',
+        completedAt: completedAt.toISOString(),
+      })
+    }
+
+    const units = parseInt(String(unitsDonated ?? ''), 10)
+    if (Number.isNaN(units) || units < 1 || units > 50) {
+      await conn.rollback()
+      return res.status(400).json({ message: 'unitsDonated must be between 1 and 50' })
+    }
+
+    const expirationYmd = typeof expirationDateRaw === 'string' ? expirationDateRaw.trim() : ''
+    if (!isValidYmd(expirationYmd)) {
+      await conn.rollback()
+      return res.status(400).json({ message: 'expirationDate is required (YYYY-MM-DD)' })
     }
 
     // Donation / collection time = server time when admin confirms (click)

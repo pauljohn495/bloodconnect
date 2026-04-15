@@ -9,6 +9,7 @@ import { useFeatureFlags } from './featureFlagsContext.jsx'
 
 const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
 const RC143_REQUESTS_KEY = 'bloodconnect_rc143_activity_requests'
+const SCHEDULE_BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
 function UserDashboard() {
   const navigate = useNavigate()
@@ -53,14 +54,15 @@ function UserDashboard() {
   const [scheduleForm, setScheduleForm] = useState({
     preferredDate: '',
     preferredTime: '',
+    bloodType: '',
     componentType: 'whole_blood',
-    weight: '',
+    weight: '50',
     healthScreening: {
-      feelingHealthy: '',
-      recentIllness: '',
-      medications: '',
-      travelHistory: '',
-      riskFactors: '',
+      hasDoctorRecommendation: '',
+      hasHospitalCoordination: '',
+      isUrgentWithin24Hours: '',
+      hasRequiredBloodTypeInfo: '',
+      hasPatientConsent: '',
     },
     notes: '',
     confirmation: false,
@@ -111,10 +113,10 @@ function UserDashboard() {
         })()
 
         const donationCount = (donations || []).length
-        const completedSchedules = (scheduleRequests || []).filter(
-          (r) => r.status === 'completed',
+        const completedDonationSchedules = (scheduleRequests || []).filter(
+          (r) => r.status === 'completed' && r.actual_donation_at,
         ).length
-        const totalDonations = donationCount + completedSchedules
+        const totalDonations = donationCount + completedDonationSchedules
 
         const avatarStorageKey = me.id ? `profileAvatar:${me.id}` : ''
         const savedAvatar = avatarStorageKey ? localStorage.getItem(avatarStorageKey) : null
@@ -137,15 +139,15 @@ function UserDashboard() {
           type: 'donation',
         }))
 
-        // Get completed schedule requests and add them to donation history
+        // Completed schedule rows that recorded a real donation (not blood-request fulfillment)
         const completedScheduleEntries = (scheduleRequests || [])
-          .filter((req) => req.status === 'completed')
+          .filter((req) => req.status === 'completed' && req.actual_donation_at)
           .map((req) => ({
             id: `schedule-${req.id}`,
             date: req.preferred_date,
             bloodType: me.blood_type || me.bloodType || '—',
             componentType: req.component_type || 'whole_blood',
-            location: 'Scheduled Donation',
+            location: 'Scheduled donation',
             status: 'Completed',
             type: 'schedule',
             preferredTime: req.preferred_time,
@@ -266,28 +268,14 @@ function UserDashboard() {
       const data = await apiRequest('/api/user/donation-eligibility')
       setEligibility(data)
 
-      // Choose the first currently eligible component type as default
-      const typesInOrder = ['whole_blood', 'platelets', 'plasma']
-      const now = Date.now()
-      let defaultType = 'whole_blood'
-
-      if (data) {
-        for (const t of typesInOrder) {
-          const info = data[t]
-          if (!info) continue
-          const serverEligible = info.isEligible
-          const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
-          const locallyEligible = serverEligible || (nextEligibleAt && nextEligibleAt <= now)
-          if (locallyEligible) {
-            defaultType = t
-            break
-          }
-        }
-      }
+      const fromProfile = (userData.bloodType || '').trim()
+      const profileBlood = SCHEDULE_BLOOD_TYPE_OPTIONS.includes(fromProfile) ? fromProfile : ''
 
       setScheduleForm((prev) => ({
         ...prev,
-        componentType: defaultType,
+        /* Blood request uses schedule_requests row for logistics only; keep component as WB for legacy admin paths */
+        componentType: 'whole_blood',
+        bloodType: profileBlood,
       }))
 
       setIsScheduleModalOpen(true)
@@ -306,7 +294,8 @@ function UserDashboard() {
         body: JSON.stringify({
           preferredDate: scheduleForm.preferredDate,
           preferredTime: scheduleForm.preferredTime,
-          componentType: scheduleForm.componentType,
+          bloodType: scheduleForm.bloodType,
+          componentType: 'whole_blood',
           weight: parseFloat(scheduleForm.weight),
           healthScreeningAnswers: scheduleForm.healthScreening,
           notes: scheduleForm.notes || null,
@@ -318,14 +307,15 @@ function UserDashboard() {
       setScheduleForm({
         preferredDate: '',
         preferredTime: '',
+        bloodType: '',
         componentType: 'whole_blood',
-        weight: '',
+        weight: '50',
         healthScreening: {
-          feelingHealthy: '',
-          recentIllness: '',
-          medications: '',
-          travelHistory: '',
-          riskFactors: '',
+          hasDoctorRecommendation: '',
+          hasHospitalCoordination: '',
+          isUrgentWithin24Hours: '',
+          hasRequiredBloodTypeInfo: '',
+          hasPatientConsent: '',
         },
         notes: '',
         confirmation: false,
@@ -334,7 +324,7 @@ function UserDashboard() {
       // Reload data to show new request
       window.location.reload()
     } catch (err) {
-      const message = err.message || 'Failed to submit schedule request'
+      const message = err.message || 'Failed to submit blood request'
       if (message.toLowerCase().includes('still in cooldown')) {
         setCooldownModal({ open: true, message })
       } else {
@@ -384,35 +374,6 @@ function UserDashboard() {
       return `${hours} hour${hours !== 1 ? 's' : ''}`
     }
     return 'Less than 1 hour'
-  }
-
-  const getEligibleComponentOptions = () => {
-    const types = [
-      { value: 'whole_blood', label: 'Whole Blood' },
-      { value: 'platelets', label: 'Platelets' },
-      { value: 'plasma', label: 'Plasma' },
-    ]
-
-    if (!eligibility) return types
-
-    const now = nowTs
-
-    return types.filter(({ value }) => {
-      const info = eligibility[value]
-      if (!info) return true
-      const serverEligible = info.isEligible
-      const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
-      const locallyEligible = serverEligible || (nextEligibleAt && nextEligibleAt <= now)
-      return locallyEligible
-    })
-  }
-
-  const hasAnyCooldown = () => {
-    if (!eligibility) return false
-    return ['whole_blood', 'platelets', 'plasma'].some((t) => {
-      const info = eligibility[t]
-      return info && !info.isEligible && info.nextEligibleAt
-    })
   }
 
   const handleLogout = () => {
@@ -687,9 +648,9 @@ function UserDashboard() {
           <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">Donation eligibility</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Blood request eligibility</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  See which donation types you can schedule today
+                  See which blood components you can request to schedule today
                 </p>
               </div>
             </div>
@@ -728,7 +689,7 @@ function UserDashboard() {
                     </div>
                     <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
                       {isEligible
-                        ? 'You can request this donation type now.'
+                        ? 'You can request this blood component now.'
                         : nextEligibleAt
                           ? `Available on ${new Date(nextEligibleAt).toLocaleDateString()} (${remaining}).`
                           : 'Cooldown information unavailable.'}
@@ -740,17 +701,23 @@ function UserDashboard() {
           </div>
         </section>
 
-        {/* Schedule Request Section */}
+        {/* Blood request status */}
         {showSchedule && scheduleRequest && (
           <section className="mb-8">
             <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm ring-1 ring-slate-100/90">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Schedule request status</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Blood request status</h3>
                   <p className="mt-1 text-xs text-slate-500">
                     Preferred Date: {new Date(scheduleRequest.preferred_date).toLocaleDateString()} at{' '}
                     {scheduleRequest.preferred_time}
                   </p>
+                  {scheduleRequest.requested_blood_type && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Requested blood type:{' '}
+                      <span className="font-medium text-slate-700">{scheduleRequest.requested_blood_type}</span>
+                    </p>
+                  )}
                 </div>
                 <span
                   className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
@@ -778,7 +745,7 @@ function UserDashboard() {
           </section>
         )}
 
-        {/* Set Schedule Button */}
+        {/* Schedule blood request */}
         {showSchedule && (
           <section className="mb-8">
             <div className="flex flex-wrap items-center gap-3">
@@ -793,8 +760,8 @@ function UserDashboard() {
                 }`}
               >
                 {scheduleRequest && scheduleRequest.status === 'pending'
-                  ? 'Schedule Request Pending'
-                  : 'Set Schedule'}
+                  ? 'Blood request pending'
+                  : 'Schedule blood request'}
               </button>
               {isRc143Volunteer && (
                 <>
@@ -965,65 +932,26 @@ function UserDashboard() {
         <DashboardAnnouncementsPanel open={announcementsPanelOpen} onClose={() => setAnnouncementsPanelOpen(false)} />
       )}
 
-      {/* Schedule Request Modal */}
+      {/* Blood request schedule modal */}
       {showSchedule && isScheduleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Set schedule</h3>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0 pr-2">
+                <h3 className="text-lg font-semibold text-slate-900">Schedule a blood request</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Choose a preferred date and time for your blood request. Staff will review and confirm.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsScheduleModalOpen(false)}
-                className="text-slate-500 hover:text-slate-700"
+                className="shrink-0 text-slate-500 hover:text-slate-700"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-            </div>
-
-            {/* Eligibility Guidelines */}
-            <div className="mb-6 rounded-xl border border-red-100 bg-red-50/60 p-4">
-              <h4 className="mb-2 text-sm font-semibold text-red-950">Requirements / eligibility guidelines</h4>
-              <ul className="list-inside list-disc space-y-1 text-xs text-red-900/90">
-                <li>Must meet minimum age requirement</li>
-                <li>Must meet minimum weight requirement</li>
-                <li>Must be feeling healthy</li>
-                <li>Must not have donated within the restricted period</li>
-                <li>Must answer health screening honestly</li>
-              </ul>
-
-              {/* Cooldown information & countdowns */}
-              {eligibility && (
-                <div className="mt-3 space-y-1 text-xs">
-                  <p className="font-semibold text-red-950">Donation cooldowns:</p>
-                  <p className="text-red-900/90">
-                    Whole Blood: 90 days · Platelets: 14 days · Plasma: 28 days
-                  </p>
-                  {hasAnyCooldown() && (
-                    <div className="mt-2 rounded-lg border border-red-100 bg-white/80 p-2">
-                      <p className="mb-1 text-[11px] font-semibold text-red-950">
-                        Currently in cooldown:
-                      </p>
-                      <ul className="space-y-0.5 text-[11px] text-red-900">
-                        {['whole_blood', 'platelets', 'plasma'].map((t) => {
-                          const info = eligibility[t]
-                          if (!info || info.isEligible || !info.nextEligibleAt) return null
-                          const label =
-                            t === 'whole_blood' ? 'Whole Blood' : t === 'platelets' ? 'Platelets' : 'Plasma'
-                          const remaining = formatCooldownRemaining(info.nextEligibleAt)
-                          const availableOn = new Date(info.nextEligibleAt).toLocaleDateString()
-                          return (
-                            <li key={t}>
-                              {label} — available on {availableOn} ({remaining})
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             <form onSubmit={handleScheduleSubmit} className="space-y-4">
@@ -1062,19 +990,18 @@ function UserDashboard() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Component Type <span className="text-red-500">*</span>
+                  Blood type <span className="text-red-500">*</span>
                 </label>
                 <select
                   required
-                  value={scheduleForm.componentType}
-                  onChange={(e) =>
-                    setScheduleForm({ ...scheduleForm, componentType: e.target.value })
-                  }
+                  value={scheduleForm.bloodType}
+                  onChange={(e) => setScheduleForm({ ...scheduleForm, bloodType: e.target.value })}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                 >
-                  {getEligibleComponentOptions().map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  <option value="">Select blood type</option>
+                  {SCHEDULE_BLOOD_TYPE_OPTIONS.map((bt) => (
+                    <option key={bt} value={bt}>
+                      {bt}
                     </option>
                   ))}
                 </select>
@@ -1082,38 +1009,37 @@ function UserDashboard() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Weight (kg) <span className="text-red-500">*</span>
+                  Description <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
+                <textarea
                   required
-                  min="0"
-                  step="0.1"
-                  value={scheduleForm.weight}
+                  value={scheduleForm.notes}
                   onChange={(e) =>
-                    setScheduleForm({ ...scheduleForm, weight: e.target.value })
+                    setScheduleForm({ ...scheduleForm, notes: e.target.value })
                   }
+                  rows={3}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                  placeholder="Describe your blood request..."
                 />
               </div>
 
-              {/* Health Screening Questions */}
+              {/* Blood request screening questions */}
               <div className="border-t border-slate-200 pt-4">
-                <h4 className="text-sm font-semibold text-slate-900 mb-3">Health Screening Questions</h4>
+                <h4 className="text-sm font-semibold text-slate-900 mb-3">Blood Request Screening</h4>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Are you feeling healthy today? <span className="text-red-500">*</span>
+                      Has a doctor recommended this blood request? <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
-                      value={scheduleForm.healthScreening.feelingHealthy}
+                      value={scheduleForm.healthScreening.hasDoctorRecommendation}
                       onChange={(e) =>
                         setScheduleForm({
                           ...scheduleForm,
                           healthScreening: {
                             ...scheduleForm.healthScreening,
-                            feelingHealthy: e.target.value,
+                            hasDoctorRecommendation: e.target.value,
                           },
                         })
                       }
@@ -1127,17 +1053,18 @@ function UserDashboard() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Have you had any recent illness? <span className="text-red-500">*</span>
+                      Have you coordinated this request with a hospital or blood bank?{' '}
+                      <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
-                      value={scheduleForm.healthScreening.recentIllness}
+                      value={scheduleForm.healthScreening.hasHospitalCoordination}
                       onChange={(e) =>
                         setScheduleForm({
                           ...scheduleForm,
                           healthScreening: {
                             ...scheduleForm.healthScreening,
-                            recentIllness: e.target.value,
+                            hasHospitalCoordination: e.target.value,
                           },
                         })
                       }
@@ -1151,17 +1078,17 @@ function UserDashboard() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Are you currently taking any medications? <span className="text-red-500">*</span>
+                      Is this blood request urgent within 24 hours? <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
-                      value={scheduleForm.healthScreening.medications}
+                      value={scheduleForm.healthScreening.isUrgentWithin24Hours}
                       onChange={(e) =>
                         setScheduleForm({
                           ...scheduleForm,
                           healthScreening: {
                             ...scheduleForm.healthScreening,
-                            medications: e.target.value,
+                            isUrgentWithin24Hours: e.target.value,
                           },
                         })
                       }
@@ -1175,17 +1102,18 @@ function UserDashboard() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Have you traveled recently? <span className="text-red-500">*</span>
+                      Do you already know the required blood type for this request?{' '}
+                      <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
-                      value={scheduleForm.healthScreening.travelHistory}
+                      value={scheduleForm.healthScreening.hasRequiredBloodTypeInfo}
                       onChange={(e) =>
                         setScheduleForm({
                           ...scheduleForm,
                           healthScreening: {
                             ...scheduleForm.healthScreening,
-                            travelHistory: e.target.value,
+                            hasRequiredBloodTypeInfo: e.target.value,
                           },
                         })
                       }
@@ -1199,17 +1127,18 @@ function UserDashboard() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">
-                      Do you have any risk factors? <span className="text-red-500">*</span>
+                      Do you have patient/family consent to proceed with this request?{' '}
+                      <span className="text-red-500">*</span>
                     </label>
                     <select
                       required
-                      value={scheduleForm.healthScreening.riskFactors}
+                      value={scheduleForm.healthScreening.hasPatientConsent}
                       onChange={(e) =>
                         setScheduleForm({
                           ...scheduleForm,
                           healthScreening: {
                             ...scheduleForm.healthScreening,
-                            riskFactors: e.target.value,
+                            hasPatientConsent: e.target.value,
                           },
                         })
                       }
@@ -1221,21 +1150,6 @@ function UserDashboard() {
                     </select>
                   </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={scheduleForm.notes}
-                  onChange={(e) =>
-                    setScheduleForm({ ...scheduleForm, notes: e.target.value })
-                  }
-                  rows={3}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  placeholder="Any additional information..."
-                />
               </div>
 
               <div className="flex items-start gap-2">
@@ -1265,7 +1179,7 @@ function UserDashboard() {
                   type="submit"
                   className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
-                  Submit Request
+                  Submit blood request
                 </button>
               </div>
             </form>
