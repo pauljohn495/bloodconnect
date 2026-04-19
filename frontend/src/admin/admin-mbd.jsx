@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
-import { apiRequest } from './api.js'
+import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
-import { apiRequest } from './api.js'
+import { apiRequest } from '../api.js'
 import { adminReportLoading, adminReportSection, responsiveTableContainer } from './admin-ui.jsx'
-import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 
 function AdminReports() {
   const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import HospitalLayout from './HospitalLayout.jsx'
-import { apiRequest } from './api.js'
-import { adminPanel } from './admin-ui.jsx'
-import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { apiRequest } from '../api.js'
+import { adminPanel } from '../admin/admin-ui.jsx'
+import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 
 function HospitalInventory() {
   const [inventory, setInventory] = useState([])

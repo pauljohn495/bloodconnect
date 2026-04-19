@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiRequest } from './api.js'
-import { BloodTypeBadge } from './BloodTypeBadge.jsx'
-import { BrandLogo } from './BrandLogo.jsx'
+import { apiRequest } from '../api.js'
+import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
+import { BrandLogo } from '../BrandLogo.jsx'
 
 function ProfileSettings() {
   const navigate = useNavigate()

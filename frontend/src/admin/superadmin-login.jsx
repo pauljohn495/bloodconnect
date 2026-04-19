@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { apiRequest } from './api.js'
-import { BrandLogo } from './BrandLogo.jsx'
+import { apiRequest } from '../api.js'
+import { BrandLogo } from '../BrandLogo.jsx'
 
 function SuperadminLogin() {
   const navigate = useNavigate()

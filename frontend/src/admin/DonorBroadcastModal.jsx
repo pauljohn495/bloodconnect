@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiRequest } from './api.js'
-import ConfirmDialog from './ConfirmDialog.jsx'
+import { apiRequest } from '../api.js'
+import ConfirmDialog from '../ConfirmDialog.jsx'
 
 const BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 

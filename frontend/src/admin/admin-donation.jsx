@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
-import { apiRequest } from './api.js'
+import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
-import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 import DonorBroadcastModal from './DonorBroadcastModal.jsx'
 
 function parseDonorPendingProfile(donor) {

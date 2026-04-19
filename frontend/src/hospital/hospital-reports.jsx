@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import HospitalLayout from './HospitalLayout.jsx'
-import { apiRequest } from './api.js'
-import { adminReportSection } from './admin-ui.jsx'
-import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { apiRequest } from '../api.js'
+import { adminReportSection } from '../admin/admin-ui.jsx'
+import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 
 const NEAR_EXPIRY_DAYS = 7
 const CRITICAL_EXPIRY_DAYS = 3

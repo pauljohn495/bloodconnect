@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
-import { useFeatureFlags } from './featureFlagsContext.jsx'
-import { apiRequest } from './api.js'
-import HospitalSupplyMap from './HospitalSupplyMap.jsx'
+import { useFeatureFlags } from '../featureFlagsContext.jsx'
+import { apiRequest } from '../api.js'
+import HospitalSupplyMap from '../HospitalSupplyMap.jsx'
 import PrcActivitiesDashboardSection from './PrcActivitiesDashboardSection.jsx'
-import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 import {
   LineChart,
   Line,

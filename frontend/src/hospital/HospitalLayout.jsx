@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { BrandLogo } from './BrandLogo.jsx'
-import { useFeatureFlags } from './featureFlagsContext.jsx'
+import { BrandLogo } from '../BrandLogo.jsx'
+import { useFeatureFlags } from '../featureFlagsContext.jsx'
 
 const HOSPITAL_SIDEBAR_HOVER_KEY = 'hospitalSidebarHovered'
 const iconClassName = 'h-5 w-5 shrink-0'

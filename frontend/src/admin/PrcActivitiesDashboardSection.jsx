@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { apiRequest } from './api.js'
+import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
-import ConfirmDialog from './ConfirmDialog.jsx'
+import ConfirmDialog from '../ConfirmDialog.jsx'
 import './admin-prc-activities-calendar.css'
 
 function toDateKey(d) {

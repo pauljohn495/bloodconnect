@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
-import { apiRequest } from './api.js'
+import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
-import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 
 function normalizeInventoryStatus(status) {
   return (status || 'available').toString().toLowerCase().replace(/\s+/g, '_')
