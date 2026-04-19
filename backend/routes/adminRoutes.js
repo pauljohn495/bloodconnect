@@ -23,6 +23,11 @@ const {
   deleteDonorController,
   recordWalkInDonationController,
 } = require('../controllers/adminDonorController')
+const {
+  previewDonorNotifyController,
+  sendDonorNotifyController,
+  listDonorNotifyHistoryController,
+} = require('../controllers/adminDonorNotifyController')
 const { postManualDonorRecallSmsController } = require('../controllers/donorRecallController')
 const {
   getInventoryController,
@@ -73,6 +78,20 @@ const {
   deleteHomePostController,
 } = require('../controllers/adminHomePostController')
 const {
+  listMbdEventsController,
+  createMbdEventController,
+  listMbdDonorsController,
+  createMbdDonorController,
+  updateMbdDonorController,
+  deleteMbdDonorController,
+} = require('../controllers/adminMbdController')
+const {
+  listPrcActivitiesController,
+  createPrcActivityController,
+  updatePrcActivityController,
+  deletePrcActivityController,
+} = require('../controllers/adminPrcActivityController')
+const {
   getAdminFeatureFlagsController,
   putAdminFeatureFlagsController,
 } = require('../controllers/featureFlagController')
@@ -109,6 +128,11 @@ router.get('/donors', getDonorsController)
 
 // POST /api/admin/donors - create donor user (admin side)
 router.post('/donors', createDonorController)
+
+// Donor in-app notification broadcasts (must be before /donors/:id)
+router.post('/donors/notify/preview', previewDonorNotifyController)
+router.post('/donors/notify/send', sendDonorNotifyController)
+router.get('/donors/notify/history', listDonorNotifyHistoryController)
 
 // GET /api/admin/donors/:id/details - donation status & stats for a donor
 router.get('/donors/:id/details', getDonorDetailsController)
@@ -250,6 +274,33 @@ router.get('/home-posts', getHomePostsController)
 router.post('/home-posts', createHomePostController)
 router.put('/home-posts/:id', updateHomePostController)
 router.delete('/home-posts/:id', deleteHomePostController)
+
+// ===== MBD (Mobile Blood Donation) — drive records & donor intake =====
+
+// GET /api/admin/mbd-events
+router.get('/mbd-events', listMbdEventsController)
+
+// POST /api/admin/mbd-events
+router.post('/mbd-events', createMbdEventController)
+
+// GET /api/admin/mbd-events/:id/donors
+router.get('/mbd-events/:id/donors', listMbdDonorsController)
+
+// POST /api/admin/mbd-events/:id/donors
+router.post('/mbd-events/:id/donors', createMbdDonorController)
+
+// PUT /api/admin/mbd-events/:id/donors/:donorId
+router.put('/mbd-events/:id/donors/:donorId', updateMbdDonorController)
+
+// DELETE /api/admin/mbd-events/:id/donors/:donorId
+router.delete('/mbd-events/:id/donors/:donorId', deleteMbdDonorController)
+
+// ===== PRC Activities (staff calendar) =====
+
+router.get('/prc-activities', listPrcActivitiesController)
+router.post('/prc-activities', createPrcActivityController)
+router.put('/prc-activities/:id', updatePrcActivityController)
+router.delete('/prc-activities/:id', deletePrcActivityController)
 
 // ===== Feature flags (module visibility) — read: admin/super_admin; write: super_admin only =====
 

@@ -275,6 +275,84 @@ async function ensureHomePostsTable() {
   console.log('Schema: ensured home_posts table')
 }
 
+/** Mobile blood donation (MBD) events and per-drive donor intake records (admin-managed). */
+async function ensureMbdTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mbd_events (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(255) NOT NULL,
+      organizer_name VARCHAR(255) NOT NULL DEFAULT '',
+      event_date DATE NOT NULL,
+      location VARCHAR(512) NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_mbd_events_event_date (event_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mbd_donor_records (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      mbd_event_id INT NOT NULL,
+      donor_name VARCHAR(255) NOT NULL,
+      barcode VARCHAR(128) NULL,
+      blood_type VARCHAR(8) NOT NULL,
+      donor_number VARCHAR(64) NULL,
+      age INT NULL,
+      gender VARCHAR(32) NULL,
+      bag_type VARCHAR(64) NULL,
+      remarks_sd ENUM('S', 'D') NOT NULL,
+      num_donations INT NOT NULL DEFAULT 1,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_mbd_donor_event (mbd_event_id),
+      CONSTRAINT fk_mbd_donor_event FOREIGN KEY (mbd_event_id) REFERENCES mbd_events(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  if (!(await columnExists('mbd_events', 'organizer_name'))) {
+    await pool.query(
+      "ALTER TABLE mbd_events ADD COLUMN organizer_name VARCHAR(255) NOT NULL DEFAULT '' AFTER name",
+    )
+    console.log('Schema: added mbd_events.organizer_name')
+  }
+  console.log('Schema: ensured mbd_events / mbd_donor_records tables')
+}
+
+/** PRC (Philippine Red Cross) staff activities — calendar scheduling. */
+/** Audit log for admin → donor in-app notification broadcasts. */
+async function ensureDonorNotificationBroadcastsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS donor_notification_broadcasts (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      title VARCHAR(255) NOT NULL,
+      message MEDIUMTEXT NOT NULL,
+      sent_by_user_id INT NULL,
+      sent_by_name VARCHAR(255) NOT NULL DEFAULT '',
+      recipient_count INT NOT NULL DEFAULT 0,
+      eligible_only TINYINT(1) NOT NULL DEFAULT 1,
+      blood_types_json TEXT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_donor_notif_broadcast_created (created_at),
+      CONSTRAINT fk_donor_notif_sent_by FOREIGN KEY (sent_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured donor_notification_broadcasts table')
+}
+
+async function ensurePrcActivitiesTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS prc_activities (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      title VARCHAR(255) NOT NULL,
+      description MEDIUMTEXT NOT NULL,
+      activity_date DATE NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_prc_activities_date (activity_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured prc_activities table')
+}
+
 module.exports = {
   ensureUserRoleEnumIncludesSuperAdmin,
   ensureDonorProfileColumns,
@@ -285,4 +363,7 @@ module.exports = {
   ensureScheduleDonationTrackingColumns,
   ensureFeatureFlagTables,
   ensureHomePostsTable,
+  ensureMbdTables,
+  ensureDonorNotificationBroadcastsTable,
+  ensurePrcActivitiesTable,
 }

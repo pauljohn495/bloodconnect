@@ -16,6 +16,13 @@ const REGISTRY = [
   { key: 'admin.users', portal: 'admin', label: 'Manage Users', group: 'Admin', routePath: '/admin/users' },
   { key: 'admin.reports', portal: 'admin', label: 'Reports & Analytics', group: 'Admin', routePath: '/admin/reports' },
   { key: 'admin.announcements', portal: 'admin', label: 'Announcements', group: 'Admin', routePath: '/admin/announcements' },
+  { key: 'admin.mbd', portal: 'admin', label: 'MBD (Mobile Blood Donation)', group: 'Admin', routePath: '/admin/mbd' },
+  {
+    key: 'admin.prc_activities',
+    portal: 'admin',
+    label: 'PRC Activities (dashboard section)',
+    group: 'Admin',
+  },
 
   // —— Hospital portal ——
   { key: 'hospital.inventory', portal: 'hospital', label: 'Inventory', group: 'Hospital', routePath: '/hospital/inventory' },
@@ -36,6 +43,7 @@ const REGISTRY = [
   { key: 'public.nav_about', portal: 'public', label: 'Nav: About', group: 'Public site' },
   { key: 'public.section_donate', portal: 'public', label: 'Donate section', group: 'Public site' },
   { key: 'public.section_about', portal: 'public', label: 'About section', group: 'Public site' },
+  { key: 'public.section_mbd', portal: 'public', label: 'MBD schedule & stats (home)', group: 'Public site' },
   { key: 'public.register', portal: 'public', label: 'Registration & account CTA', group: 'Public site', routePath: '/register' },
 ]
 

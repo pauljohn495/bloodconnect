@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
+import { useFeatureFlags } from './featureFlagsContext.jsx'
 import { apiRequest } from './api.js'
 import HospitalSupplyMap from './HospitalSupplyMap.jsx'
+import PrcActivitiesDashboardSection from './PrcActivitiesDashboardSection.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
 import {
   LineChart,
@@ -76,6 +78,7 @@ function IconBuilding({ className }) {
 }
 
 function AdminDashboard() {
+  const { isFlagEnabled } = useFeatureFlags()
   const [dashboardData, setDashboardData] = useState(null)
   const [allStocks, setAllStocks] = useState([])
   const [recentTransfers, setRecentTransfers] = useState([])
@@ -183,7 +186,7 @@ function AdminDashboard() {
   return (
     <AdminLayout
       pageTitle="Dashboard overview"
-      pageDescription="Monitor donors, requests, and hospital partners in real time."
+      pageDescription="Monitor donors, requests, and partners in real time. PRC Activities appear below when enabled in Module visibility."
     >
             {/* Top stats — clear cards, high contrast, calm clinical palette */}
             <section
@@ -423,6 +426,8 @@ function AdminDashboard() {
                 </div>
               </div>
             </section>
+
+            {isFlagEnabled('admin', 'admin.prc_activities') && <PrcActivitiesDashboardSection />}
 
             {/* Recent Transferred Table */}
             <section className="mt-6">

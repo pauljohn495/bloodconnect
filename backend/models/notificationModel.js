@@ -35,9 +35,29 @@ async function createNotification(userId, title, message, type = 'info') {
   )
 }
 
+/** Batch insert in chunks for admin donor broadcasts. Pass `connection` to include in a transaction. */
+async function insertNotificationsBulk(userIds, title, message, type = 'info', connection = null) {
+  if (!userIds?.length) return
+  const queryFn = connection ? connection.query.bind(connection) : pool.query.bind(pool)
+  const chunkSize = 250
+  for (let i = 0; i < userIds.length; i += chunkSize) {
+    const chunk = userIds.slice(i, i + chunkSize)
+    const placeholders = chunk.map(() => '(?, ?, ?, ?)').join(', ')
+    const params = chunk.flatMap((uid) => [uid, title, message, type])
+    await queryFn(
+      `
+      INSERT INTO notifications (user_id, title, message, type)
+      VALUES ${placeholders}
+    `,
+      params,
+    )
+  }
+}
+
 module.exports = {
   getUserNotifications,
   markNotificationRead,
   createNotification,
+  insertNotificationsBulk,
 }
 

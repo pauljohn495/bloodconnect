@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from './api.js'
 import { adminPanel } from './admin-ui.jsx'
 import { BloodTypeBadge } from './BloodTypeBadge.jsx'
+import DonorBroadcastModal from './DonorBroadcastModal.jsx'
 
 function parseDonorPendingProfile(donor) {
   if (!donor?.pending_profile_json) return null
@@ -116,6 +117,7 @@ function AdminDonation() {
   ])
   const [isSavingOrgDonation, setIsSavingOrgDonation] = useState(false)
 
+  const [donorBroadcastOpen, setDonorBroadcastOpen] = useState(false)
   const [isDonationRankingModalOpen, setIsDonationRankingModalOpen] = useState(false)
   const [rankingTab, setRankingTab] = useState('organizations') // 'organizations' | 'donors'
   const [orgRanking, setOrgRanking] = useState([])
@@ -1422,6 +1424,22 @@ function AdminDonation() {
                     className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                   >
                     Schedule History
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDonorBroadcastOpen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 0 0-5-5.9V4a1 1 0 1 0-2 0v1.1A6 6 0 0 0 6 11v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 1 1-6 0v-1"
+                        stroke="currentColor"
+                        strokeWidth="1.75"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Send Notification
                   </button>
                   <button
                     type="button"
@@ -3652,6 +3670,8 @@ function AdminDonation() {
           </div>
         </div>
       )}
+
+      <DonorBroadcastModal open={donorBroadcastOpen} onClose={() => setDonorBroadcastOpen(false)} />
     </AdminLayout>
   )
 }

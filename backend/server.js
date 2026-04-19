@@ -13,6 +13,9 @@ const {
   ensureScheduleDonationTrackingColumns,
   ensureFeatureFlagTables,
   ensureHomePostsTable,
+  ensureMbdTables,
+  ensureDonorNotificationBroadcastsTable,
+  ensurePrcActivitiesTable,
 } = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const { getPublicHomePostsController } = require('./controllers/adminHomePostController')
@@ -117,6 +120,9 @@ async function start() {
         await ensureScheduleDonationTrackingColumns()
         await ensureFeatureFlagTables()
         await ensureHomePostsTable()
+        await ensureMbdTables()
+        await ensureDonorNotificationBroadcastsTable()
+        await ensurePrcActivitiesTable()
         startHospitalInventoryAlertScheduler()
         startDonorRecallScheduler()
       } catch (migrationError) {

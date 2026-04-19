@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { BrandLogo } from './BrandLogo.jsx'
@@ -9,7 +9,6 @@ function formatMbdDate(value) {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return '—'
   return d.toLocaleString(undefined, {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -34,6 +33,13 @@ function mbdStatusLabel(status) {
 function mapsUrl(location) {
   if (!location) return null
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
+}
+
+function parseMbdDate(value) {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  return d
 }
 
 function MbdDetailModal({ item, onClose }) {
@@ -63,10 +69,15 @@ function MbdDetailModal({ item, onClose }) {
           </div>
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{item.description || 'No description provided.'}</p>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Description</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+              {item.description || 'No description provided.'}
+            </p>
+          </div>
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">When</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{formatMbdDate(item.event_starts_at)}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date & time added</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{formatMbdDate(item.created_at)}</p>
           </div>
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Where</p>
@@ -115,7 +126,10 @@ function PostDetailModal({ post, onClose }) {
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{post.body}</p>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Description</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{post.body}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -124,6 +138,7 @@ function PostDetailModal({ post, onClose }) {
 
 function Home() {
   const { isFlagEnabled } = useFeatureFlags()
+  const showMbdPublic = isFlagEnabled('public', 'public.section_mbd')
   const [activeRole, setActiveRole] = useState('donor') // 'donor' | 'hospital' | 'admin'
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -202,6 +217,34 @@ function Home() {
     }
   }, [])
 
+  const mbdCalendarGroups = useMemo(() => {
+    const grouped = new Map()
+
+    mbdItems.forEach((item) => {
+      const parsed = parseMbdDate(item.event_starts_at)
+      const key = parsed
+        ? `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+        : 'unknown-date'
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          date: parsed,
+          entries: [],
+        })
+      }
+
+      grouped.get(key).entries.push(item)
+    })
+
+    return Array.from(grouped.values()).sort((a, b) => {
+      if (!a.date && !b.date) return 0
+      if (!a.date) return 1
+      if (!b.date) return -1
+      return a.date.getTime() - b.date.getTime()
+    })
+  }, [mbdItems])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -218,6 +261,10 @@ function Home() {
   }, [])
 
   useEffect(() => {
+    if (!showMbdPublic) {
+      setMbdItems([])
+      return
+    }
     let cancelled = false
     ;(async () => {
       try {
@@ -235,7 +282,7 @@ function Home() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [showMbdPublic])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -488,11 +535,15 @@ function Home() {
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-wide text-white/70">Active Schedules</p>
-                  <p className="mt-2 text-2xl font-bold">{mbdItems.length}</p>
-                </div>
+              <div
+                className={`grid gap-3 ${showMbdPublic ? 'grid-cols-2' : 'grid-cols-1 sm:max-w-[200px]'}`}
+              >
+                {showMbdPublic && (
+                  <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
+                    <p className="text-[11px] uppercase tracking-wide text-white/70">Active Schedules</p>
+                    <p className="mt-2 text-2xl font-bold">{mbdItems.length}</p>
+                  </div>
+                )}
                 <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
                   <p className="text-[11px] uppercase tracking-wide text-white/70">Published Posts</p>
                   <p className="mt-2 text-2xl font-bold">{homePosts.length}</p>
@@ -511,35 +562,62 @@ function Home() {
                 Real-time feed
               </span>
             </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-linear-to-b from-white to-red-50/30 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
-                <div className="mb-3">
-                  <h2 className="text-base font-semibold text-slate-900">Blood Donation Schedule</h2>
-                  <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
+            <div
+              className={`grid grid-cols-1 gap-4 ${showMbdPublic ? 'lg:grid-cols-2' : ''}`}
+            >
+              {showMbdPublic && (
+                <div className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-linear-to-b from-white to-red-50/30 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                  <div className="mb-3">
+                    <h2 className="text-base font-semibold text-slate-900">Blood Donation Schedule</h2>
+                    <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
+                  </div>
+                  <ul className="flex-1 space-y-3 overflow-y-auto pr-1">
+                    {mbdItems.length === 0 && (
+                      <li className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
+                        No active MBD yet.
+                      </li>
+                    )}
+                    {mbdCalendarGroups.map((group) => (
+                      <li key={group.key} className="rounded-xl border border-slate-200/90 bg-white/80 p-3">
+                        <div className="grid grid-cols-[auto_1fr] gap-3">
+                          <div className="w-16 rounded-lg border border-red-200 bg-red-50 px-2 py-2 text-center">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">
+                              {group.date
+                                ? group.date.toLocaleDateString(undefined, { month: 'short' })
+                                : 'Date'}
+                            </p>
+                            <p className="mt-0.5 text-xl font-extrabold leading-none text-red-800">
+                              {group.date ? String(group.date.getDate()).padStart(2, '0') : '--'}
+                            </p>
+                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-red-600/90">
+                              {group.date
+                                ? group.date.toLocaleDateString(undefined, { weekday: 'short' })
+                                : 'TBD'}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            {group.entries.map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setSelectedMbd(item)}
+                                className="w-full rounded-lg border border-slate-200/90 bg-white p-2.5 text-left transition duration-200 hover:border-red-300 hover:bg-red-50/70"
+                              >
+                                <p className="text-[11px] font-black uppercase tracking-wide text-red-700">
+                                  {mbdTypeLabel(item.announcement_type)} • {mbdStatusLabel(item.status)}
+                                </p>
+                                <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-900">{item.title}</p>
+                                <p className="mt-1 text-xs text-slate-500">{formatMbdDate(item.event_starts_at)}</p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="flex-1 space-y-2 overflow-y-auto pr-1">
-                  {mbdItems.length === 0 && (
-                    <li className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
-                      No active MBD yet.
-                    </li>
-                  )}
-                  {mbdItems.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMbd(item)}
-                        className="w-full rounded-xl border border-slate-200/90 bg-white/90 p-3 text-left transition duration-200 hover:border-red-300 hover:bg-red-50/70"
-                      >
-                        <p className="text-[12px] font-black uppercase tracking-wide text-red-700">
-                          {mbdTypeLabel(item.announcement_type)} • {mbdStatusLabel(item.status)}
-                        </p>
-                        <p className="mt-1 line-clamp-1 text-sm font-semibold text-slate-900">{item.title}</p>
-                        <p className="mt-1 text-xs text-slate-500">{formatMbdDate(item.event_starts_at)}</p>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              )}
 
               <div className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-linear-to-b from-white to-indigo-50/40 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
                 <div className="mb-3">
@@ -790,6 +868,18 @@ function Home() {
             </div>
           </section>
         )}
+        <section className="border-t border-red-200/80 bg-[linear-gradient(180deg,rgba(254,242,242,0.92)_0%,rgba(255,255,255,0.96)_100%)] py-16 sm:py-20 lg:py-24">
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-col items-center py-2 sm:py-4">
+              <p className="w-fit whitespace-nowrap text-center font-serif text-sm font-semibold uppercase tracking-[0.09em] text-red-800 sm:text-lg lg:text-[2rem]">
+                Volunteers + Logistics + Information Technology = A Red Cross That Is
+              </p>
+              <p className="mt-3 w-fit whitespace-nowrap text-center font-serif text-3xl font-extrabold uppercase leading-tight tracking-[0.07em] text-red-800 sm:mt-4 sm:text-5xl lg:text-6xl">
+                Always First, Always Ready, Always There
+              </p>
+            </div>
+          </div>
+        </section>
         <footer className="border-t border-slate-200/90 bg-slate-900 py-8 text-slate-200">
           <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[1.45fr_1fr_1fr] lg:gap-8 lg:px-8">
             <div>
@@ -808,10 +898,12 @@ function Home() {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Status</p>
-              <p className="mt-3 text-sm text-slate-300">
-                Active MBD: <span className="font-semibold text-white">{mbdItems.length}</span>
-              </p>
-              <p className="mt-1 text-sm text-slate-300">
+              {showMbdPublic && (
+                <p className="mt-3 text-sm text-slate-300">
+                  Active MBD: <span className="font-semibold text-white">{mbdItems.length}</span>
+                </p>
+              )}
+              <p className={`text-sm text-slate-300 ${showMbdPublic ? 'mt-1' : 'mt-3'}`}>
                 Announcements: <span className="font-semibold text-white">{homePosts.length}</span>
               </p>
             </div>
@@ -819,7 +911,7 @@ function Home() {
         </footer>
       </main>
 
-      {selectedMbd && <MbdDetailModal item={selectedMbd} onClose={() => setSelectedMbd(null)} />}
+      {showMbdPublic && selectedMbd && <MbdDetailModal item={selectedMbd} onClose={() => setSelectedMbd(null)} />}
       {selectedPost && <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />}
       </div>
     </div>

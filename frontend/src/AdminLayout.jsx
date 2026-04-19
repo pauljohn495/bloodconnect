@@ -74,6 +74,17 @@ function AnnouncementsIcon() {
   )
 }
 
+function MbdIcon() {
+  return (
+    <svg className={iconClassName} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        {...navIconStroke}
+        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+      />
+    </svg>
+  )
+}
+
 function SettingsIcon() {
   return (
     <svg className={iconClassName} viewBox="0 0 24 24" aria-hidden="true">
@@ -89,6 +100,7 @@ function SettingsIcon() {
 const superAdminSidebarItems = [
   { name: 'Module visibility', path: '/superadmin/feature-settings', icon: SettingsIcon, flagKey: null },
   { name: 'Manage Users', path: '/admin/users', icon: UsersIcon, flagKey: 'admin.users' },
+  { name: 'MBD', path: '/admin/mbd', icon: MbdIcon, flagKey: 'admin.mbd' },
 ]
 
 const allSidebarItems = [
@@ -100,6 +112,7 @@ const allSidebarItems = [
   { name: 'Manage Users', path: '/admin/users', icon: UsersIcon, flagKey: 'admin.users' },
   { name: 'Reports & Analytics', path: '/admin/reports', icon: ReportsIcon, flagKey: 'admin.reports' },
   { name: 'Announcements', path: '/admin/announcements', icon: AnnouncementsIcon, flagKey: 'admin.announcements' },
+  { name: 'MBD', path: '/admin/mbd', icon: MbdIcon, flagKey: 'admin.mbd' },
 ]
 
 function NavLinks({ onNavigate, isExpanded, items }) {

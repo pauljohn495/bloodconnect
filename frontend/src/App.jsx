@@ -10,6 +10,7 @@ import AdminReports from './admin-reports.jsx'
 import AdminInventory from './admin-inventory.jsx'
 import AdminUsers from './admin-users.jsx'
 import AdminAnnouncements from './admin-announcements.jsx'
+import AdminMbd from './admin-mbd.jsx'
 import UserDashboard from './user-dashboard.jsx'
 import ProfileSettings from './profile-settings.jsx'
 import HospitalInventory from './hospital-inventory.jsx'
@@ -44,6 +45,8 @@ function App() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/reports" element={<AdminReports />} />
             <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+            <Route path="/admin/mbd" element={<AdminMbd />} />
+            <Route path="/admin/prc-activities" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/superadmin/feature-settings" element={<AdminFeatureSettings />} />
             <Route
               path="/admin/feature-settings"
