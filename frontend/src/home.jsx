@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { apiRequest } from './api.js'
 import { BrandLogo } from './BrandLogo.jsx'
 import { useFeatureFlags } from './featureFlagsContext.jsx'
@@ -379,10 +379,10 @@ function Home() {
   const navLinkClass = (id, options = {}) => {
     const { forceActive } = options
     const active = forceActive != null ? forceActive : activeSection === id
-    return `rounded-lg px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-red-900 ${
+    return `rounded-lg px-3 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-red-800 ${
       active
-        ? 'bg-red-950/55 text-white'
-        : 'text-white/95 hover:bg-red-800/45 hover:text-white'
+        ? 'bg-white text-red-700 shadow-sm'
+        : 'text-white/95 hover:bg-red-800/70 hover:text-white'
     }`
   }
 
@@ -390,219 +390,201 @@ function Home() {
     <div className="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(241,245,249,0.82)_40%,rgba(255,255,255,0.95)_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_-8%,rgba(254,202,202,0.35)_0%,rgba(248,250,252,0)_38%),radial-gradient(circle_at_95%_15%,rgba(252,165,165,0.2)_0%,rgba(248,250,252,0)_42%),linear-gradient(180deg,#f8fafc_0%,#f8fafc_100%)]"
       />
       <div className="relative z-10">
-      {/* Sticky header */}
-      <header className="sticky top-0 z-50 border-b border-red-950/35 bg-red-900/95 shadow-md backdrop-blur supports-backdrop-filter:bg-red-900/85">
-        <div className="mx-auto flex min-h-12 max-w-7xl items-center justify-between gap-3 px-4 py-2 sm:min-h-14 sm:px-6 lg:px-8">
-          <button
-            type="button"
-            onClick={scrollToTop}
-            className="flex min-h-10 min-w-0 shrink-0 items-center gap-2 rounded-xl px-1 py-1 text-left text-white transition hover:bg-red-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-          >
-            <BrandLogo tone="hero" className="h-9 w-9 shrink-0 rounded-lg" roundedClass="rounded-lg" />
-            <span className="leading-tight">
-              <span className="block text-sm font-bold tracking-tight sm:text-base">BloodConnect</span>
-              <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-red-100 sm:block">
-                Blood management
+        <header className="sticky top-0 z-50 border-b border-red-950/30 bg-red-900/95 shadow-sm backdrop-blur">
+          <div className="mx-auto flex min-h-14 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+            <button
+              type="button"
+              onClick={scrollToTop}
+              className="flex min-h-10 min-w-0 items-center gap-3 rounded-xl px-2 py-1 text-left transition hover:bg-red-800/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            >
+              <BrandLogo tone="hero" className="h-9 w-9 shrink-0 rounded-lg" roundedClass="rounded-lg" />
+              <span className="leading-tight">
+                <span className="block text-sm font-bold tracking-tight text-white sm:text-base">BloodConnect</span>
+                <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-red-100/85 sm:block">
+                  Always first, always ready
+                </span>
               </span>
-            </span>
-          </button>
+            </button>
 
-          <nav className="hidden items-center gap-0.5 md:flex" aria-label="Primary">
-            {isFlagEnabled('public', 'public.nav_announcements') && (
-              <button
-                type="button"
-                className={navLinkClass('announcements')}
-                onClick={() => scrollToSection('login')}
-              >
-                Login
-              </button>
-            )}
-            {isFlagEnabled('public', 'public.nav_donate') && (
-              <button type="button" className={navLinkClass('donate')} onClick={() => scrollToSection('donate')}>
-                Donate
-              </button>
-            )}
-            {isFlagEnabled('public', 'public.nav_about') && (
-              <button type="button" className={navLinkClass('about')} onClick={() => scrollToSection('about')}>
-                About
-              </button>
-            )}
-          </nav>
-
-          <button
-            type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white hover:bg-red-800/50 md:hidden"
-            aria-expanded={mobileNavOpen}
-            aria-controls="home-mobile-nav"
-            aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
-            onClick={() => setMobileNavOpen((o) => !o)}
-          >
-            {mobileNavOpen ? (
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            )}
-          </button>
-        </div>
-
-        {mobileNavOpen && (
-          <div
-            id="home-mobile-nav"
-            className="border-t border-red-950/40 bg-red-950/98 px-4 py-3 shadow-inner md:hidden"
-          >
-            <nav className="flex flex-col gap-1" aria-label="Mobile primary">
+            <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
               {isFlagEnabled('public', 'public.nav_announcements') && (
                 <button
                   type="button"
-                  className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                    false ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
-                  }`}
+                  className={navLinkClass('announcements', { forceActive: false })}
                   onClick={() => scrollToSection('login')}
                 >
                   Login
                 </button>
               )}
               {isFlagEnabled('public', 'public.nav_donate') && (
-                <button
-                  type="button"
-                  className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                    activeSection === 'donate' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
-                  }`}
-                  onClick={() => scrollToSection('donate')}
-                >
+                <button type="button" className={navLinkClass('donate')} onClick={() => scrollToSection('donate')}>
                   Donate
                 </button>
               )}
               {isFlagEnabled('public', 'public.nav_about') && (
-                <button
-                  type="button"
-                  className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                    activeSection === 'about' ? 'bg-red-900/70 text-white' : 'text-white/95 hover:bg-red-800/45'
-                  }`}
-                  onClick={() => scrollToSection('about')}
-                >
-                  About Us
+                <button type="button" className={navLinkClass('about')} onClick={() => scrollToSection('about')}>
+                  About
                 </button>
               )}
             </nav>
-          </div>
-        )}
-      </header>
 
-      <main className="pt-2 sm:pt-3">
-        <div className="mx-auto min-h-[calc(100vh-3.25rem)] max-w-6xl px-4 pt-4 pb-10 sm:px-6 lg:px-8 lg:pt-5 lg:pb-12">
-          <section className="relative -mx-4 overflow-hidden rounded-none border-y border-white/25 bg-[linear-gradient(125deg,#7f1d1d_0%,#dc2626_45%,#f43f5e_100%)] px-7 pb-7 pt-5 text-white shadow-[0_35px_90px_-35px_rgba(127,29,29,0.8)] sm:-mx-6 sm:rounded-4xl sm:border sm:border-white/70 sm:px-10 sm:pb-10 sm:pt-6 lg:-mx-8 lg:pt-7">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -top-20 -left-16 h-72 w-72 rounded-full bg-white/20 blur-3xl"
-            />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-20 right-0 h-80 w-80 rounded-full bg-amber-200/25 blur-3xl"
-            />
-            <div className="relative z-10 grid grid-cols-1 gap-7 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-              <div>
-                <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
-                  Connecting Lives
-                  <span className="block text-rose-100">Through Blood Donation</span>
-                </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-relaxed text-red-50/95 sm:text-base">
-                  BloodConnect powers fast, transparent, and coordinated blood services for donors, recipients, hospitals, and administrators.
-                </p>
-                <div className="mt-7 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white transition hover:bg-red-800/70 md:hidden"
+              aria-expanded={mobileNavOpen}
+              aria-controls="home-mobile-nav"
+              aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+              onClick={() => setMobileNavOpen((o) => !o)}
+            >
+              {mobileNavOpen ? (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {mobileNavOpen && (
+            <div id="home-mobile-nav" className="border-t border-red-950/30 bg-red-900/98 px-4 py-3 shadow-inner md:hidden">
+              <nav className="flex flex-col gap-1" aria-label="Mobile primary">
+                {isFlagEnabled('public', 'public.nav_announcements') && (
                   <button
                     type="button"
+                    className="min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-white transition hover:bg-red-800/70"
                     onClick={() => scrollToSection('login')}
-                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-red-700 shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-rose-50"
                   >
-                    Get Started
+                    Login
                   </button>
-                  {isFlagEnabled('public', 'public.register') && (
+                )}
+                {isFlagEnabled('public', 'public.nav_donate') && (
+                  <button
+                    type="button"
+                    className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                      activeSection === 'donate'
+                        ? 'bg-white text-red-700 ring-1 ring-white/80'
+                        : 'text-white hover:bg-red-800/70'
+                    }`}
+                    onClick={() => scrollToSection('donate')}
+                  >
+                    Donate
+                  </button>
+                )}
+                {isFlagEnabled('public', 'public.nav_about') && (
+                  <button
+                    type="button"
+                    className={`min-h-11 w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+                      activeSection === 'about'
+                        ? 'bg-white text-red-700 ring-1 ring-white/80'
+                        : 'text-white hover:bg-red-800/70'
+                    }`}
+                    onClick={() => scrollToSection('about')}
+                  >
+                    About
+                  </button>
+                )}
+              </nav>
+            </div>
+          )}
+        </header>
+
+        <main>
+          <section className="mx-auto w-full max-w-7xl px-4 pt-8 pb-6 sm:px-6 lg:px-8 lg:pt-10">
+            <div className="overflow-hidden rounded-3xl border border-slate-200/85 bg-white shadow-[0_16px_34px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80">
+              <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="border-b border-slate-200/80 bg-white p-7 sm:p-9 lg:border-r lg:border-b-0">
+                  <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-red-700 ring-1 ring-red-100">
+                    Public Dashboard
+                  </span>
+                  <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+                    Modern blood response for donors, hospitals, and administrators.
+                  </h1>
+                  <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">
+                    BloodConnect keeps campaigns, requests, and community updates synchronized so life-saving decisions happen faster.
+                  </p>
+                  <div className="mt-7 flex flex-wrap items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => navigate('/register')}
-                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:bg-white/20"
+                      onClick={() => scrollToSection('login')}
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-900/10 transition hover:bg-red-700"
                     >
-                      Create Account
+                      Login
                     </button>
-                  )}
-                </div>
-              </div>
-              <div
-                className={`grid gap-3 ${showMbdPublic ? 'grid-cols-2' : 'grid-cols-1 sm:max-w-[200px]'}`}
-              >
-                {showMbdPublic && (
-                  <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
-                    <p className="text-[11px] uppercase tracking-wide text-white/70">Active Schedules</p>
-                    <p className="mt-2 text-2xl font-bold">{mbdItems.length}</p>
+                    {isFlagEnabled('public', 'public.register') && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/register')}
+                        className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                      >
+                        Create Account
+                      </button>
+                    )}
                   </div>
-                )}
-                <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur">
-                  <p className="text-[11px] uppercase tracking-wide text-white/70">Published Posts</p>
-                  <p className="mt-2 text-2xl font-bold">{homePosts.length}</p>
                 </div>
+
+                <aside className="bg-slate-50/70 p-6 sm:p-7">
+                  <p className="text-xs font-semibold uppercase tracking-[0.13em] text-slate-600">System snapshot</p>
+                  <div className={`mt-4 grid gap-3 ${showMbdPublic ? 'sm:grid-cols-2 lg:grid-cols-1' : 'grid-cols-1'}`}>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Announcements</p>
+                      <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{homePosts.length}</p>
+                    </div>
+                    {showMbdPublic && (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Active schedules</p>
+                        <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{mbdItems.length}</p>
+                      </div>
+                    )}
+                  </div>
+                </aside>
               </div>
             </div>
           </section>
 
-          <section className="mt-8 rounded-[1.75rem] border border-red-100/80 bg-white/85 p-4 shadow-[0_28px_75px_-45px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">Live Updates</h2>
-                <p className="mt-1 text-xs text-slate-500">Upcoming schedules and latest announcements</p>
-              </div>
-              <span className="rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700 ring-1 ring-red-100">
-                Real-time feed
-              </span>
-            </div>
-            <div
-              className={`grid grid-cols-1 gap-4 ${showMbdPublic ? 'lg:grid-cols-2' : ''}`}
-            >
+          <section className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+            <div className={`grid grid-cols-1 gap-6 ${showMbdPublic ? 'xl:grid-cols-2' : ''}`}>
               {showMbdPublic && (
-                <div className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-linear-to-b from-white to-red-50/30 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
-                  <div className="mb-3">
-                    <h2 className="text-base font-semibold text-slate-900">Blood Donation Schedule</h2>
-                    <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
+                <div className="overflow-hidden rounded-3xl border border-slate-200/85 bg-white shadow-[0_14px_35px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80">
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+                    <div>
+                      <h2 className="text-base font-semibold tracking-tight text-slate-900">Blood Donation Schedule</h2>
+                      <p className="mt-0.5 text-sm text-slate-600">Upcoming and active public drives</p>
+                    </div>
                   </div>
-                  <ul className="flex-1 space-y-3 overflow-y-auto pr-1">
+
+                  <ul className="max-h-[440px] space-y-3 overflow-y-auto bg-white p-4 sm:p-5">
                     {mbdItems.length === 0 && (
                       <li className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
                         No active MBD yet.
                       </li>
                     )}
                     {mbdCalendarGroups.map((group) => (
-                      <li key={group.key} className="rounded-xl border border-slate-200/90 bg-white/80 p-3">
+                      <li key={group.key} className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3">
                         <div className="grid grid-cols-[auto_1fr] gap-3">
-                          <div className="w-16 rounded-lg border border-red-200 bg-red-50 px-2 py-2 text-center">
+                          <div className="w-16 rounded-xl border border-red-200 bg-white px-2 py-2 text-center">
                             <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">
-                              {group.date
-                                ? group.date.toLocaleDateString(undefined, { month: 'short' })
-                                : 'Date'}
+                              {group.date ? group.date.toLocaleDateString(undefined, { month: 'short' }) : 'Date'}
                             </p>
                             <p className="mt-0.5 text-xl font-extrabold leading-none text-red-800">
                               {group.date ? String(group.date.getDate()).padStart(2, '0') : '--'}
                             </p>
                             <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-red-600/90">
-                              {group.date
-                                ? group.date.toLocaleDateString(undefined, { weekday: 'short' })
-                                : 'TBD'}
+                              {group.date ? group.date.toLocaleDateString(undefined, { weekday: 'short' }) : 'TBD'}
                             </p>
                           </div>
-
                           <div className="space-y-2">
                             {group.entries.map((item) => (
                               <button
                                 key={item.id}
                                 type="button"
                                 onClick={() => setSelectedMbd(item)}
-                                className="w-full rounded-lg border border-slate-200/90 bg-white p-2.5 text-left transition duration-200 hover:border-red-300 hover:bg-red-50/70"
+                                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-left transition hover:border-red-300 hover:bg-red-50"
                               >
                                 <p className="text-[11px] font-black uppercase tracking-wide text-red-700">
                                   {mbdTypeLabel(item.announcement_type)} • {mbdStatusLabel(item.status)}
@@ -619,12 +601,18 @@ function Home() {
                 </div>
               )}
 
-              <div className="group flex h-full flex-col rounded-2xl border border-slate-200 bg-linear-to-b from-white to-indigo-50/40 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
-                <div className="mb-3">
-                  <h2 className="text-base font-semibold text-slate-900">Announcements</h2>
-                  <p className="mt-1 text-xs text-slate-500">Tap any item to view full details</p>
+              <div className="overflow-hidden rounded-3xl border border-slate-200/85 bg-white shadow-[0_14px_35px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80">
+                <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+                  <div>
+                    <h2 className="text-base font-semibold tracking-tight text-slate-900">Announcements</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">Latest updates</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                    Public
+                  </span>
                 </div>
-                <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+
+                <div className="max-h-[440px] space-y-3 overflow-y-auto bg-white p-4 sm:p-5">
                   {homePosts.length === 0 && (
                     <p className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
                       No published posts yet.
@@ -635,7 +623,7 @@ function Home() {
                       key={post.id}
                       type="button"
                       onClick={() => setSelectedPost(post)}
-                      className="w-full rounded-xl border border-slate-200/90 bg-white/90 p-3 text-left transition duration-200 hover:border-red-300 hover:bg-red-50/70"
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/90 p-4 text-left transition hover:border-red-300 hover:bg-red-50/70"
                     >
                       <h3 className="text-sm font-semibold text-slate-900">{post.title}</h3>
                     </button>
@@ -645,274 +633,284 @@ function Home() {
             </div>
           </section>
 
-          <section className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_14px_36px_-24px_rgba(220,38,38,0.6)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_50px_-28px_rgba(220,38,38,0.6)]">
+          <section className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 px-4 pb-10 sm:px-6 lg:grid-cols-3 lg:px-8">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-red-100">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m4-4H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-slate-900">Emergency Response Ready</h3>
-              <p className="mt-2 text-sm text-slate-600">Coordinate urgent requests quickly with clear, centralized updates across teams.</p>
+              <h3 className="text-sm font-semibold text-slate-900">Emergency response ready</h3>
+              <p className="mt-2 text-sm text-slate-600">Coordinate urgent blood requests quickly through one synchronized workflow.</p>
             </div>
-            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_14px_36px_-24px_rgba(244,63,94,0.6)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_50px_-28px_rgba(244,63,94,0.6)]">
-              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600 ring-1 ring-rose-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-red-100">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-slate-900">Reliable Tracking</h3>
-              <p className="mt-2 text-sm text-slate-600">Monitor donation records, schedules, and request statuses in one place.</p>
+              <h3 className="text-sm font-semibold text-slate-900">Reliable tracking</h3>
+              <p className="mt-2 text-sm text-slate-600">Monitor schedules, announcements, and status changes with transparent records.</p>
             </div>
-            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-[0_14px_36px_-24px_rgba(14,165,233,0.6)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_50px_-28px_rgba(14,165,233,0.6)]">
-              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-red-100">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h5M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z" />
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-slate-900">Secure Access</h3>
-              <p className="mt-2 text-sm text-slate-600">Role-based login for donors, hospitals, and administrators.</p>
+              <h3 className="text-sm font-semibold text-slate-900">Secure role access</h3>
+              <p className="mt-2 text-sm text-slate-600">Built for donors, hospitals, and administrators with role-based entry points.</p>
             </div>
           </section>
 
-        </div>
-
-        <section id="login" className="border-t border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(254,242,242,0.65)_100%)] py-16 backdrop-blur-[2px]">
-          <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-            <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2">
-              <div className="text-center lg:text-left">
-                <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Every drop connects a life.</h3>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
-                  Sign in to continue helping hospitals and patients faster through timely blood management.
+          <section id="login" className="scroll-mt-24 border-y border-slate-200 bg-white py-16">
+            <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 px-4 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-7">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-700">Login portal</p>
+                <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+                  Every drop connects a life.
+                </h2>
+                <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
+                  Continue to your dashboard and support faster blood response, campaign visibility, and hospital readiness.
                 </p>
-                <p className="mt-3 text-sm leading-relaxed text-slate-500 sm:text-base">
-                  Your one login supports safer donations, quicker response, and stronger community care.
-                </p>
-              </div>
-
-              <div className="mx-auto w-full max-w-md">
-                <div className="rounded-3xl bg-white p-6 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/70 sm:p-8">
-                  <div className="mb-6 flex rounded-full bg-slate-100 p-1 text-xs font-medium text-slate-600">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRole('donor')}
-                      className={`flex-1 rounded-full px-3 py-2 transition ${
-                        activeRole === 'donor'
-                          ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
-                          : 'hover:text-red-600'
-                      }`}
-                    >
-                      Donor / Recipient
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveRole('hospital')}
-                      className={`flex-1 rounded-full px-3 py-2 transition ${
-                        activeRole === 'hospital'
-                          ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
-                          : 'hover:text-red-600'
-                      }`}
-                    >
-                      Hospital
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveRole('admin')}
-                      className={`flex-1 rounded-full px-3 py-2 transition ${
-                        activeRole === 'admin'
-                          ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
-                          : 'hover:text-red-600'
-                      }`}
-                    >
-                      Admin
-                    </button>
+                <div className="mt-6 space-y-3">
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    Donors and recipients access personal dashboard tools.
                   </div>
-
-                  <div className="mb-6 space-y-1">
-                    <h2 className="text-lg font-semibold text-slate-900">Login to BloodConnect</h2>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    Hospital teams manage inventory and requests in real time.
                   </div>
-
-                  <form className="space-y-4" onSubmit={handleLogin}>
-                    <div className="space-y-1">
-                      <label htmlFor="identifier" className="block text-xs font-medium text-slate-700">
-                        Username or Email
-                      </label>
-                      <input
-                        id="identifier"
-                        type="text"
-                        value={identifier}
-                        onChange={(e) => setIdentifier(e.target.value)}
-                        className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
-                        placeholder="Enter your username or email"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="password" className="block text-xs font-medium text-slate-700">
-                          Password
-                        </label>
-                        <button
-                          type="button"
-                          className="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700"
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
-                      <input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
-                      />
-                    </div>
-
-                    {error && <p className="text-xs font-medium text-red-600">{error}</p>}
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                    >
-                      {isSubmitting ? 'Logging in...' : 'Login'}
-                    </button>
-
-                    {isGoogleRole && (
-                      <>
-                        <div className="flex items-center gap-2 pt-1">
-                          <div className="h-px flex-1 bg-slate-200" />
-                          <span className="text-[11px] uppercase tracking-wide text-slate-400">or</span>
-                          <div className="h-px flex-1 bg-slate-200" />
-                        </div>
-
-                        {!googleClientId ? (
-                          <p className="text-xs text-amber-600">
-                            Google login is unavailable. Set `VITE_GOOGLE_CLIENT_ID` in frontend env.
-                          </p>
-                        ) : (
-                          <div className="flex justify-center">
-                            <div ref={googleButtonRef} />
-                          </div>
-                        )}
-
-                        {googleError && <p className="text-xs font-medium text-red-600">{googleError}</p>}
-                      </>
-                    )}
-
-                    {isFlagEnabled('public', 'public.register') && (
-                      <p className="text-center text-xs text-slate-500">
-                        New to BloodConnect?{' '}
-                        <button
-                          type="button"
-                          onClick={() => navigate('/register')}
-                          className="cursor-pointer font-semibold text-red-600 hover:text-red-700"
-                        >
-                          Create an account
-                        </button>
-                      </p>
-                    )}
-                  </form>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    Administrators coordinate the full network.
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
 
-        {/* Donate */}
-        {isFlagEnabled('public', 'public.section_donate') && (
-          <section
-            id="donate"
-            className="scroll-mt-22 flex min-h-[65vh] flex-col justify-center border-t border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.86)_0%,rgba(239,246,255,0.65)_100%)] py-24 sm:min-h-[72vh] sm:py-28 lg:min-h-[80vh] lg:py-32"
-          >
-            <div className="mx-auto w-full max-w-3xl px-4 text-center sm:px-6">
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-                Give blood, save lives
-              </h2>
-              <p className="mx-auto mt-6 max-w-xl text-sm text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
-                Register as a donor to help hospitals maintain a safe blood supply. It only takes a few minutes to get
-                started.
-              </p>
-              {isFlagEnabled('public', 'public.register') && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/register')}
-                  className="mt-12 inline-flex min-h-12 items-center justify-center rounded-full bg-red-600 px-10 py-3.5 text-sm font-semibold text-white shadow-md transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 sm:mt-16"
-                >
-                  Start donating
-                </button>
-              )}
+              <div className="mx-auto w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_35px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80 sm:p-8">
+                <div className="mb-6 flex rounded-full bg-slate-100 p-1 text-xs font-medium text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setActiveRole('donor')}
+                    className={`flex-1 rounded-full px-3 py-2 transition ${
+                      activeRole === 'donor'
+                        ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                        : 'hover:text-red-600'
+                    }`}
+                  >
+                    Donor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveRole('hospital')}
+                    className={`flex-1 rounded-full px-3 py-2 transition ${
+                      activeRole === 'hospital'
+                        ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                        : 'hover:text-red-600'
+                    }`}
+                  >
+                    Hospital
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveRole('admin')}
+                    className={`flex-1 rounded-full px-3 py-2 transition ${
+                      activeRole === 'admin'
+                        ? 'bg-white text-red-600 shadow-sm ring-1 ring-red-200'
+                        : 'hover:text-red-600'
+                    }`}
+                  >
+                    Admin
+                  </button>
+                </div>
+
+                <h3 className="mb-6 text-lg font-semibold text-slate-900">Login to BloodConnect</h3>
+
+                <form className="space-y-4" onSubmit={handleLogin}>
+                  <div className="space-y-1">
+                    <label htmlFor="identifier" className="block text-xs font-medium text-slate-700">
+                      Username or Email
+                    </label>
+                    <input
+                      id="identifier"
+                      type="text"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
+                      placeholder="Enter your username or email"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="password" className="block text-xs font-medium text-slate-700">
+                        Password
+                      </label>
+                      <button type="button" className="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700">
+                        Forgot password?
+                      </button>
+                    </div>
+                    <input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
+                    />
+                  </div>
+
+                  {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-red-900/10 transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                  >
+                    {isSubmitting ? 'Logging in...' : 'Login'}
+                  </button>
+
+                  {isGoogleRole && (
+                    <>
+                      <div className="flex items-center gap-2 pt-1">
+                        <div className="h-px flex-1 bg-slate-200" />
+                        <span className="text-[11px] uppercase tracking-wide text-slate-400">or</span>
+                        <div className="h-px flex-1 bg-slate-200" />
+                      </div>
+
+                      {!googleClientId ? (
+                        <p className="text-xs text-amber-600">
+                          Google login is unavailable. Set `VITE_GOOGLE_CLIENT_ID` in frontend env.
+                        </p>
+                      ) : (
+                        <div className="flex justify-center">
+                          <div ref={googleButtonRef} />
+                        </div>
+                      )}
+
+                      {googleError && <p className="text-xs font-medium text-red-600">{googleError}</p>}
+                    </>
+                  )}
+
+                  {isFlagEnabled('public', 'public.register') && (
+                    <p className="text-center text-xs text-slate-500">
+                      New to BloodConnect?{' '}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/register')}
+                        className="cursor-pointer font-semibold text-red-600 hover:text-red-700"
+                      >
+                        Create an account
+                      </button>
+                    </p>
+                  )}
+                </form>
+              </div>
             </div>
           </section>
-        )}
 
-        {/* About */}
-        {isFlagEnabled('public', 'public.section_about') && (
-          <section
-            id="about"
-            className="scroll-mt-22 border-t border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9)_0%,rgba(255,255,255,0.9)_100%)] py-24 sm:py-28 lg:py-32"
-          >
-            <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
-              <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-                About BloodConnect
-              </h2>
-              <p className="mt-8 text-sm leading-relaxed text-slate-600 sm:mt-10 sm:text-base lg:mt-12 lg:text-lg">
-                BloodConnect is built for hospitals, donors, and administrators to coordinate blood requests, inventory,
-                and donation activity in one place. Our goal is to reduce delays in emergencies and keep the community
-                informed about drives and urgent needs—safely and transparently.
+          {isFlagEnabled('public', 'public.section_donate') && (
+            <section id="donate" className="scroll-mt-24 border-b border-slate-200 py-18 sm:py-20">
+              <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+                <div className="rounded-3xl border border-red-200 bg-red-50/80 p-8 text-center sm:p-12">
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Give blood, save lives.</h2>
+                  <p className="mx-auto mt-4 max-w-2xl text-sm text-slate-600 sm:text-base">
+                    Register as a donor and help hospitals maintain safe and reliable blood supply for urgent cases.
+                  </p>
+                  {isFlagEnabled('public', 'public.register') && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/register')}
+                      className="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-red-600 px-10 py-3 text-sm font-semibold text-white shadow-sm shadow-red-900/10 transition hover:bg-red-700"
+                    >
+                      Start donating
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {isFlagEnabled('public', 'public.section_about') && (
+            <section id="about" className="scroll-mt-24 py-18 sm:py-20">
+              <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">About BloodConnect</h2>
+                    <p className="mt-4 text-sm leading-relaxed text-slate-600 sm:text-base">
+                      BloodConnect helps hospitals, donors, and administrators coordinate requests, inventory, and campaigns from one platform.
+                    </p>
+                    <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
+                      The goal is clear: reduce delays during emergencies and keep workflows transparent for every participant.
+                    </p>
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+                    <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700">Mission values</p>
+                    <ul className="mt-4 space-y-3 text-sm text-slate-700">
+                      <li className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        Fast mobilization for urgent blood requests.
+                      </li>
+                      <li className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        Reliable information flow for donors and institutions.
+                      </li>
+                      <li className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        Connected teams focused on better patient outcomes.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <section className="border-y border-red-200 bg-red-700 py-14">
+            <div className="mx-auto w-full max-w-6xl px-4 text-center sm:px-6 lg:px-8">
+              <p className="text-sm font-semibold uppercase tracking-widest text-red-100 sm:text-lg">
+                Volunteers + Logistics + Information Technology
               </p>
-              <p className="mt-6 text-sm leading-relaxed text-slate-600 sm:mt-8 sm:text-base lg:mt-10 lg:text-lg">
-                Whether you are logging in to donate, manage hospital supply, or oversee the network, BloodConnect keeps
-                critical workflows clear and connected.
-              </p>
-            </div>
-          </section>
-        )}
-        <section className="border-t border-red-200/80 bg-[linear-gradient(180deg,rgba(254,242,242,0.92)_0%,rgba(255,255,255,0.96)_100%)] py-16 sm:py-20 lg:py-24">
-          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-            <div className="flex flex-col items-center py-2 sm:py-4">
-              <p className="w-fit whitespace-nowrap text-center font-serif text-sm font-semibold uppercase tracking-[0.09em] text-red-800 sm:text-lg lg:text-[2rem]">
-                Volunteers + Logistics + Information Technology = A Red Cross That Is
-              </p>
-              <p className="mt-3 w-fit whitespace-nowrap text-center font-serif text-3xl font-extrabold uppercase leading-tight tracking-[0.07em] text-red-800 sm:mt-4 sm:text-5xl lg:text-6xl">
+              <p className="mt-3 text-2xl font-extrabold uppercase tracking-[0.07em] text-white sm:text-4xl lg:text-5xl">
                 Always First, Always Ready, Always There
               </p>
             </div>
-          </div>
-        </section>
-        <footer className="border-t border-slate-200/90 bg-slate-900 py-8 text-slate-200">
-          <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[1.45fr_1fr_1fr] lg:gap-8 lg:px-8">
-            <div>
-              <p className="text-sm font-semibold text-white">BloodConnect</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                A coordinated platform for blood donation campaigns, requests, and life-saving response.
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Navigation</p>
-              <div className="mt-3 space-y-2 text-sm text-slate-300">
-                <button type="button" onClick={() => scrollToSection('login')} className="block hover:text-white">Login</button>
-                <button type="button" onClick={() => scrollToSection('donate')} className="block hover:text-white">Donate</button>
-                <button type="button" onClick={() => scrollToSection('about')} className="block hover:text-white">About</button>
+          </section>
+
+          <footer className="border-t border-slate-200 bg-white py-10 text-slate-700">
+            <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-7 px-4 sm:px-6 lg:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">BloodConnect</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                  A coordinated platform for blood donation campaigns, requests, and life-saving response.
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Navigation</p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <button type="button" onClick={() => scrollToSection('login')} className="block hover:text-red-700">
+                    Login
+                  </button>
+                  <button type="button" onClick={() => scrollToSection('donate')} className="block hover:text-red-700">
+                    Donate
+                  </button>
+                  <button type="button" onClick={() => scrollToSection('about')} className="block hover:text-red-700">
+                    About
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Status</p>
+                {showMbdPublic && (
+                  <p className="mt-3 text-sm text-slate-600">
+                    Active MBD: <span className="font-semibold text-slate-900">{mbdItems.length}</span>
+                  </p>
+                )}
+                <p className={`text-sm text-slate-600 ${showMbdPublic ? 'mt-1' : 'mt-3'}`}>
+                  Announcements: <span className="font-semibold text-slate-900">{homePosts.length}</span>
+                </p>
               </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Status</p>
-              {showMbdPublic && (
-                <p className="mt-3 text-sm text-slate-300">
-                  Active MBD: <span className="font-semibold text-white">{mbdItems.length}</span>
-                </p>
-              )}
-              <p className={`text-sm text-slate-300 ${showMbdPublic ? 'mt-1' : 'mt-3'}`}>
-                Announcements: <span className="font-semibold text-white">{homePosts.length}</span>
-              </p>
-            </div>
-          </div>
-        </footer>
-      </main>
+          </footer>
+        </main>
 
-      {showMbdPublic && selectedMbd && <MbdDetailModal item={selectedMbd} onClose={() => setSelectedMbd(null)} />}
-      {selectedPost && <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />}
+        {showMbdPublic && selectedMbd && <MbdDetailModal item={selectedMbd} onClose={() => setSelectedMbd(null)} />}
+        {selectedPost && <PostDetailModal post={selectedPost} onClose={() => setSelectedPost(null)} />}
       </div>
     </div>
   )
