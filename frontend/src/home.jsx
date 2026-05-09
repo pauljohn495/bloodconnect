@@ -140,6 +140,7 @@ function Home() {
   const { isFlagEnabled } = useFeatureFlags()
   const showMbdPublic = isFlagEnabled('public', 'public.section_mbd')
   const [activeRole, setActiveRole] = useState('donor') // 'donor' | 'hospital' | 'admin'
+  const [donorLoginMode, setDonorLoginMode] = useState('identifier') // 'identifier' | 'phone'
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -156,6 +157,7 @@ function Home() {
   const navigate = useNavigate()
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
   const isGoogleRole = activeRole === 'donor'
+  const isPhoneLogin = activeRole === 'donor' && donorLoginMode === 'phone'
   const getHeaderOffset = useCallback(() => {
     const headerEl = document.querySelector('header')
     const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0
@@ -300,9 +302,10 @@ function Home() {
       const data = await apiRequest('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({
-          identifier,
+          identifier: identifier.trim(),
           password,
           role: roleForApi,
+          loginMode: isPhoneLogin ? 'phone' : 'default',
         }),
       })
 
@@ -375,6 +378,12 @@ function Home() {
       shape: 'pill',
     })
   }, [googleClientId, handleGoogleLogin, isGoogleRole])
+
+  useEffect(() => {
+    if (activeRole !== 'donor') {
+      setDonorLoginMode('identifier')
+    }
+  }, [activeRole])
 
   const navLinkClass = (id, options = {}) => {
     const { forceActive } = options
@@ -728,35 +737,48 @@ function Home() {
                 <form className="space-y-4" onSubmit={handleLogin}>
                   <div className="space-y-1">
                     <label htmlFor="identifier" className="block text-xs font-medium text-slate-700">
-                      Username or Email
+                      {isPhoneLogin ? 'Mobile number' : 'Username or Email'}
                     </label>
                     <input
                       id="identifier"
-                      type="text"
+                      type={isPhoneLogin ? 'tel' : 'text'}
+                      inputMode={isPhoneLogin ? 'numeric' : undefined}
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
                       className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
-                      placeholder="Enter your username or email"
+                      placeholder={isPhoneLogin ? 'Enter your mobile number' : 'Enter your username or email'}
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="password" className="block text-xs font-medium text-slate-700">
-                        Password
-                      </label>
-                      <button type="button" className="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700">
-                        Forgot password?
-                      </button>
+                  {!isPhoneLogin && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="password" className="block text-xs font-medium text-slate-700">
+                          Password
+                        </label>
+                        <button type="button" className="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700">
+                          Forgot password?
+                        </button>
+                      </div>
+                      <input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
+                      />
                     </div>
-                    <input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
-                    />
-                  </div>
+                  )}
+
+                  {activeRole === 'donor' && (
+                    <button
+                      type="button"
+                      onClick={() => setDonorLoginMode((prev) => (prev === 'phone' ? 'identifier' : 'phone'))}
+                      className="text-xs font-semibold text-red-600 hover:text-red-700"
+                    >
+                      {isPhoneLogin ? 'Login using Username/Email' : 'Login using Phone number'}
+                    </button>
+                  )}
 
                   {error && <p className="text-xs font-medium text-red-600">{error}</p>}
 

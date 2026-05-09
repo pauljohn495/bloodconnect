@@ -31,6 +31,32 @@ async function ensureDonorProfileColumns() {
     )
     console.log('Schema: added users.profile_update_requested_at')
   }
+  if (!(await columnExists('users', 'barcode'))) {
+    await pool.query('ALTER TABLE users ADD COLUMN barcode VARCHAR(128) NULL')
+    console.log('Schema: added users.barcode')
+  }
+  const [statusRows] = await pool.query(
+    `SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'status'`,
+  )
+  const statusRow = statusRows[0]
+  if (statusRow && String(statusRow.COLUMN_TYPE || '').toLowerCase().startsWith('enum')) {
+    const statusType = String(statusRow.COLUMN_TYPE || '')
+    if (!statusType.includes("'discontinued'")) {
+      const newType = `${statusType.slice(0, -1)},'discontinued')`
+      const nullPart = statusRow.IS_NULLABLE === 'YES' ? 'NULL' : 'NOT NULL'
+      let defaultPart = ''
+      if (statusRow.COLUMN_DEFAULT !== null && statusRow.COLUMN_DEFAULT !== undefined) {
+        const raw = statusRow.COLUMN_DEFAULT
+        if (raw !== '' && String(raw).toUpperCase() !== 'NULL') {
+          defaultPart = ` DEFAULT '${String(raw).replace(/'/g, "''")}'`
+        }
+      }
+      await pool.query(`ALTER TABLE users MODIFY COLUMN status ${newType} ${nullPart}${defaultPart}`)
+      console.log('Schema: extended users.status enum with discontinued')
+    }
+  }
 }
 
 async function ensureHospitalLocationColumns() {
@@ -284,6 +310,7 @@ async function ensureMbdTables() {
       organizer_name VARCHAR(255) NOT NULL DEFAULT '',
       event_date DATE NOT NULL,
       location VARCHAR(512) NOT NULL,
+      deferral_counts_json MEDIUMTEXT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_mbd_events_event_date (event_date)
@@ -300,19 +327,65 @@ async function ensureMbdTables() {
       age INT NULL,
       gender VARCHAR(32) NULL,
       bag_type VARCHAR(64) NULL,
-      remarks_sd ENUM('S', 'D') NOT NULL,
+      remarks_sd ENUM('S', 'D', 'T') NULL,
       num_donations INT NOT NULL DEFAULT 1,
+      transferred_donor_user_id INT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_mbd_donor_event (mbd_event_id),
+      INDEX idx_mbd_donor_transferred_user (transferred_donor_user_id),
+      CONSTRAINT fk_mbd_donor_transferred_user FOREIGN KEY (transferred_donor_user_id) REFERENCES users(id) ON DELETE SET NULL,
       CONSTRAINT fk_mbd_donor_event FOREIGN KEY (mbd_event_id) REFERENCES mbd_events(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
+  const [remarksEnumRows] = await pool.query(
+    `SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'mbd_donor_records'
+       AND COLUMN_NAME = 'remarks_sd'`,
+  )
+  const remarksEnumRow = remarksEnumRows[0]
+  if (remarksEnumRow && String(remarksEnumRow.COLUMN_TYPE || '').toLowerCase().startsWith('enum')) {
+    const columnType = String(remarksEnumRow.COLUMN_TYPE || '')
+    const hasT = columnType.includes("'T'") || columnType.includes('\'T\'')
+    const isNullable = remarksEnumRow.IS_NULLABLE === 'YES'
+    if (!hasT || !isNullable) {
+      const nullPart = 'NULL'
+      let defaultPart = ''
+      if (remarksEnumRow.COLUMN_DEFAULT !== null && remarksEnumRow.COLUMN_DEFAULT !== undefined) {
+        const raw = remarksEnumRow.COLUMN_DEFAULT
+        if (raw !== '' && String(raw).toUpperCase() !== 'NULL') {
+          defaultPart = ` DEFAULT '${String(raw).replace(/'/g, "''")}'`
+        }
+      }
+      await pool.query(`ALTER TABLE mbd_donor_records MODIFY COLUMN remarks_sd ENUM('S','D','T') ${nullPart}${defaultPart}`)
+      console.log('Schema: updated mbd_donor_records.remarks_sd enum to allow NULL + T')
+    }
+  }
   if (!(await columnExists('mbd_events', 'organizer_name'))) {
     await pool.query(
       "ALTER TABLE mbd_events ADD COLUMN organizer_name VARCHAR(255) NOT NULL DEFAULT '' AFTER name",
     )
     console.log('Schema: added mbd_events.organizer_name')
+  }
+  if (!(await columnExists('mbd_events', 'deferral_counts_json'))) {
+    await pool.query(
+      'ALTER TABLE mbd_events ADD COLUMN deferral_counts_json MEDIUMTEXT NULL AFTER location',
+    )
+    console.log('Schema: added mbd_events.deferral_counts_json')
+  }
+  if (!(await columnExists('mbd_donor_records', 'transferred_donor_user_id'))) {
+    await pool.query(
+      'ALTER TABLE mbd_donor_records ADD COLUMN transferred_donor_user_id INT NULL AFTER num_donations',
+    )
+    await pool.query(
+      'ALTER TABLE mbd_donor_records ADD INDEX idx_mbd_donor_transferred_user (transferred_donor_user_id)',
+    )
+    await pool.query(
+      'ALTER TABLE mbd_donor_records ADD CONSTRAINT fk_mbd_donor_transferred_user FOREIGN KEY (transferred_donor_user_id) REFERENCES users(id) ON DELETE SET NULL',
+    )
+    console.log('Schema: added mbd_donor_records.transferred_donor_user_id')
   }
   console.log('Schema: ensured mbd_events / mbd_donor_records tables')
 }

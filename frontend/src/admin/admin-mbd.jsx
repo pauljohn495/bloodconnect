@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
 
-const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const DONOR_BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
+const SUMMARY_BLOOD_TYPES = ['A', 'B', 'O', 'AB']
 
 const GENDERS = [
   { value: '', label: '—' },
@@ -12,13 +13,40 @@ const GENDERS = [
   { value: 'Other', label: 'Other' },
 ]
 
-const REMARKS_OPTIONS = [
-  { value: 'S', label: 'S' },
-  { value: 'D', label: 'D' },
+const DISCONTINUED_OPTIONS = [
+  { value: '', label: '—' },
+  { value: 'S', label: 'Single' },
+  { value: 'D', label: 'Double' },
+  { value: 'T', label: 'Triple' },
 ]
 const DONATION_TYPE_OPTIONS = [
   { value: 'first_timer', label: 'First timer' },
   { value: 'repeater', label: 'Repeater' },
+]
+const BAG_TYPE_OPTIONS = [
+  { value: '', label: '—' },
+  { value: 'Single Bag', label: 'Single Bag' },
+  { value: 'Double Bag', label: 'Double Bag' },
+  { value: 'Triple Bag', label: 'Triple Bag' },
+]
+const DEFERRAL_FIELDS = [
+  { key: 'low_hbg', label: 'LOW HBG' },
+  { key: 'menstruation', label: 'MENSTRUATION' },
+  { key: 'high_bp', label: 'HIGH BP' },
+  { key: 'low_bp', label: 'LOW BP' },
+  { key: 'vaccinations', label: 'VACCINATIONS' },
+  { key: 'underweight', label: 'UNDERWEIGHT' },
+  { key: 'tattoo_piercing', label: 'TATTOO/PIERCING' },
+  { key: 'antibiotic_therapy_or_medication', label: 'ANTIBIOTIC THERAPY OR MEDICATION' },
+  { key: 'less_than_3_months_from_last_donations', label: 'LESS THAN 3 MONTHS FROM LAST DONATIONS' },
+  { key: 'surgical_operations', label: 'SURGICAL OPERATIONS' },
+  { key: 'dental_extraction', label: 'DENTAL EXTRACTION' },
+  { key: 'cough_colds', label: 'COUGH & COLDS' },
+  { key: 'fever', label: 'FEVER' },
+  { key: 'lack_of_sleep', label: 'LACK OF SLEEP' },
+  { key: 'alcohol_intake_less_than_12_hrs', label: 'ALCOHOL INTAKE LESS THAN 12 HRS' },
+  { key: 'other_medical_condition', label: 'OTHER MEDICAL CONDITION' },
+  { key: 'others', label: 'OTHERS' },
 ]
 
 const AGE_GROUPS = [
@@ -31,14 +59,37 @@ const AGE_GROUPS = [
   { label: '61-65', min: 61, max: 65 },
 ]
 
-const BAG_GROUPS = ['Triple Bag', 'Double Bag', 'Single Bag', 'Other']
+const BAG_GROUPS = ['Single Bag', 'Double Bag', 'Triple Bag']
+
+const emptyDeferralForm = () =>
+  Object.fromEntries(DEFERRAL_FIELDS.map((field) => [field.key, '0']))
 
 function normalizeBagGroup(value) {
   const raw = String(value || '').toLowerCase()
+  if (!raw.trim()) return ''
   if (raw.includes('triple')) return 'Triple Bag'
   if (raw.includes('double')) return 'Double Bag'
-  if (raw.includes('single')) return 'Single Bag'
-  return 'Other'
+  return 'Single Bag'
+}
+
+function normalizeBloodType(value) {
+  const raw = String(value || '').trim().toUpperCase()
+  if (!raw) return ''
+  if (raw.startsWith('AB')) return 'AB'
+  if (raw.startsWith('A')) return 'A'
+  if (raw.startsWith('B')) return 'B'
+  if (raw.startsWith('O')) return 'O'
+  return raw
+}
+
+function normalizeDonorBloodType(value) {
+  const raw = String(value || '').trim().toUpperCase()
+  if (DONOR_BLOOD_TYPES.includes(raw)) return raw
+  if (raw === 'A') return 'A+'
+  if (raw === 'B') return 'B+'
+  if (raw === 'AB') return 'AB+'
+  if (raw === 'O') return 'O+'
+  return 'O+'
 }
 
 function formatEventDate(value) {
@@ -62,6 +113,49 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;')
 }
 
+function discontinuedLabel(value) {
+  const code = String(value || '').toUpperCase()
+  if (code === 'S') return 'Single'
+  if (code === 'D') return 'Double'
+  if (code === 'T') return 'Triple'
+  return '—'
+}
+
+function ConfirmModal({ open, title, message, confirmText = 'Confirm', cancelText = 'Cancel', onConfirm, onCancel }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-99 flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+      <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={onCancel} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-t-[1.35rem] bg-white shadow-2xl ring-1 ring-slate-200 sm:rounded-3xl"
+      >
+        <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+          <h3 className="text-base font-bold text-slate-900">{title}</h3>
+        </div>
+        <div className="px-5 py-4 text-sm text-slate-700 sm:px-6">{message}</div>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          >
+            {cancelText}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-red-700"
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const emptyCreateForm = () => ({
   name: '',
   organizerName: '',
@@ -77,13 +171,16 @@ const emptyDonorForm = () => ({
   age: '',
   gender: '',
   bagType: '',
-  remarksSd: 'S',
+  remarksSd: '',
   donationType: 'first_timer',
   numDonations: '1',
 })
 
+const toDigits = (value) => String(value ?? '').replace(/\D/g, '')
+
 function AdminMbd() {
   const p = adminPanel.rose
+  const modalScrollRef = useRef(null)
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -96,7 +193,12 @@ function AdminMbd() {
   const [donorForm, setDonorForm] = useState(emptyDonorForm)
   const [donorSaving, setDonorSaving] = useState(false)
   const [editingDonorId, setEditingDonorId] = useState(null)
+  const [deferralForm, setDeferralForm] = useState(emptyDeferralForm)
+  const [deferralSaving, setDeferralSaving] = useState(false)
+  const [transferAllLoading, setTransferAllLoading] = useState(false)
   const [notification, setNotification] = useState(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
@@ -131,12 +233,22 @@ function AdminMbd() {
     setModalOpen(true)
     setEditingDonorId(null)
     setDonorForm(emptyDonorForm())
+    setDeferralForm(
+      Object.fromEntries(DEFERRAL_FIELDS.map((field) => [field.key, String(Number(row?.deferral_counts?.[field.key]) || 0)])),
+    )
     setDonorsLoading(true)
     try {
-      const data = await apiRequest(`/api/admin/mbd-events/${row.id}/donors`)
-      setDonors(Array.isArray(data) ? data : [])
+      const [donorData, deferralData] = await Promise.all([
+        apiRequest(`/api/admin/mbd-events/${row.id}/donors`),
+        apiRequest(`/api/admin/mbd-events/${row.id}/deferrals`),
+      ])
+      setDonors(Array.isArray(donorData) ? donorData : [])
+      const fetchedCounts = deferralData?.deferral_counts || {}
+      setDeferralForm(
+        Object.fromEntries(DEFERRAL_FIELDS.map((field) => [field.key, String(Number(fetchedCounts[field.key]) || 0)])),
+      )
     } catch (e) {
-      showNotification(e.message || 'Failed to load donors', 'destructive')
+      showNotification(e.message || 'Failed to load modal data', 'destructive')
       setDonors([])
     } finally {
       setDonorsLoading(false)
@@ -149,6 +261,7 @@ function AdminMbd() {
     setDonors([])
     setEditingDonorId(null)
     setDonorForm(emptyDonorForm())
+    setDeferralForm(emptyDeferralForm())
   }
 
   const handleCreateMbd = async (e) => {
@@ -185,12 +298,12 @@ function AdminMbd() {
     donorNumber: donorForm.donorNumber.trim(),
     age: donorForm.age === '' ? '' : Number(donorForm.age),
     gender: donorForm.gender,
-    bagType: donorForm.bagType.trim(),
+    bagType: donorForm.bagType,
     remarksSd: donorForm.remarksSd,
-    numDonations:
-      donorForm.donationType === 'repeater'
-        ? Math.max(2, donorForm.numDonations === '' ? 2 : Number(donorForm.numDonations))
-        : 1,
+    numDonations: Math.max(
+      donorForm.donationType === 'repeater' ? 2 : 1,
+      donorForm.numDonations === '' ? (donorForm.donationType === 'repeater' ? 2 : 1) : Number(donorForm.numDonations),
+    ),
   })
 
   const handleSaveDonor = async (e) => {
@@ -233,14 +346,22 @@ function AdminMbd() {
     setDonorForm({
       donorName: d.donor_name || '',
       barcode: d.barcode || '',
-      bloodType: d.blood_type || 'O+',
+      bloodType: normalizeDonorBloodType(d.blood_type),
       donorNumber: d.donor_number || '',
       age: d.age != null ? String(d.age) : '',
       gender: d.gender || '',
-      bagType: d.bag_type || '',
-      remarksSd: d.remarks_sd || 'S',
+      bagType: normalizeBagGroup(d.bag_type),
+      remarksSd: d.remarks_sd || '',
       donationType: Number(d.num_donations) > 1 ? 'repeater' : 'first_timer',
       numDonations: d.num_donations != null ? String(d.num_donations) : '1',
+    })
+    requestAnimationFrame(() => {
+      const el = modalScrollRef.current
+      if (el && typeof el.scrollTo === 'function') {
+        el.scrollTo({ top: 0, behavior: 'smooth' })
+      } else if (el) {
+        el.scrollTop = 0
+      }
     })
   }
 
@@ -249,18 +370,96 @@ function AdminMbd() {
     setDonorForm(emptyDonorForm())
   }
 
-  const deleteDonor = async (d) => {
+  const handleSaveDeferrals = async (e) => {
+    e.preventDefault()
     if (!selectedEvent) return
-    if (!window.confirm(`Remove donor record for "${d.donor_name}"?`)) return
+    setDeferralSaving(true)
     try {
-      await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors/${d.id}`, { method: 'DELETE' })
+      const payload = Object.fromEntries(
+        DEFERRAL_FIELDS.map((field) => [field.key, Number(toDigits(deferralForm[field.key] || '0') || 0)]),
+      )
+      await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/deferrals`, {
+        method: 'PUT',
+        body: JSON.stringify({ deferralCounts: payload }),
+      })
+      setDeferralForm(
+        Object.fromEntries(DEFERRAL_FIELDS.map((field) => [field.key, String(Number(payload[field.key]) || 0)])),
+      )
+      setEvents((prev) =>
+        prev.map((event) => (event.id === selectedEvent.id ? { ...event, deferral_counts: payload } : event)),
+      )
+      showNotification('Deferral counts saved.', 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Could not save deferral counts', 'destructive')
+    } finally {
+      setDeferralSaving(false)
+    }
+  }
+
+  const deleteDonor = (d) => {
+    setDeleteTarget(d || null)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDeleteDonor = async () => {
+    if (!selectedEvent || !deleteTarget) {
+      setDeleteConfirmOpen(false)
+      setDeleteTarget(null)
+      return
+    }
+    try {
+      await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors/${deleteTarget.id}`, { method: 'DELETE' })
       showNotification('Donor removed.', 'primary')
       const data = await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors`)
       setDonors(Array.isArray(data) ? data : [])
       await loadEvents()
-      if (editingDonorId === d.id) cancelEditDonor()
+      if (editingDonorId === deleteTarget.id) cancelEditDonor()
     } catch (err) {
       showNotification(err.message || 'Could not delete donor', 'destructive')
+    } finally {
+      setDeleteConfirmOpen(false)
+      setDeleteTarget(null)
+    }
+  }
+
+  const transferDonorToDonorList = async (donorId) => {
+    if (!selectedEvent || !donorId) return
+    await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors/${donorId}/transfer-to-donor-list`, {
+      method: 'POST',
+    })
+  }
+
+  const handleTransferAllToDonorList = async () => {
+    if (!selectedEvent) return
+    const listedDonors = [...donors]
+    if (!listedDonors.length) return
+    try {
+      setTransferAllLoading(true)
+      let successCount = 0
+      for (const donor of listedDonors) {
+        try {
+          await transferDonorToDonorList(donor.id)
+          successCount += 1
+        } catch {
+          // Continue transfer for remaining donors.
+        }
+      }
+      const data = await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors`)
+      setDonors(Array.isArray(data) ? data : [])
+      if (successCount === listedDonors.length) {
+        showNotification(`Processed ${successCount} donor(s) to donor list.`, 'primary')
+      } else if (successCount > 0) {
+        showNotification(
+          `Processed ${successCount} donor(s). ${listedDonors.length - successCount} failed to transfer.`,
+          'destructive',
+        )
+      } else {
+        showNotification('No donors were transferred. Please try again.', 'destructive')
+      }
+    } catch (err) {
+      showNotification(err.message || 'Could not add listed donors to donor list', 'destructive')
+    } finally {
+      setTransferAllLoading(false)
     }
   }
 
@@ -269,18 +468,20 @@ function AdminMbd() {
 
   const labelCls = 'block text-xs font-semibold uppercase tracking-wide text-slate-600'
   const summary = useMemo(() => {
-    const bloodTypeCounts = Object.fromEntries(BLOOD_TYPES.map((type) => [type, 0]))
+    const bloodTypeCounts = Object.fromEntries(SUMMARY_BLOOD_TYPES.map((type) => [type, 0]))
     const ageGroupCounts = Object.fromEntries(AGE_GROUPS.map((group) => [group.label, 0]))
     const sexCounts = { Male: 0, Female: 0, Other: 0, Unspecified: 0 }
-    const remarksCounts = { S: 0, D: 0 }
+    const discontinuedCounts = { S: 0, D: 0, T: 0 }
+    const discontinuedByType = Object.fromEntries(SUMMARY_BLOOD_TYPES.map((type) => [type, { S: 0, D: 0, T: 0 }]))
     const donationCounts = { firstTimer: 0, repeater: 0 }
     const bagByType = {}
     BAG_GROUPS.forEach((bag) => {
-      bagByType[bag] = Object.fromEntries(BLOOD_TYPES.map((type) => [type, 0]))
+      bagByType[bag] = Object.fromEntries(SUMMARY_BLOOD_TYPES.map((type) => [type, 0]))
     })
 
     donors.forEach((donor) => {
-      const bt = BLOOD_TYPES.includes(donor.blood_type) ? donor.blood_type : null
+      const btNorm = normalizeBloodType(donor.blood_type)
+      const bt = SUMMARY_BLOOD_TYPES.includes(btNorm) ? btNorm : null
       if (bt) bloodTypeCounts[bt] += 1
 
       const age = Number(donor.age)
@@ -296,20 +497,22 @@ function AdminMbd() {
       else sexCounts.Unspecified += 1
 
       const rk = String(donor.remarks_sd || '').toUpperCase()
-      if (rk === 'S') remarksCounts.S += 1
-      if (rk === 'D') remarksCounts.D += 1
+      if (rk === 'S') discontinuedCounts.S += 1
+      if (rk === 'D') discontinuedCounts.D += 1
+      if (rk === 'T') discontinuedCounts.T += 1
+      if (bt && (rk === 'S' || rk === 'D' || rk === 'T')) discontinuedByType[bt][rk] += 1
 
       const donationNumber = Number(donor.num_donations)
       if (Number.isFinite(donationNumber) && donationNumber > 1) donationCounts.repeater += 1
       else donationCounts.firstTimer += 1
 
       const bag = normalizeBagGroup(donor.bag_type)
-      if (bt) bagByType[bag][bt] += 1
+      if (bt && BAG_GROUPS.includes(bag)) bagByType[bag][bt] += 1
     })
 
     const bagTotals = {}
     BAG_GROUPS.forEach((bag) => {
-      bagTotals[bag] = BLOOD_TYPES.reduce((acc, bt) => acc + bagByType[bag][bt], 0)
+      bagTotals[bag] = SUMMARY_BLOOD_TYPES.reduce((acc, bt) => acc + bagByType[bag][bt], 0)
     })
 
     return {
@@ -317,7 +520,8 @@ function AdminMbd() {
       bloodTypeCounts,
       ageGroupCounts,
       sexCounts,
-      remarksCounts,
+      discontinuedCounts,
+      discontinuedByType,
       donationCounts,
       bagByType,
       bagTotals,
@@ -329,16 +533,16 @@ function AdminMbd() {
     const printableRows = donors.map((d, idx) => ({
       no: idx + 1,
       barcode: d.barcode || '',
-      bt: d.blood_type || '',
+      bt: normalizeBloodType(d.blood_type || ''),
       donorNumber: d.donor_number || '',
       age: d.age != null ? d.age : '',
       sex: d.gender || '',
       bag: d.bag_type || '',
-      remarks: d.remarks_sd || '',
+      discontinued: discontinuedLabel(d.remarks_sd || ''),
       donation: Number.isFinite(Number(d.num_donations)) ? `${Number(d.num_donations)}X` : '',
     }))
 
-    const summaryBloodRows = BLOOD_TYPES.map(
+    const summaryBloodRows = SUMMARY_BLOOD_TYPES.map(
       (bt) => `<tr><td>${bt}</td><td class="num">${summary.bloodTypeCounts[bt]}</td></tr>`,
     ).join('')
     const ageRows = AGE_GROUPS.map(
@@ -355,17 +559,23 @@ function AdminMbd() {
           <td class="num">${escapeHtml(row.age)}</td>
           <td>${escapeHtml(row.sex)}</td>
           <td>${escapeHtml(row.bag)}</td>
-          <td>${escapeHtml(row.remarks)}</td>
+          <td>${escapeHtml(row.discontinued)}</td>
           <td>${escapeHtml(row.donation)}</td>
         </tr>
       `,
       )
       .join('')
 
-    const bagRows = BAG_GROUPS.map((bag) => {
-      const cells = BLOOD_TYPES.map((bt) => `<td class="num">${summary.bagByType[bag][bt]}</td>`).join('')
-      return `<tr><td>${bag}</td>${cells}<td class="num">${summary.bagTotals[bag]}</td></tr>`
+    const bagRows = SUMMARY_BLOOD_TYPES.map((bt) => {
+      const discontinuedText = `${summary.discontinuedByType[bt].S} (Single), ${summary.discontinuedByType[bt].D} (Double), ${summary.discontinuedByType[bt].T} (Triple)`
+      const cells = BAG_GROUPS.map((bag) => `<td class="num">${summary.bagByType[bag][bt]}</td>`).join('')
+      return `<tr><td>${bt}</td><td>${discontinuedText}</td>${cells}</tr>`
     }).join('')
+    const deferralRows = DEFERRAL_FIELDS.map((field) => {
+      const count = Number(deferralForm[field.key] || 0)
+      return `<tr><td>${escapeHtml(field.label)}</td><td class="num">${count}</td></tr>`
+    }).join('')
+    const deferralTotal = DEFERRAL_FIELDS.reduce((sum, field) => sum + Number(deferralForm[field.key] || 0), 0)
 
     const printHtml = `
       <!doctype html>
@@ -387,6 +597,7 @@ function AdminMbd() {
             .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
             .tight th, .tight td { padding: 3px 5px; }
             .section-title { font-size: 12px; font-weight: 700; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .03em; }
+            .page-break-before { break-before: page; page-break-before: always; }
             @media print {
               body { margin: 12mm; }
               @page { size: A4 portrait; margin: 12mm; }
@@ -419,7 +630,7 @@ function AdminMbd() {
             </table>
           </div>
 
-          <div class="grid-3">
+          <div class="grid">
             <table class="tight">
               <thead><tr><th>SEX DISTRIBUTION</th><th class="num">TOTAL</th></tr></thead>
               <tbody>
@@ -437,31 +648,40 @@ function AdminMbd() {
                 <tr><td><strong>TOTAL</strong></td><td class="num"><strong>${summary.total}</strong></td></tr>
               </tbody>
             </table>
-            <table class="tight">
-              <thead><tr><th>REMARKS</th><th class="num">TOTAL</th></tr></thead>
-              <tbody>
-                <tr><td>S</td><td class="num">${summary.remarksCounts.S}</td></tr>
-                <tr><td>D</td><td class="num">${summary.remarksCounts.D}</td></tr>
-                <tr><td><strong>TOTAL</strong></td><td class="num"><strong>${summary.total}</strong></td></tr>
-              </tbody>
-            </table>
           </div>
 
           <div class="section-title">Bag Type Breakdown</div>
           <table class="tight">
             <thead>
               <tr>
-                <th>BAG TYPE</th>
-                ${BLOOD_TYPES.map((bt) => `<th class="num">${bt}</th>`).join('')}
-                <th class="num">TOTAL</th>
+                <th>BLOOD TYPE</th>
+                <th>DISCONTINUED</th>
+                ${BAG_GROUPS.map((bag) => `<th class="num">${bag}</th>`).join('')}
               </tr>
             </thead>
             <tbody>
               ${bagRows}
               <tr>
+                <td><strong>GRAND TOTAL</strong></td>
+                <td><strong>${summary.discontinuedCounts.S} (Single), ${summary.discontinuedCounts.D} (Double), ${summary.discontinuedCounts.T} (Triple)</strong></td>
+                ${BAG_GROUPS.map((bag) => `<td class="num"><strong>${summary.bagTotals[bag]}</strong></td>`).join('')}
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="section-title page-break-before">Deferral Breakdown</div>
+          <table class="tight" style="max-width: 520px">
+            <thead>
+              <tr>
+                <th>REASON</th>
+                <th class="num">TOTAL</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${deferralRows}
+              <tr>
                 <td><strong>TOTAL</strong></td>
-                ${BLOOD_TYPES.map((bt) => `<td class="num"><strong>${summary.bloodTypeCounts[bt]}</strong></td>`).join('')}
-                <td class="num"><strong>${summary.total}</strong></td>
+                <td class="num"><strong>${deferralTotal}</strong></td>
               </tr>
             </tbody>
           </table>
@@ -476,8 +696,8 @@ function AdminMbd() {
                 <th>ID</th>
                 <th>AGE</th>
                 <th>SEX</th>
-                <th>BAG</th>
-                <th>REMARKS</th>
+                <th>Successful</th>
+                <th>DISCONTINUED</th>
                 <th>DONATION</th>
               </tr>
             </thead>
@@ -699,7 +919,7 @@ function AdminMbd() {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+            <div ref={modalScrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
               <div className="mb-4 flex justify-end">
                 <button
                   type="button"
@@ -748,7 +968,7 @@ function AdminMbd() {
                       value={donorForm.bloodType}
                       onChange={(ev) => setDonorForm((f) => ({ ...f, bloodType: ev.target.value }))}
                     >
-                      {BLOOD_TYPES.map((bt) => (
+                      {DONOR_BLOOD_TYPES.map((bt) => (
                         <option key={bt} value={bt}>
                           {bt}
                         </option>
@@ -799,18 +1019,24 @@ function AdminMbd() {
                   </div>
                   <div>
                     <label className={labelCls} htmlFor="donor-bag">
-                      Bag type
+                      Successful
                     </label>
-                    <input
+                    <select
                       id="donor-bag"
                       className={inputCls}
                       value={donorForm.bagType}
                       onChange={(ev) => setDonorForm((f) => ({ ...f, bagType: ev.target.value }))}
-                    />
+                    >
+                      {BAG_TYPE_OPTIONS.map((bag) => (
+                        <option key={bag.value || 'unset'} value={bag.value}>
+                          {bag.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className={labelCls} htmlFor="donor-remarks">
-                      Remarks (S or D)
+                      Discontinued
                     </label>
                     <select
                       id="donor-remarks"
@@ -818,7 +1044,7 @@ function AdminMbd() {
                       value={donorForm.remarksSd}
                       onChange={(ev) => setDonorForm((f) => ({ ...f, remarksSd: ev.target.value }))}
                     >
-                      {REMARKS_OPTIONS.map((r) => (
+                      {DISCONTINUED_OPTIONS.map((r) => (
                         <option key={r.value} value={r.value}>
                           {r.label}
                         </option>
@@ -861,11 +1087,15 @@ function AdminMbd() {
                     <input
                       id="donor-nd"
                       type="number"
-                      min={donorForm.donationType === 'repeater' ? 2 : 1}
+                      min={1}
                       className={inputCls}
                       value={donorForm.numDonations}
-                      onChange={(ev) => setDonorForm((f) => ({ ...f, numDonations: ev.target.value }))}
-                      disabled={donorForm.donationType === 'first_timer'}
+                      onChange={(ev) =>
+                        setDonorForm((f) => ({
+                          ...f,
+                          numDonations: toDigits(ev.target.value),
+                        }))
+                      }
                     />
                   </div>
                 </div>
@@ -889,7 +1119,66 @@ function AdminMbd() {
                 </div>
               </form>
 
-              <h3 className="mt-8 text-sm font-semibold text-slate-900">Donors for this event</h3>
+              <form
+                onSubmit={handleSaveDeferrals}
+                className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">Deferral</h3>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Enter deferred counts by reason. Numbers only.
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Total Deferrals:{' '}
+                    {DEFERRAL_FIELDS.reduce((sum, field) => sum + Number(deferralForm[field.key] || 0), 0)}
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {DEFERRAL_FIELDS.map((field) => (
+                    <div key={field.key}>
+                      <label className={labelCls} htmlFor={`deferral-${field.key}`}>
+                        {field.label}
+                      </label>
+                      <input
+                        id={`deferral-${field.key}`}
+                        type="number"
+                        min={0}
+                        className={inputCls}
+                        value={deferralForm[field.key] || '0'}
+                        onChange={(ev) =>
+                          setDeferralForm((prev) => ({
+                            ...prev,
+                            [field.key]: toDigits(ev.target.value),
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    disabled={deferralSaving}
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl bg-slate-800 px-5 text-sm font-semibold text-white shadow-sm hover:bg-slate-900 disabled:opacity-60"
+                  >
+                    {deferralSaving ? 'Saving…' : 'Save deferrals'}
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-8 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-900">Donors for this event</h3>
+                <button
+                  type="button"
+                  disabled={transferAllLoading || donors.length === 0}
+                  onClick={handleTransferAllToDonorList}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                >
+                  {transferAllLoading ? 'Adding all...' : 'Add all to donor list'}
+                </button>
+              </div>
               <div className="mt-3 overflow-x-auto rounded-2xl border border-slate-200">
                 <table className="min-w-full border-collapse text-left text-sm">
                   <thead className="bg-slate-100/85">
@@ -901,9 +1190,9 @@ function AdminMbd() {
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Age</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Gender</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Bag</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Rmk</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Disc.</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600"># Don.</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600"> </th>
+                      <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -931,9 +1220,14 @@ function AdminMbd() {
                           <td className="px-3 py-2 text-slate-700">{d.age != null ? d.age : '—'}</td>
                           <td className="px-3 py-2 text-slate-700">{d.gender || '—'}</td>
                           <td className="px-3 py-2 text-slate-700">{d.bag_type || '—'}</td>
-                          <td className="px-3 py-2 text-slate-700">{d.remarks_sd}</td>
+                          <td className="px-3 py-2 text-slate-700">{discontinuedLabel(d.remarks_sd)}</td>
                           <td className="px-3 py-2 text-slate-700">{d.num_donations}</td>
                           <td className="px-3 py-2 text-right whitespace-nowrap">
+                            {d.transferred_donor_user_id ? (
+                              <span className="mr-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                                Added
+                              </span>
+                            ) : null}
                             <button
                               type="button"
                               onClick={(ev) => {
@@ -964,6 +1258,17 @@ function AdminMbd() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={deleteConfirmOpen}
+        title="Delete donor record?"
+        message={deleteTarget ? `Remove donor record for "${deleteTarget.donor_name}"?` : 'Remove this donor record?'}
+        confirmText="Delete"
+        onCancel={() => {
+          setDeleteConfirmOpen(false)
+          setDeleteTarget(null)
+        }}
+        onConfirm={confirmDeleteDonor}
+      />
       {notification && (
         <div className="fixed right-4 top-4 z-95 transition-all duration-300 ease-in-out">
           <div

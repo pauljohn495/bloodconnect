@@ -6,7 +6,7 @@ const getDonorsController = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT id, username, email, full_name, phone, blood_type, last_donation_date, created_at, status,
+      SELECT id, username, email, full_name, phone, barcode, blood_type, last_donation_date, created_at, status,
              profile_image_url, pending_profile_json, profile_update_requested_at
       FROM users
       WHERE role = 'donor'
@@ -21,7 +21,7 @@ const getDonorsController = async (req, res) => {
 }
 
 const createDonorController = async (req, res) => {
-  const { donorName, bloodType, contactPhone, contactEmail, username, password } = req.body
+  const { donorName, bloodType, contactPhone, contactEmail, username, password, barcode } = req.body
 
   if (!donorName || !bloodType || !contactPhone) {
     return res
@@ -71,10 +71,10 @@ const createDonorController = async (req, res) => {
 
     const [result] = await pool.query(
       `
-      INSERT INTO users (username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date, is_manual_donor)
-      VALUES (?, ?, ?, 'donor', ?, ?, ?, 'active', NULL, 1)
+      INSERT INTO users (username, email, password_hash, role, full_name, phone, barcode, blood_type, status, last_donation_date, is_manual_donor)
+      VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, 'active', NULL, 1)
     `,
-      [finalUsername, safeEmail, passwordHash, donorName, contactPhone, bloodType],
+      [finalUsername, safeEmail, passwordHash, donorName, contactPhone, barcode || null, bloodType],
     )
 
     res.status(201).json({
@@ -82,6 +82,7 @@ const createDonorController = async (req, res) => {
       donorName,
       bloodType,
       contactPhone,
+      barcode: barcode || null,
       contactEmail: contactEmail || null,
       username: finalUsername,
     })
@@ -104,7 +105,7 @@ const getDonorDetailsController = async (req, res) => {
   try {
     const [users] = await pool.query(
       `
-      SELECT id, full_name, phone, blood_type, status, last_donation_date, profile_image_url, is_manual_donor
+      SELECT id, full_name, phone, barcode, blood_type, status, last_donation_date, profile_image_url, is_manual_donor
       FROM users
       WHERE id = ? AND role = 'donor'
       LIMIT 1
@@ -178,6 +179,22 @@ const getDonorDetailsController = async (req, res) => {
     }
 
     const mergeMap = await mergeDonationStats()
+    let mbdDonationBaseline = 0
+    try {
+      const [mbdRows] = await pool.query(
+        `
+        SELECT MAX(COALESCE(num_donations, 0)) AS mbd_max_num_donations
+        FROM mbd_donor_records
+        WHERE transferred_donor_user_id = ?
+      `,
+        [donorId],
+      )
+      mbdDonationBaseline = Number(mbdRows?.[0]?.mbd_max_num_donations || 0)
+    } catch (mbdErr) {
+      if (!(mbdErr && (mbdErr.code === 'ER_NO_SUCH_TABLE' || mbdErr.errno === 1146))) {
+        throw mbdErr
+      }
+    }
 
     const now = new Date()
     const base = {
@@ -262,11 +279,14 @@ const getDonorDetailsController = async (req, res) => {
       }
     }
 
+    totalDonations = Math.max(totalDonations, mbdDonationBaseline)
+
     return res.json({
       donor: {
         id: donor.id,
         fullName: donor.full_name,
         phone: donor.phone,
+        barcode: donor.barcode || null,
         bloodType: donor.blood_type,
         status: donor.status,
         lastDonationDate: donor.last_donation_date,
@@ -285,7 +305,7 @@ const getDonorDetailsController = async (req, res) => {
 
 const updateDonorController = async (req, res) => {
   const donorId = parseInt(req.params.id, 10)
-  const { donorName, bloodType, contactPhone, status } = req.body
+  const { donorName, bloodType, contactPhone, barcode, status } = req.body
 
   if (Number.isNaN(donorId)) {
     return res.status(400).json({ message: 'Invalid donor id' })
@@ -312,15 +332,21 @@ const updateDonorController = async (req, res) => {
       return res.status(400).json({ message: 'Mobile number is already registered' })
     }
 
-    const finalStatus = status === 'inactive' ? 'inactive' : 'active'
+    const statusNorm = String(status || '').trim().toLowerCase()
+    const finalStatus =
+      statusNorm === 'inactive'
+        ? 'inactive'
+        : statusNorm === 'discontinued'
+          ? 'discontinued'
+          : 'active'
     await pool.query(
       `
       UPDATE users
-      SET full_name = ?, blood_type = ?, phone = ?, status = ?,
+      SET full_name = ?, blood_type = ?, phone = ?, barcode = ?, status = ?,
           pending_profile_json = NULL, profile_update_requested_at = NULL
       WHERE id = ? AND role = 'donor'
     `,
-      [donorName, bloodType, contactPhone, finalStatus, donorId],
+      [donorName, bloodType, contactPhone, barcode || null, finalStatus, donorId],
     )
 
     return res.json({ message: 'Donor updated successfully' })

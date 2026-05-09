@@ -1,7 +1,44 @@
 const { pool } = require('../db')
+const bcrypt = require('bcryptjs')
 
-const BLOOD_TYPES = new Set(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])
-const REMARKS = new Set(['S', 'D'])
+const BLOOD_TYPES = new Set(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', 'A', 'B', 'O', 'AB'])
+const REMARKS = new Set(['S', 'D', 'T'])
+const DEFERRAL_KEYS = [
+  'low_hbg',
+  'menstruation',
+  'high_bp',
+  'low_bp',
+  'vaccinations',
+  'underweight',
+  'tattoo_piercing',
+  'antibiotic_therapy_or_medication',
+  'less_than_3_months_from_last_donations',
+  'surgical_operations',
+  'dental_extraction',
+  'cough_colds',
+  'fever',
+  'lack_of_sleep',
+  'alcohol_intake_less_than_12_hrs',
+  'other_medical_condition',
+  'others',
+]
+
+function normalizeDeferralCounts(raw) {
+  let parsed = raw
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      parsed = null
+    }
+  }
+  const out = {}
+  DEFERRAL_KEYS.forEach((key) => {
+    const value = parsed && Object.prototype.hasOwnProperty.call(parsed, key) ? Number(parsed[key]) : 0
+    out[key] = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
+  })
+  return out
+}
 
 const mapEventRow = (row) => ({
   id: row.id,
@@ -10,6 +47,7 @@ const mapEventRow = (row) => ({
   event_date: row.event_date,
   location: row.location,
   donor_count: row.donor_count != null ? Number(row.donor_count) : 0,
+  deferral_counts: normalizeDeferralCounts(row.deferral_counts_json || null),
   created_at: row.created_at,
   updated_at: row.updated_at,
 })
@@ -26,9 +64,34 @@ const mapDonorRow = (row) => ({
   bag_type: row.bag_type,
   remarks_sd: row.remarks_sd,
   num_donations: row.num_donations != null ? Number(row.num_donations) : 0,
+  transferred_donor_user_id:
+    row.transferred_donor_user_id != null ? Number(row.transferred_donor_user_id) : null,
   created_at: row.created_at,
   updated_at: row.updated_at,
 })
+
+function normalizeBloodType(raw) {
+  const value = String(raw || '').trim().toUpperCase()
+  if (!value) return ''
+  if (value === 'AB+' || value === 'AB-') return value
+  if (value === 'A+' || value === 'A-') return value
+  if (value === 'B+' || value === 'B-') return value
+  if (value === 'O+' || value === 'O-') return value
+  if (value === 'AB') return 'AB'
+  if (value === 'A') return 'A'
+  if (value === 'B') return 'B'
+  if (value === 'O') return 'O'
+  return value
+}
+
+function normalizeUserBloodTypeFromMbd(raw) {
+  const value = String(raw || '').trim().toUpperCase()
+  if (!value) return null
+  const validUserTypes = new Set(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])
+  if (validUserTypes.has(value)) return value
+  if (value === 'A' || value === 'B' || value === 'AB' || value === 'O') return `${value}+`
+  return null
+}
 
 function parseEventId(req) {
   const id = Number(req.params.id)
@@ -42,6 +105,21 @@ function parseDonorId(req) {
   return id
 }
 
+async function generateUniqueUsername(base = 'mbd_donor') {
+  const seed = String(base || 'mbd_donor')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '')
+    .slice(0, 30) || 'mbd_donor'
+  let idx = 0
+  while (idx < 1000) {
+    const candidate = idx === 0 ? seed : `${seed}${idx}`
+    const [rows] = await pool.query('SELECT id FROM users WHERE username = ? LIMIT 1', [candidate])
+    if (!rows.length) return candidate
+    idx += 1
+  }
+  return `${seed}_${Date.now()}`
+}
+
 const listMbdEventsController = async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -52,6 +130,7 @@ const listMbdEventsController = async (req, res) => {
         e.organizer_name,
         e.event_date,
         e.location,
+        e.deferral_counts_json,
         e.created_at,
         e.updated_at,
         (SELECT COUNT(*) FROM mbd_donor_records d WHERE d.mbd_event_id = e.id) AS donor_count
@@ -103,10 +182,10 @@ const createMbdEventController = async (req, res) => {
   try {
     const [result] = await pool.query(
       `
-      INSERT INTO mbd_events (name, organizer_name, event_date, location)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO mbd_events (name, organizer_name, event_date, location, deferral_counts_json)
+      VALUES (?, ?, ?, ?, ?)
     `,
-      [name, organizerName, dateNorm, location],
+      [name, organizerName, dateNorm, location, JSON.stringify(normalizeDeferralCounts(null))],
     )
 
     const [rows] = await pool.query(
@@ -117,6 +196,7 @@ const createMbdEventController = async (req, res) => {
         e.organizer_name,
         e.event_date,
         e.location,
+        e.deferral_counts_json,
         e.created_at,
         e.updated_at,
         0 AS donor_count
@@ -164,6 +244,7 @@ const listMbdDonorsController = async (req, res) => {
         bag_type,
         remarks_sd,
         num_donations,
+        transferred_donor_user_id,
         created_at,
         updated_at
       FROM mbd_donor_records
@@ -203,6 +284,7 @@ const createMbdDonorController = async (req, res) => {
       : req.body.blood_type != null
         ? String(req.body.blood_type).trim()
         : ''
+  const bloodType = normalizeBloodType(bloodTypeRaw)
   const donorNumber =
     req.body.donorNumber != null
       ? String(req.body.donorNumber).trim()
@@ -218,18 +300,19 @@ const createMbdDonorController = async (req, res) => {
       : req.body.remarks_sd != null
         ? String(req.body.remarks_sd).trim().toUpperCase()
         : ''
+  const remarks = remarksRaw ? remarksRaw : null
   const numRaw = req.body.numDonations != null ? req.body.numDonations : req.body.num_donations
 
   if (!donorName) {
     return res.status(400).json({ message: 'donorName is required' })
   }
-  if (!BLOOD_TYPES.has(bloodTypeRaw)) {
+  if (!BLOOD_TYPES.has(bloodType)) {
     return res.status(400).json({
-      message: 'bloodType must be one of A+, A-, B+, B-, AB+, AB-, O+, O-',
+      message: 'bloodType must be one of A+, A-, B+, B-, O+, O-, AB+, AB-',
     })
   }
-  if (!REMARKS.has(remarksRaw)) {
-    return res.status(400).json({ message: 'remarksSd must be S or D' })
+  if (remarks != null && !REMARKS.has(remarks)) {
+    return res.status(400).json({ message: 'remarksSd must be S, D, T, or empty' })
   }
 
   let age = null
@@ -274,12 +357,12 @@ const createMbdDonorController = async (req, res) => {
         eventId,
         donorName,
         barcode || null,
-        bloodTypeRaw,
+        bloodType,
         donorNumber || null,
         age,
         gender || null,
         bagType || null,
-        remarksRaw,
+        remarks,
         numDonations,
       ],
     )
@@ -298,6 +381,7 @@ const createMbdDonorController = async (req, res) => {
         bag_type,
         remarks_sd,
         num_donations,
+        transferred_donor_user_id,
         created_at,
         updated_at
       FROM mbd_donor_records
@@ -338,6 +422,7 @@ const updateMbdDonorController = async (req, res) => {
       : req.body.blood_type != null
         ? String(req.body.blood_type).trim()
         : ''
+  const bloodType = normalizeBloodType(bloodTypeRaw)
   const donorNumber =
     req.body.donorNumber != null
       ? String(req.body.donorNumber).trim()
@@ -353,18 +438,19 @@ const updateMbdDonorController = async (req, res) => {
       : req.body.remarks_sd != null
         ? String(req.body.remarks_sd).trim().toUpperCase()
         : ''
+  const remarks = remarksRaw ? remarksRaw : null
   const numRaw = req.body.numDonations != null ? req.body.numDonations : req.body.num_donations
 
   if (!donorName) {
     return res.status(400).json({ message: 'donorName is required' })
   }
-  if (!BLOOD_TYPES.has(bloodTypeRaw)) {
+  if (!BLOOD_TYPES.has(bloodType)) {
     return res.status(400).json({
-      message: 'bloodType must be one of A+, A-, B+, B-, AB+, AB-, O+, O-',
+      message: 'bloodType must be one of A+, A-, B+, B-, O+, O-, AB+, AB-',
     })
   }
-  if (!REMARKS.has(remarksRaw)) {
-    return res.status(400).json({ message: 'remarksSd must be S or D' })
+  if (remarks != null && !REMARKS.has(remarks)) {
+    return res.status(400).json({ message: 'remarksSd must be S, D, T, or empty' })
   }
 
   let age = null
@@ -402,12 +488,12 @@ const updateMbdDonorController = async (req, res) => {
       [
         donorName,
         barcode || null,
-        bloodTypeRaw,
+        bloodType,
         donorNumber || null,
         age,
         gender || null,
         bagType || null,
-        remarksRaw,
+        remarks,
         numDonations,
         donorId,
         eventId,
@@ -432,6 +518,7 @@ const updateMbdDonorController = async (req, res) => {
         bag_type,
         remarks_sd,
         num_donations,
+        transferred_donor_user_id,
         created_at,
         updated_at
       FROM mbd_donor_records
@@ -479,6 +566,190 @@ const deleteMbdDonorController = async (req, res) => {
   }
 }
 
+const transferMbdDonorToDonorListController = async (req, res) => {
+  const eventId = parseEventId(req)
+  const donorId = parseDonorId(req)
+  if (!eventId || !donorId) {
+    return res.status(400).json({ message: 'Invalid id' })
+  }
+
+  const conn = await pool.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [rows] = await conn.query(
+      `
+      SELECT
+        id,
+        donor_name,
+        barcode,
+        blood_type,
+        donor_number,
+        transferred_donor_user_id,
+        remarks_sd
+      FROM mbd_donor_records
+      WHERE id = ? AND mbd_event_id = ?
+      LIMIT 1
+      FOR UPDATE
+    `,
+      [donorId, eventId],
+    )
+    if (!rows.length) {
+      await conn.rollback()
+      return res.status(404).json({ message: 'Donor record not found for this MBD event' })
+    }
+    const mbdDonor = rows[0]
+    const status = mbdDonor.remarks_sd ? 'discontinued' : 'active'
+    const normalizedUserBloodType = normalizeUserBloodTypeFromMbd(mbdDonor.blood_type)
+    const donorNumber = String(mbdDonor.donor_number || '').trim()
+    let targetUserId = mbdDonor.transferred_donor_user_id ? Number(mbdDonor.transferred_donor_user_id) : null
+
+    if (!targetUserId && mbdDonor.barcode) {
+      const [existingByBarcode] = await conn.query(
+        "SELECT id FROM users WHERE role = 'donor' AND barcode = ? LIMIT 1",
+        [mbdDonor.barcode],
+      )
+      if (existingByBarcode.length) targetUserId = Number(existingByBarcode[0].id)
+    }
+
+    let transferablePhone = donorNumber || null
+    if (transferablePhone) {
+      const params = [transferablePhone]
+      let phoneSql = "SELECT id FROM users WHERE role = 'donor' AND phone = ?"
+      if (targetUserId) {
+        phoneSql += ' AND id <> ?'
+        params.push(targetUserId)
+      }
+      phoneSql += ' LIMIT 1'
+      const [existingPhone] = await conn.query(phoneSql, params)
+      if (existingPhone.length) transferablePhone = null
+    }
+
+    if (targetUserId) {
+      await conn.query(
+        `
+        UPDATE users
+        SET
+          full_name = COALESCE(NULLIF(?, ''), full_name),
+          blood_type = COALESCE(NULLIF(?, ''), blood_type),
+          phone = CASE WHEN (phone IS NULL OR TRIM(phone) = '') THEN ? ELSE phone END,
+          status = ?,
+          is_manual_donor = 1,
+          barcode = COALESCE(NULLIF(?, ''), barcode)
+        WHERE id = ? AND role = 'donor'
+      `,
+        [
+          mbdDonor.donor_name || '',
+          normalizedUserBloodType || '',
+          transferablePhone,
+          status,
+          mbdDonor.barcode || '',
+          targetUserId,
+        ],
+      )
+    } else {
+      const usernameBase = `mbd_${(mbdDonor.barcode || mbdDonor.donor_name || 'donor').toLowerCase()}`
+      const username = await generateUniqueUsername(usernameBase)
+      const passwordHash = await bcrypt.hash(`mbd-${Date.now()}-${Math.random()}`, 10)
+      const safeEmail = `${username}@noemail.bloodconnect`
+      const [insertResult] = await conn.query(
+        `
+        INSERT INTO users (
+          username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date, is_manual_donor, barcode
+        )
+        VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, NULL, 1, ?)
+      `,
+        [
+          username,
+          safeEmail,
+          passwordHash,
+          mbdDonor.donor_name || '',
+          transferablePhone,
+          normalizedUserBloodType,
+          status,
+          mbdDonor.barcode || null,
+        ],
+      )
+      targetUserId = Number(insertResult.insertId)
+    }
+
+    await conn.query(
+      'UPDATE mbd_donor_records SET transferred_donor_user_id = ? WHERE id = ? AND mbd_event_id = ?',
+      [targetUserId, donorId, eventId],
+    )
+
+    await conn.commit()
+    return res.status(mbdDonor.transferred_donor_user_id ? 200 : 201).json({
+      message: mbdDonor.transferred_donor_user_id
+        ? 'Donor already in donor list; synced latest data'
+        : 'Donor added to donor list',
+      donorUserId: targetUserId,
+      alreadyTransferred: Boolean(mbdDonor.transferred_donor_user_id),
+    })
+  } catch (error) {
+    await conn.rollback()
+    if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
+      return res.status(500).json({
+        message: 'MBD tables are missing. Restart the server to run schema migration.',
+      })
+    }
+    console.error('Transfer MBD donor error:', error)
+    return res.status(500).json({ message: 'Failed to transfer donor to donor list' })
+  } finally {
+    conn.release()
+  }
+}
+
+const getMbdDeferralsController = async (req, res) => {
+  const eventId = parseEventId(req)
+  if (!eventId) {
+    return res.status(400).json({ message: 'Invalid MBD event id' })
+  }
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, deferral_counts_json FROM mbd_events WHERE id = ? LIMIT 1',
+      [eventId],
+    )
+    if (!rows.length) {
+      return res.status(404).json({ message: 'MBD event not found' })
+    }
+    return res.json({ deferral_counts: normalizeDeferralCounts(rows[0].deferral_counts_json || null) })
+  } catch (error) {
+    if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
+      return res.status(500).json({
+        message: 'MBD tables are missing. Restart the server to run schema migration.',
+      })
+    }
+    console.error('Get MBD deferrals error:', error)
+    return res.status(500).json({ message: 'Failed to fetch deferral data' })
+  }
+}
+
+const updateMbdDeferralsController = async (req, res) => {
+  const eventId = parseEventId(req)
+  if (!eventId) {
+    return res.status(400).json({ message: 'Invalid MBD event id' })
+  }
+  const nextCounts = normalizeDeferralCounts(req.body?.deferralCounts ?? req.body?.deferral_counts ?? null)
+  try {
+    const [result] = await pool.query(
+      'UPDATE mbd_events SET deferral_counts_json = ? WHERE id = ?',
+      [JSON.stringify(nextCounts), eventId],
+    )
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: 'MBD event not found' })
+    }
+    return res.json({ deferral_counts: nextCounts })
+  } catch (error) {
+    if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
+      return res.status(500).json({
+        message: 'MBD tables are missing. Restart the server to run schema migration.',
+      })
+    }
+    console.error('Update MBD deferrals error:', error)
+    return res.status(500).json({ message: 'Failed to save deferral data' })
+  }
+}
+
 module.exports = {
   listMbdEventsController,
   createMbdEventController,
@@ -486,4 +757,7 @@ module.exports = {
   createMbdDonorController,
   updateMbdDonorController,
   deleteMbdDonorController,
+  transferMbdDonorToDonorListController,
+  getMbdDeferralsController,
+  updateMbdDeferralsController,
 }

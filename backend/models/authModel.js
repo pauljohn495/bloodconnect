@@ -1,14 +1,21 @@
 const { pool } = require('../db')
 
 async function findUserByIdentifier(identifier) {
+  const raw = String(identifier || '').trim()
+  const normalizedPhone = raw.replace(/\D/g, '')
   const [rows] = await pool.query(
     `
     SELECT id, username, email, password_hash, role, full_name, status, phone, blood_type
     FROM users
-    WHERE (email = ? OR username = ?)
+    WHERE (
+      email = ?
+      OR username = ?
+      OR phone = ?
+      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') = ?
+    )
     LIMIT 1
   `,
-    [identifier, identifier],
+    [raw, raw, raw, normalizedPhone],
   )
   return rows[0] || null
 }

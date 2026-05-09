@@ -50,6 +50,7 @@ function AdminDonation() {
   const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations' | 'rc143'
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [donorName, setDonorName] = useState('')
+  const [donorBarcode, setDonorBarcode] = useState('')
   const [bloodType, setBloodType] = useState('')
   const [contactDonor, setContactDonor] = useState('')
   const [donors, setDonors] = useState([])
@@ -93,6 +94,7 @@ function AdminDonation() {
   const [isEditDonorModalOpen, setIsEditDonorModalOpen] = useState(false)
   const [editingDonor, setEditingDonor] = useState(null)
   const [editDonorName, setEditDonorName] = useState('')
+  const [editBarcode, setEditBarcode] = useState('')
   const [editBloodType, setEditBloodType] = useState('')
   const [editContactDonor, setEditContactDonor] = useState('')
   const [editStatus, setEditStatus] = useState('active')
@@ -292,7 +294,7 @@ function AdminDonation() {
   }, [selectedDonorDetails])
 
   const donorNameForSearch = (donor) =>
-    (
+    `${(donor?.barcode || '').toString().toLowerCase()} ${(
       donor.full_name ||
       donor.fullName ||
       donor.donor_name ||
@@ -301,7 +303,7 @@ function AdminDonation() {
       ''
     )
       .toString()
-      .toLowerCase()
+      .toLowerCase()}`
 
   const donorDisplayName = (donor) =>
     (
@@ -403,6 +405,7 @@ function AdminDonation() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setDonorName('')
+    setDonorBarcode('')
     setBloodType('')
     setContactDonor('')
   }
@@ -547,6 +550,7 @@ function AdminDonation() {
         method: 'POST',
         body: JSON.stringify({
           donorName,
+          barcode: donorBarcode,
           bloodType,
           contactPhone: contactDonor,
         }),
@@ -843,6 +847,7 @@ function AdminDonation() {
     setOpenMenuDonorId(null)
     setEditingDonor(donor)
     setEditDonorName(donor.full_name || donor.fullName || donor.donor_name || donor.donorName || '')
+    setEditBarcode(donor.barcode || '')
     setEditBloodType(donor.blood_type || donor.bloodType || '')
     setEditContactDonor(donor.phone || donor.contact_phone || donor.contactPhone || '')
     setEditStatus(donor.status || 'active')
@@ -853,6 +858,7 @@ function AdminDonation() {
     setIsEditDonorModalOpen(false)
     setEditingDonor(null)
     setEditDonorName('')
+    setEditBarcode('')
     setEditBloodType('')
     setEditContactDonor('')
     setEditStatus('active')
@@ -866,6 +872,7 @@ function AdminDonation() {
         method: 'PUT',
         body: JSON.stringify({
           donorName: editDonorName,
+          barcode: editBarcode,
           bloodType: editBloodType,
           contactPhone: editContactDonor,
           status: editStatus,
@@ -1372,7 +1379,7 @@ function AdminDonation() {
                   placeholder={
                     activeSection === 'organizations'
                       ? 'Search name, contact, email...'
-                      : 'Search donor name...'
+                      : 'Search barcode or donor name...'
                   }
                   className="w-56 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
@@ -1484,7 +1491,7 @@ function AdminDonation() {
                   {activeSection === 'donors' ? (
                     <>
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                        Donor Name
+                        BARCODE
                       </th>
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                         Blood Type
@@ -1557,7 +1564,7 @@ function AdminDonation() {
                   filteredDonors.map((donor) => (
                     <tr key={donor.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                        {donor.full_name || donor.fullName || donor.donor_name || donor.donorName || donor.username || '—'}
+                        {donor.barcode || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
                         <BloodTypeBadge type={donor.blood_type || donor.bloodType} className="text-[13px]" />
@@ -1582,6 +1589,8 @@ function AdminDonation() {
                               ? 'bg-green-100 text-green-700 ring-green-200'
                               : donor.status === 'inactive'
                                 ? 'bg-red-100 text-red-700 ring-red-200'
+                                : donor.status === 'discontinued'
+                                  ? 'bg-amber-100 text-amber-800 ring-amber-200'
                                 : 'bg-slate-100 text-slate-700 ring-slate-200'
                             }`}
                         >
@@ -1757,6 +1766,19 @@ function AdminDonation() {
                   onChange={(e) => setDonorName(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                   placeholder="Enter donor full name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Barcode
+                </label>
+                <input
+                  type="text"
+                  value={donorBarcode}
+                  onChange={(e) => setDonorBarcode(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter donor barcode"
                 />
               </div>
 
@@ -2602,6 +2624,16 @@ function AdminDonation() {
               </div>
 
               <div>
+                <label className="block text-xs font-medium text-slate-700">Barcode</label>
+                <input
+                  type="text"
+                  value={editBarcode}
+                  onChange={(e) => setEditBarcode(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-slate-700">Blood Type</label>
                 <select
                   value={editBloodType}
@@ -2641,6 +2673,7 @@ function AdminDonation() {
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
+                  <option value="discontinued">Discontinued</option>
                 </select>
               </div>
 
@@ -3494,9 +3527,9 @@ function AdminDonation() {
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[11px] text-slate-500">Name</p>
+                    <p className="text-[11px] text-slate-500">Barcode</p>
                     <p className="font-medium text-slate-900">
-                      {selectedDonorDetails.donor.fullName || '—'}
+                      {selectedDonorDetails.donor.barcode || '—'}
                     </p>
                   </div>
                   <div>
@@ -3525,60 +3558,6 @@ function AdminDonation() {
                       {selectedDonorDetails.totalDonations || 0}
                     </p>
                   </div>
-                </div>
-              </div>
-
-              {/* Component Status */}
-              <div>
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                  Component Status
-                </h4>
-                <div className="space-y-3">
-                  {['whole_blood', 'platelets', 'plasma'].map((key) => {
-                    const info = selectedDonorDetails.stats?.[key]
-                    if (!info) return null
-                    const label =
-                      key === 'whole_blood'
-                        ? 'Whole Blood'
-                        : key === 'platelets'
-                        ? 'Platelets'
-                        : 'Plasma'
-                    const eligibleBadgeClasses = info.isEligible
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                      : 'bg-amber-50 text-amber-700 ring-amber-200'
-                    return (
-                      <div
-                        key={key}
-                        className="flex items-start justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
-                      >
-                        <div>
-                          <p className="text-xs font-semibold text-slate-900">
-                            {label}
-                          </p>
-                          <p className="mt-1 text-[11px] text-slate-600">
-                            Completed donations: <span className="font-semibold">{info.completedCount}</span>
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-slate-600">
-                            Last donation:{' '}
-                            {info.lastCompletedAt
-                              ? new Date(info.lastCompletedAt).toLocaleDateString()
-                              : '—'}
-                          </p>
-                          {!info.isEligible && info.nextEligibleAt && (
-                            <p className="mt-0.5 text-[11px] text-amber-700">
-                              Next eligible on{' '}
-                              {new Date(info.nextEligibleAt).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        <span
-                          className={`mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${eligibleBadgeClasses}`}
-                        >
-                          {info.isEligible ? 'Eligible' : 'In cooldown'}
-                        </span>
-                      </div>
-                    )
-                  })}
                 </div>
               </div>
 

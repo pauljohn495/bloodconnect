@@ -49,7 +49,8 @@ function buildAuthPayload(user) {
 }
 
 async function login(req, res, next) {
-  const { identifier, password, role } = req.body
+  const { password, role, loginMode } = req.body
+  const identifier = String(req.body.identifier || '').trim()
 
   try {
     const user = await findUserByIdentifier(identifier)
@@ -86,11 +87,14 @@ async function login(req, res, next) {
       throw error
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password_hash)
-    if (!passwordMatch) {
-      const error = new Error('Invalid credentials')
-      error.statusCode = 401
-      throw error
+    const isPhoneOnlyLogin = loginMode === 'phone' && normalizedRole === 'donor'
+    if (!isPhoneOnlyLogin) {
+      const passwordMatch = await bcrypt.compare(password, user.password_hash)
+      if (!passwordMatch) {
+        const error = new Error('Invalid credentials')
+        error.statusCode = 401
+        throw error
+      }
     }
 
     const responseBody = buildAuthPayload(user)

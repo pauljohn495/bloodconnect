@@ -84,6 +84,9 @@ const {
   createMbdDonorController,
   updateMbdDonorController,
   deleteMbdDonorController,
+  transferMbdDonorToDonorListController,
+  getMbdDeferralsController,
+  updateMbdDeferralsController,
 } = require('../controllers/adminMbdController')
 const {
   listPrcActivitiesController,
@@ -294,6 +297,18 @@ router.put('/mbd-events/:id/donors/:donorId', updateMbdDonorController)
 
 // DELETE /api/admin/mbd-events/:id/donors/:donorId
 router.delete('/mbd-events/:id/donors/:donorId', deleteMbdDonorController)
+
+// POST /api/admin/mbd-events/:id/donors/:donorId/transfer-to-donor-list
+router.post(
+  '/mbd-events/:id/donors/:donorId/transfer-to-donor-list',
+  transferMbdDonorToDonorListController,
+)
+
+// GET /api/admin/mbd-events/:id/deferrals
+router.get('/mbd-events/:id/deferrals', getMbdDeferralsController)
+
+// PUT /api/admin/mbd-events/:id/deferrals
+router.put('/mbd-events/:id/deferrals', updateMbdDeferralsController)
 
 // ===== PRC Activities (staff calendar) =====
 

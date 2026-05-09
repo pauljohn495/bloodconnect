@@ -1,12 +1,12 @@
 const { errorResponse } = require('../utils/response')
 
 function validateLogin(req, res, next) {
-  const { identifier, password, role } = req.body
+  const { identifier, password, role, loginMode } = req.body
 
-  if (!identifier || !password) {
+  if (!identifier) {
     return errorResponse(res, {
       statusCode: 400,
-      message: 'Identifier and password are required',
+      message: 'Identifier is required',
     })
   }
 
@@ -14,6 +14,29 @@ function validateLogin(req, res, next) {
     return errorResponse(res, {
       statusCode: 400,
       message: 'Invalid role value',
+    })
+  }
+
+  if (loginMode && !['default', 'phone'].includes(loginMode)) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'Invalid login mode',
+    })
+  }
+
+  const normalizedRole = role === 'recipient' ? 'donor' : role
+  const isPhoneMode = loginMode === 'phone'
+  if (!isPhoneMode && !password) {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'Password is required',
+    })
+  }
+
+  if (isPhoneMode && normalizedRole && normalizedRole !== 'donor') {
+    return errorResponse(res, {
+      statusCode: 400,
+      message: 'Phone-number-only login is only available for donor/recipient account type',
     })
   }
 
