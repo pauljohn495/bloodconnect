@@ -693,7 +693,7 @@ function AdminMbd() {
                 <th style="width:40px">#</th>
                 <th>BARCODE</th>
                 <th>BT</th>
-                <th>ID</th>
+                <th>Contact No.</th>
                 <th>AGE</th>
                 <th>SEX</th>
                 <th>Successful</th>
