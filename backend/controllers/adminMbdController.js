@@ -19,9 +19,9 @@ const DEFERRAL_KEYS = [
   'fever',
   'lack_of_sleep',
   'alcohol_intake_less_than_12_hrs',
-  'other_medical_condition',
-  'others',
 ]
+
+const CUSTOM_DEFERRAL_LABELS_KEY = '_custom_labels'
 
 function normalizeDeferralCounts(raw) {
   let parsed = raw
@@ -37,6 +37,26 @@ function normalizeDeferralCounts(raw) {
     const value = parsed && Object.prototype.hasOwnProperty.call(parsed, key) ? Number(parsed[key]) : 0
     out[key] = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
   })
+  if (parsed && typeof parsed === 'object') {
+    Object.keys(parsed).forEach((key) => {
+      if (key.startsWith('custom_')) {
+        const value = Number(parsed[key])
+        out[key] = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
+      }
+    })
+    const labels = parsed[CUSTOM_DEFERRAL_LABELS_KEY]
+    if (labels && typeof labels === 'object' && !Array.isArray(labels)) {
+      const normalizedLabels = {}
+      Object.keys(labels).forEach((key) => {
+        if (!key.startsWith('custom_')) return
+        const label = String(labels[key] || '').trim()
+        if (label) normalizedLabels[key] = label
+      })
+      if (Object.keys(normalizedLabels).length) {
+        out[CUSTOM_DEFERRAL_LABELS_KEY] = normalizedLabels
+      }
+    }
+  }
   return out
 }
 
@@ -59,6 +79,7 @@ const mapDonorRow = (row) => ({
   barcode: row.barcode,
   blood_type: row.blood_type,
   donor_number: row.donor_number,
+  assigned_donor_id: row.assigned_donor_id,
   age: row.age != null ? Number(row.age) : null,
   gender: row.gender,
   bag_type: row.bag_type,
@@ -239,6 +260,7 @@ const listMbdDonorsController = async (req, res) => {
         barcode,
         blood_type,
         donor_number,
+        assigned_donor_id,
         age,
         gender,
         bag_type,
@@ -290,6 +312,12 @@ const createMbdDonorController = async (req, res) => {
       ? String(req.body.donorNumber).trim()
       : req.body.donor_number != null
         ? String(req.body.donor_number).trim()
+        : ''
+  const assignedDonorId =
+    req.body.assignedDonorId != null
+      ? String(req.body.assignedDonorId).trim()
+      : req.body.assigned_donor_id != null
+        ? String(req.body.assigned_donor_id).trim()
         : ''
   const ageRaw = req.body.age
   const gender = req.body.gender != null ? String(req.body.gender).trim() : ''
@@ -345,13 +373,14 @@ const createMbdDonorController = async (req, res) => {
         barcode,
         blood_type,
         donor_number,
+        assigned_donor_id,
         age,
         gender,
         bag_type,
         remarks_sd,
         num_donations
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         eventId,
@@ -359,6 +388,7 @@ const createMbdDonorController = async (req, res) => {
         barcode || null,
         bloodType,
         donorNumber || null,
+        assignedDonorId || null,
         age,
         gender || null,
         bagType || null,
@@ -376,6 +406,7 @@ const createMbdDonorController = async (req, res) => {
         barcode,
         blood_type,
         donor_number,
+        assigned_donor_id,
         age,
         gender,
         bag_type,
@@ -429,6 +460,12 @@ const updateMbdDonorController = async (req, res) => {
       : req.body.donor_number != null
         ? String(req.body.donor_number).trim()
         : ''
+  const assignedDonorId =
+    req.body.assignedDonorId != null
+      ? String(req.body.assignedDonorId).trim()
+      : req.body.assigned_donor_id != null
+        ? String(req.body.assigned_donor_id).trim()
+        : ''
   const ageRaw = req.body.age
   const gender = req.body.gender != null ? String(req.body.gender).trim() : ''
   const bagType = req.body.bagType != null ? String(req.body.bagType).trim() : req.body.bag_type != null ? String(req.body.bag_type).trim() : ''
@@ -478,6 +515,7 @@ const updateMbdDonorController = async (req, res) => {
         barcode = ?,
         blood_type = ?,
         donor_number = ?,
+        assigned_donor_id = ?,
         age = ?,
         gender = ?,
         bag_type = ?,
@@ -490,6 +528,7 @@ const updateMbdDonorController = async (req, res) => {
         barcode || null,
         bloodType,
         donorNumber || null,
+        assignedDonorId || null,
         age,
         gender || null,
         bagType || null,
@@ -513,6 +552,7 @@ const updateMbdDonorController = async (req, res) => {
         barcode,
         blood_type,
         donor_number,
+        assigned_donor_id,
         age,
         gender,
         bag_type,
@@ -527,7 +567,15 @@ const updateMbdDonorController = async (req, res) => {
       [donorId, eventId],
     )
 
-    return res.json(mapDonorRow(rows[0]))
+    const updated = mapDonorRow(rows[0])
+    if (updated.transferred_donor_user_id && assignedDonorId) {
+      await pool.query(
+        `UPDATE users SET assigned_donor_id = ? WHERE id = ? AND role = 'donor'`,
+        [assignedDonorId, updated.transferred_donor_user_id],
+      )
+    }
+
+    return res.json(updated)
   } catch (error) {
     if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
       return res.status(500).json({
@@ -584,6 +632,7 @@ const transferMbdDonorToDonorListController = async (req, res) => {
         barcode,
         blood_type,
         donor_number,
+        assigned_donor_id,
         transferred_donor_user_id,
         remarks_sd
       FROM mbd_donor_records
@@ -601,6 +650,7 @@ const transferMbdDonorToDonorListController = async (req, res) => {
     const status = mbdDonor.remarks_sd ? 'discontinued' : 'active'
     const normalizedUserBloodType = normalizeUserBloodTypeFromMbd(mbdDonor.blood_type)
     const donorNumber = String(mbdDonor.donor_number || '').trim()
+    const assignedDonorId = String(mbdDonor.assigned_donor_id || '').trim()
     let targetUserId = mbdDonor.transferred_donor_user_id ? Number(mbdDonor.transferred_donor_user_id) : null
 
     if (!targetUserId && mbdDonor.barcode) {
@@ -634,7 +684,8 @@ const transferMbdDonorToDonorListController = async (req, res) => {
           phone = CASE WHEN (phone IS NULL OR TRIM(phone) = '') THEN ? ELSE phone END,
           status = ?,
           is_manual_donor = 1,
-          barcode = COALESCE(NULLIF(?, ''), barcode)
+          barcode = COALESCE(NULLIF(?, ''), barcode),
+          assigned_donor_id = COALESCE(NULLIF(?, ''), assigned_donor_id)
         WHERE id = ? AND role = 'donor'
       `,
         [
@@ -643,6 +694,7 @@ const transferMbdDonorToDonorListController = async (req, res) => {
           transferablePhone,
           status,
           mbdDonor.barcode || '',
+          assignedDonorId,
           targetUserId,
         ],
       )
@@ -654,9 +706,9 @@ const transferMbdDonorToDonorListController = async (req, res) => {
       const [insertResult] = await conn.query(
         `
         INSERT INTO users (
-          username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date, is_manual_donor, barcode
+          username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date, is_manual_donor, barcode, assigned_donor_id
         )
-        VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, NULL, 1, ?)
+        VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, NULL, 1, ?, ?)
       `,
         [
           username,
@@ -667,6 +719,7 @@ const transferMbdDonorToDonorListController = async (req, res) => {
           normalizedUserBloodType,
           status,
           mbdDonor.barcode || null,
+          assignedDonorId || null,
         ],
       )
       targetUserId = Number(insertResult.insertId)

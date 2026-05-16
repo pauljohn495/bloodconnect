@@ -1497,7 +1497,7 @@ function AdminDonation() {
                         Blood Type
                       </th>
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                        Contact
+                        ID
                       </th>
                       <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                         Eligibility
@@ -1570,7 +1570,7 @@ function AdminDonation() {
                         <BloodTypeBadge type={donor.blood_type || donor.bloodType} className="text-[13px]" />
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                        {donor.phone || donor.contact_phone || donor.contactPhone || '—'}
+                        {donor.assigned_donor_id || donor.assignedDonorId || '—'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-sm">
                         {getWholeBloodEligibility(donor) ? (

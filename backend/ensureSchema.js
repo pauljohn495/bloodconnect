@@ -35,6 +35,10 @@ async function ensureDonorProfileColumns() {
     await pool.query('ALTER TABLE users ADD COLUMN barcode VARCHAR(128) NULL')
     console.log('Schema: added users.barcode')
   }
+  if (!(await columnExists('users', 'assigned_donor_id'))) {
+    await pool.query('ALTER TABLE users ADD COLUMN assigned_donor_id VARCHAR(64) NULL')
+    console.log('Schema: added users.assigned_donor_id')
+  }
   const [statusRows] = await pool.query(
     `SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
      FROM INFORMATION_SCHEMA.COLUMNS
@@ -324,6 +328,7 @@ async function ensureMbdTables() {
       barcode VARCHAR(128) NULL,
       blood_type VARCHAR(8) NOT NULL,
       donor_number VARCHAR(64) NULL,
+      assigned_donor_id VARCHAR(64) NULL,
       age INT NULL,
       gender VARCHAR(32) NULL,
       bag_type VARCHAR(64) NULL,
@@ -374,6 +379,12 @@ async function ensureMbdTables() {
       'ALTER TABLE mbd_events ADD COLUMN deferral_counts_json MEDIUMTEXT NULL AFTER location',
     )
     console.log('Schema: added mbd_events.deferral_counts_json')
+  }
+  if (!(await columnExists('mbd_donor_records', 'assigned_donor_id'))) {
+    await pool.query(
+      'ALTER TABLE mbd_donor_records ADD COLUMN assigned_donor_id VARCHAR(64) NULL AFTER donor_number',
+    )
+    console.log('Schema: added mbd_donor_records.assigned_donor_id')
   }
   if (!(await columnExists('mbd_donor_records', 'transferred_donor_user_id'))) {
     await pool.query(

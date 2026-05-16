@@ -6,7 +6,7 @@ const getDonorsController = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT id, username, email, full_name, phone, barcode, blood_type, last_donation_date, created_at, status,
+      SELECT id, username, email, full_name, phone, barcode, assigned_donor_id, blood_type, last_donation_date, created_at, status,
              profile_image_url, pending_profile_json, profile_update_requested_at
       FROM users
       WHERE role = 'donor'

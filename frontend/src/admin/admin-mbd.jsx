@@ -45,9 +45,66 @@ const DEFERRAL_FIELDS = [
   { key: 'fever', label: 'FEVER' },
   { key: 'lack_of_sleep', label: 'LACK OF SLEEP' },
   { key: 'alcohol_intake_less_than_12_hrs', label: 'ALCOHOL INTAKE LESS THAN 12 HRS' },
-  { key: 'other_medical_condition', label: 'OTHER MEDICAL CONDITION' },
-  { key: 'others', label: 'OTHERS' },
 ]
+
+const CUSTOM_DEFERRAL_LABELS_KEY = '_custom_labels'
+
+function slugifyCustomDeferralKey(label) {
+  const base = String(label || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+  return `custom_${base || 'condition'}_${Date.now().toString(36).slice(-5)}`
+}
+
+function hydrateLegacyDeferralCounts(counts) {
+  if (!counts || typeof counts !== 'object') return counts || {}
+  const hydrated = { ...counts }
+  const labels = { ...(hydrated[CUSTOM_DEFERRAL_LABELS_KEY] || {}) }
+  const legacy = [
+    { key: 'other_medical_condition', label: 'OTHER MEDICAL CONDITION' },
+    { key: 'others', label: 'OTHERS' },
+  ]
+  legacy.forEach(({ key, label }) => {
+    const value = Number(hydrated[key] || 0)
+    if (value > 0) {
+      const customKey = `custom_${key}`
+      hydrated[customKey] = value
+      labels[customKey] = labels[customKey] || label
+      delete hydrated[key]
+    }
+  })
+  if (Object.keys(labels).length) hydrated[CUSTOM_DEFERRAL_LABELS_KEY] = labels
+  return hydrated
+}
+
+function parseCustomDeferralFields(counts) {
+  if (!counts || typeof counts !== 'object') return []
+  const labels = counts[CUSTOM_DEFERRAL_LABELS_KEY] || {}
+  return Object.keys(counts)
+    .filter((key) => key.startsWith('custom_'))
+    .map((key) => ({
+      key,
+      label:
+        labels[key] ||
+        key
+          .replace(/^custom_/, '')
+          .replace(/_[a-z0-9]{4,6}$/i, '')
+          .replace(/_/g, ' ')
+          .toUpperCase(),
+    }))
+}
+
+function buildDeferralFormState(counts) {
+  const base = Object.fromEntries(
+    DEFERRAL_FIELDS.map((field) => [field.key, String(Number(counts?.[field.key]) || 0)]),
+  )
+  parseCustomDeferralFields(counts).forEach(({ key }) => {
+    base[key] = String(Number(counts?.[key]) || 0)
+  })
+  return base
+}
 
 const AGE_GROUPS = [
   { label: '16-17', min: 16, max: 17 },
@@ -121,6 +178,62 @@ function discontinuedLabel(value) {
   return '—'
 }
 
+function CustomDeferralNameModal({ open, value, onChange, onConfirm, onCancel }) {
+  if (!open) return null
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onConfirm()
+  }
+  return (
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]">
+      <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={onCancel} />
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="custom-deferral-modal-title"
+        onSubmit={handleSubmit}
+        className="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200"
+      >
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h3 id="custom-deferral-modal-title" className="text-base font-bold text-slate-900">
+            Add medical condition
+          </h3>
+          <p className="mt-1 text-xs text-slate-600">Enter the deferral reason to add to this event.</p>
+        </div>
+        <div className="px-5 py-4">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="custom-deferral-name">
+            Condition name
+          </label>
+          <input
+            id="custom-deferral-name"
+            type="text"
+            autoFocus
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="e.g. Diabetes"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-200"
+          />
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex min-h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="inline-flex min-h-9 items-center justify-center rounded-xl bg-red-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-red-700"
+          >
+            Add
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function ConfirmModal({ open, title, message, confirmText = 'Confirm', cancelText = 'Cancel', onConfirm, onCancel }) {
   if (!open) return null
   return (
@@ -168,6 +281,7 @@ const emptyDonorForm = () => ({
   barcode: '',
   bloodType: 'O+',
   donorNumber: '',
+  assignedDonorId: '',
   age: '',
   gender: '',
   bagType: '',
@@ -194,6 +308,9 @@ function AdminMbd() {
   const [donorSaving, setDonorSaving] = useState(false)
   const [editingDonorId, setEditingDonorId] = useState(null)
   const [deferralForm, setDeferralForm] = useState(emptyDeferralForm)
+  const [customDeferralFields, setCustomDeferralFields] = useState([])
+  const [customDeferralModalOpen, setCustomDeferralModalOpen] = useState(false)
+  const [customDeferralNameDraft, setCustomDeferralNameDraft] = useState('')
   const [deferralSaving, setDeferralSaving] = useState(false)
   const [transferAllLoading, setTransferAllLoading] = useState(false)
   const [notification, setNotification] = useState(null)
@@ -233,9 +350,9 @@ function AdminMbd() {
     setModalOpen(true)
     setEditingDonorId(null)
     setDonorForm(emptyDonorForm())
-    setDeferralForm(
-      Object.fromEntries(DEFERRAL_FIELDS.map((field) => [field.key, String(Number(row?.deferral_counts?.[field.key]) || 0)])),
-    )
+    const initialCounts = hydrateLegacyDeferralCounts(row?.deferral_counts || {})
+    setDeferralForm(buildDeferralFormState(initialCounts))
+    setCustomDeferralFields(parseCustomDeferralFields(initialCounts))
     setDonorsLoading(true)
     try {
       const [donorData, deferralData] = await Promise.all([
@@ -243,10 +360,9 @@ function AdminMbd() {
         apiRequest(`/api/admin/mbd-events/${row.id}/deferrals`),
       ])
       setDonors(Array.isArray(donorData) ? donorData : [])
-      const fetchedCounts = deferralData?.deferral_counts || {}
-      setDeferralForm(
-        Object.fromEntries(DEFERRAL_FIELDS.map((field) => [field.key, String(Number(fetchedCounts[field.key]) || 0)])),
-      )
+      const fetchedCounts = hydrateLegacyDeferralCounts(deferralData?.deferral_counts || {})
+      setDeferralForm(buildDeferralFormState(fetchedCounts))
+      setCustomDeferralFields(parseCustomDeferralFields(fetchedCounts))
     } catch (e) {
       showNotification(e.message || 'Failed to load modal data', 'destructive')
       setDonors([])
@@ -262,6 +378,9 @@ function AdminMbd() {
     setEditingDonorId(null)
     setDonorForm(emptyDonorForm())
     setDeferralForm(emptyDeferralForm())
+    setCustomDeferralFields([])
+    setCustomDeferralModalOpen(false)
+    setCustomDeferralNameDraft('')
   }
 
   const handleCreateMbd = async (e) => {
@@ -296,6 +415,7 @@ function AdminMbd() {
     barcode: donorForm.barcode.trim(),
     bloodType: donorForm.bloodType,
     donorNumber: donorForm.donorNumber.trim(),
+    assignedDonorId: donorForm.assignedDonorId.trim(),
     age: donorForm.age === '' ? '' : Number(donorForm.age),
     gender: donorForm.gender,
     bagType: donorForm.bagType,
@@ -348,6 +468,7 @@ function AdminMbd() {
       barcode: d.barcode || '',
       bloodType: normalizeDonorBloodType(d.blood_type),
       donorNumber: d.donor_number || '',
+      assignedDonorId: d.assigned_donor_id || '',
       age: d.age != null ? String(d.age) : '',
       gender: d.gender || '',
       bagType: normalizeBagGroup(d.bag_type),
@@ -370,6 +491,51 @@ function AdminMbd() {
     setDonorForm(emptyDonorForm())
   }
 
+  const openCustomDeferralModal = () => {
+    setCustomDeferralNameDraft('')
+    setCustomDeferralModalOpen(true)
+  }
+
+  const closeCustomDeferralModal = () => {
+    setCustomDeferralModalOpen(false)
+    setCustomDeferralNameDraft('')
+  }
+
+  const confirmAddCustomDeferral = () => {
+    const label = customDeferralNameDraft.trim()
+    if (!label) {
+      showNotification('Enter a condition name.', 'destructive')
+      return
+    }
+    const normalized = label.toUpperCase()
+    const duplicate = customDeferralFields.some(
+      (field) => String(field.label || '').trim().toUpperCase() === normalized,
+    )
+    if (duplicate) {
+      showNotification('That condition is already listed.', 'destructive')
+      return
+    }
+    const key = slugifyCustomDeferralKey(label)
+    setCustomDeferralFields((prev) => [...prev, { key, label: normalized }])
+    setDeferralForm((prev) => ({ ...prev, [key]: '0' }))
+    closeCustomDeferralModal()
+  }
+
+  const removeCustomDeferralField = (key) => {
+    setCustomDeferralFields((prev) => prev.filter((field) => field.key !== key))
+    setDeferralForm((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  const deferralCountTotal = useMemo(() => {
+    const fixed = DEFERRAL_FIELDS.reduce((sum, field) => sum + Number(deferralForm[field.key] || 0), 0)
+    const custom = customDeferralFields.reduce((sum, field) => sum + Number(deferralForm[field.key] || 0), 0)
+    return fixed + custom
+  }, [deferralForm, customDeferralFields])
+
   const handleSaveDeferrals = async (e) => {
     e.preventDefault()
     if (!selectedEvent) return
@@ -378,13 +544,19 @@ function AdminMbd() {
       const payload = Object.fromEntries(
         DEFERRAL_FIELDS.map((field) => [field.key, Number(toDigits(deferralForm[field.key] || '0') || 0)]),
       )
+      customDeferralFields.forEach(({ key, label }) => {
+        payload[key] = Number(toDigits(deferralForm[key] || '0') || 0)
+        if (String(label || '').trim()) {
+          if (!payload[CUSTOM_DEFERRAL_LABELS_KEY]) payload[CUSTOM_DEFERRAL_LABELS_KEY] = {}
+          payload[CUSTOM_DEFERRAL_LABELS_KEY][key] = String(label).trim()
+        }
+      })
       await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/deferrals`, {
         method: 'PUT',
         body: JSON.stringify({ deferralCounts: payload }),
       })
-      setDeferralForm(
-        Object.fromEntries(DEFERRAL_FIELDS.map((field) => [field.key, String(Number(payload[field.key]) || 0)])),
-      )
+      setDeferralForm(buildDeferralFormState(payload))
+      setCustomDeferralFields(parseCustomDeferralFields(payload))
       setEvents((prev) =>
         prev.map((event) => (event.id === selectedEvent.id ? { ...event, deferral_counts: payload } : event)),
       )
@@ -535,6 +707,7 @@ function AdminMbd() {
       barcode: d.barcode || '',
       bt: normalizeBloodType(d.blood_type || ''),
       donorNumber: d.donor_number || '',
+      assignedDonorId: d.assigned_donor_id || '',
       age: d.age != null ? d.age : '',
       sex: d.gender || '',
       bag: d.bag_type || '',
@@ -556,6 +729,7 @@ function AdminMbd() {
           <td>${escapeHtml(row.barcode)}</td>
           <td>${escapeHtml(row.bt)}</td>
           <td>${escapeHtml(row.donorNumber)}</td>
+          <td>${escapeHtml(row.assignedDonorId)}</td>
           <td class="num">${escapeHtml(row.age)}</td>
           <td>${escapeHtml(row.sex)}</td>
           <td>${escapeHtml(row.bag)}</td>
@@ -571,11 +745,18 @@ function AdminMbd() {
       const cells = BAG_GROUPS.map((bag) => `<td class="num">${summary.bagByType[bag][bt]}</td>`).join('')
       return `<tr><td>${bt}</td><td>${discontinuedText}</td>${cells}</tr>`
     }).join('')
-    const deferralRows = DEFERRAL_FIELDS.map((field) => {
-      const count = Number(deferralForm[field.key] || 0)
-      return `<tr><td>${escapeHtml(field.label)}</td><td class="num">${count}</td></tr>`
-    }).join('')
-    const deferralTotal = DEFERRAL_FIELDS.reduce((sum, field) => sum + Number(deferralForm[field.key] || 0), 0)
+    const deferralRows = [
+      ...DEFERRAL_FIELDS.map((field) => {
+        const count = Number(deferralForm[field.key] || 0)
+        return `<tr><td>${escapeHtml(field.label)}</td><td class="num">${count}</td></tr>`
+      }),
+      ...customDeferralFields.map((field) => {
+        const count = Number(deferralForm[field.key] || 0)
+        const label = String(field.label || '').trim() || field.key
+        return `<tr><td>${escapeHtml(label)}</td><td class="num">${count}</td></tr>`
+      }),
+    ].join('')
+    const deferralTotal = deferralCountTotal
 
     const printHtml = `
       <!doctype html>
@@ -694,6 +875,7 @@ function AdminMbd() {
                 <th>BARCODE</th>
                 <th>BT</th>
                 <th>Contact No.</th>
+                <th>ID</th>
                 <th>AGE</th>
                 <th>SEX</th>
                 <th>Successful</th>
@@ -702,7 +884,7 @@ function AdminMbd() {
               </tr>
             </thead>
             <tbody>
-              ${donorRows || '<tr><td colspan="9" style="text-align:center">No donor records.</td></tr>'}
+              ${donorRows || '<tr><td colspan="10" style="text-align:center">No donor records.</td></tr>'}
             </tbody>
           </table>
         </body>
@@ -977,13 +1159,25 @@ function AdminMbd() {
                   </div>
                   <div>
                     <label className={labelCls} htmlFor="donor-num">
-                      Donor number
+                      Contact number
                     </label>
                     <input
                       id="donor-num"
                       className={inputCls}
                       value={donorForm.donorNumber}
                       onChange={(ev) => setDonorForm((f) => ({ ...f, donorNumber: ev.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="donor-id">
+                      ID
+                    </label>
+                    <input
+                      id="donor-id"
+                      className={inputCls}
+                      value={donorForm.assignedDonorId}
+                      onChange={(ev) => setDonorForm((f) => ({ ...f, assignedDonorId: ev.target.value }))}
+                      placeholder="Unique donor ID"
                     />
                   </div>
                   <div>
@@ -1131,8 +1325,7 @@ function AdminMbd() {
                     </p>
                   </div>
                   <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700">
-                    Total Deferrals:{' '}
-                    {DEFERRAL_FIELDS.reduce((sum, field) => sum + Number(deferralForm[field.key] || 0), 0)}
+                    Total Deferrals: {deferralCountTotal}
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1156,6 +1349,55 @@ function AdminMbd() {
                       />
                     </div>
                   ))}
+                  {customDeferralFields.map((field) => (
+                    <div key={field.key}>
+                      <div className="flex items-start justify-between gap-1">
+                        <label className={labelCls} htmlFor={`deferral-${field.key}`}>
+                          {field.label}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeCustomDeferralField(field.key)}
+                          className="-mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-red-600"
+                          aria-label={`Remove ${field.label}`}
+                          title="Remove"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <input
+                        id={`deferral-${field.key}`}
+                        type="number"
+                        min={0}
+                        className={inputCls}
+                        value={deferralForm[field.key] || '0'}
+                        onChange={(ev) =>
+                          setDeferralForm((prev) => ({
+                            ...prev,
+                            [field.key]: toDigits(ev.target.value),
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                  <div className="flex flex-col justify-end">
+                    <span className={`${labelCls} invisible`} aria-hidden="true">
+                      Add
+                    </span>
+                    <button
+                      type="button"
+                      onClick={openCustomDeferralModal}
+                      className={`${inputCls} !mt-1 flex items-center justify-center text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700`}
+                      aria-label="Add medical condition"
+                      title="Add medical condition"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
@@ -1186,7 +1428,8 @@ function AdminMbd() {
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Name</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Barcode</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Type</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">No.</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Contact</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">ID</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Age</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Gender</th>
                       <th className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-600">Bag</th>
@@ -1198,14 +1441,14 @@ function AdminMbd() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {donorsLoading && (
                       <tr>
-                        <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
+                        <td colSpan={11} className="px-3 py-8 text-center text-slate-500">
                           Loading donors…
                         </td>
                       </tr>
                     )}
                     {!donorsLoading && donors.length === 0 && (
                       <tr>
-                        <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
+                        <td colSpan={11} className="px-3 py-8 text-center text-slate-500">
                           No donors recorded yet for this MBD.
                         </td>
                       </tr>
@@ -1217,6 +1460,7 @@ function AdminMbd() {
                           <td className="px-3 py-2 text-slate-700">{d.barcode || '—'}</td>
                           <td className="px-3 py-2 text-slate-700">{d.blood_type}</td>
                           <td className="px-3 py-2 text-slate-700">{d.donor_number || '—'}</td>
+                          <td className="px-3 py-2 text-slate-700">{d.assigned_donor_id || '—'}</td>
                           <td className="px-3 py-2 text-slate-700">{d.age != null ? d.age : '—'}</td>
                           <td className="px-3 py-2 text-slate-700">{d.gender || '—'}</td>
                           <td className="px-3 py-2 text-slate-700">{d.bag_type || '—'}</td>
@@ -1258,6 +1502,13 @@ function AdminMbd() {
           </div>
         </div>
       )}
+      <CustomDeferralNameModal
+        open={customDeferralModalOpen}
+        value={customDeferralNameDraft}
+        onChange={setCustomDeferralNameDraft}
+        onConfirm={confirmAddCustomDeferral}
+        onCancel={closeCustomDeferralModal}
+      />
       <ConfirmModal
         open={deleteConfirmOpen}
         title="Delete donor record?"
