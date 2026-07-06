@@ -100,10 +100,23 @@ function typeBadgeClasses(type) {
   return 'bg-slate-100 text-slate-700 ring-slate-200'
 }
 
+function postCategoryBadgeClasses(category) {
+  if (category === 'top_donors') return 'bg-rose-100 text-rose-800 ring-rose-200'
+  if (category === 'top_organizers') return 'bg-violet-100 text-violet-800 ring-violet-200'
+  if (category === 'top_municipality') return 'bg-sky-100 text-sky-800 ring-sky-200'
+  return 'bg-slate-100 text-slate-700 ring-slate-200'
+}
+
 function statusBadgeClasses(status) {
   if (status === 'ongoing') return 'bg-emerald-100 text-emerald-800 ring-emerald-200'
   if (status === 'completed') return 'bg-slate-100 text-slate-600 ring-slate-200'
   return 'bg-sky-100 text-sky-800 ring-sky-200'
+}
+
+function publishedBadgeClasses(isPublished) {
+  return isPublished
+    ? 'bg-emerald-100 text-emerald-800 ring-emerald-200'
+    : 'bg-amber-100 text-amber-800 ring-amber-200'
 }
 
 const emptyForm = () => ({
@@ -119,6 +132,7 @@ const emptyPostForm = () => ({
   title: '',
   body: '',
   isPublished: true,
+  imageUrls: [],
 })
 
 function AdminAnnouncements() {
@@ -281,6 +295,24 @@ function AdminAnnouncements() {
     resetPostForm()
   }
 
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    files.forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        setPostForm((f) => ({ ...f, imageUrls: [...f.imageUrls, ev.target.result] }))
+      }
+      reader.readAsDataURL(file)
+    })
+    // Reset input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  const removeImage = (idx) => {
+    setPostForm((f) => ({ ...f, imageUrls: f.imageUrls.filter((_, i) => i !== idx) }))
+  }
+
   const submitPost = async (e) => {
     e.preventDefault()
     if (!postForm.title.trim() || !postForm.body.trim()) {
@@ -293,6 +325,7 @@ function AdminAnnouncements() {
         title: postForm.title.trim(),
         body: postForm.body,
         isPublished: postForm.isPublished,
+        imageUrls: postForm.imageUrls,
       }
       if (editingPost) {
         await apiRequest(`/api/admin/home-posts/${editingPost.id}`, {
@@ -323,6 +356,7 @@ function AdminAnnouncements() {
       title: post.title || '',
       body: post.body || '',
       isPublished: !!post.is_published,
+      imageUrls: Array.isArray(post.image_urls) ? post.image_urls : [],
     })
     setPostModalOpen(true)
   }
@@ -363,7 +397,19 @@ function AdminAnnouncements() {
               <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Add MBD
+              Create Schedule
+            </button>
+          )}
+          {activeSection === 'post' && (
+            <button
+              type="button"
+              onClick={openCreatePost}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 sm:w-auto"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Post
             </button>
           )}
         </div>
@@ -385,7 +431,7 @@ function AdminAnnouncements() {
                   : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'
               }`}
             >
-              MBD
+              MBD Schedule
             </button>
             <button
               type="button"
@@ -557,81 +603,102 @@ function AdminAnnouncements() {
           </div>
         )}
 
-        {activeSection === 'post' && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold tracking-tight text-slate-900">Post</h3>
-              <span className="text-xs font-medium text-slate-500">
-                {posts.length} item{posts.length === 1 ? '' : 's'}
-              </span>
+        {activeSection === 'post' && postError && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{postError}</div>
+        )}
+
+        {activeSection === 'post' && !postError && posts.length === 0 && (
+          <div className={adminPanel.amber.outer}>
+            <div className="px-4 py-14 text-center sm:px-6">
+              <p className="text-sm font-medium text-slate-600">No posts yet.</p>
+              <p className="mt-1 text-sm text-slate-500">Create one to publish rankings and highlights on the home page.</p>
             </div>
+          </div>
+        )}
 
-            {postError && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{postError}</div>
-            )}
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900">Post Management</h4>
-                  <p className="mt-1 text-xs text-slate-500">Create and publish homepage ranking posts from a modal form.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={openCreatePost}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-                >
-                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Post
-                </button>
+        {activeSection === 'post' && !postError && posts.length > 0 && (
+          <div className="space-y-8">
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold tracking-tight text-slate-900">Post</h3>
+                <span className="text-xs font-medium text-slate-500">
+                  {posts.length} item{posts.length === 1 ? '' : 's'}
+                </span>
               </div>
-            </div>
-
-            {posts.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 shadow-sm">
-                No posts yet.
-              </div>
-            ) : (
-              <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                 {posts.map((post) => (
-                  <li key={post.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-700">
-                        {postCategoryLabel(post.category)}
-                      </span>
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                          post.is_published ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {post.is_published ? 'Published' : 'Draft'}
-                      </span>
-                    </div>
-                    <h4 className="mt-3 text-base font-semibold text-slate-900">{post.title}</h4>
-                    <p className="mt-2 line-clamp-5 whitespace-pre-line text-sm text-slate-600">{post.body}</p>
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditPost(post)}
-                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removePost(post)}
-                        className="rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
+                  <li
+                    key={post.id}
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90 transition hover:shadow-lg hover:ring-slate-200/90"
+                  >
+                    <div className="relative flex flex-1 flex-col bg-white px-5 pb-5 pt-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1 ${publishedBadgeClasses(
+                                post.is_published,
+                              )}`}
+                            >
+                              {post.is_published ? 'Published' : 'Draft'}
+                            </span>
+                          </div>
+                          <h3 className="mt-3 text-base font-bold leading-snug tracking-tight text-slate-900">
+                            {post.title}
+                          </h3>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditPost(post)}
+                            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removePost(post)}
+                            className="rounded-xl border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      {post.body ? (
+                        <p className="mt-3 line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-slate-500">
+                          {post.body}
+                        </p>
+                      ) : (
+                        <p className="mt-3 text-xs italic text-slate-400">No content</p>
+                      )}
+
+                      <div className="mt-5 border-t border-slate-100/90 pt-4">
+                        <div className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/90 p-3 ring-1 ring-slate-100/80">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200/60">
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.75}
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Last updated</p>
+                            <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                              {formatEventDisplay(post.updated_at || post.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
+            </section>
+          </div>
         )}
 
       </div>
@@ -814,7 +881,7 @@ function AdminAnnouncements() {
       )}
 
       {postModalOpen && (
-        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
           <button
             type="button"
             className="absolute inset-0 cursor-default"
@@ -827,7 +894,11 @@ function AdminAnnouncements() {
             aria-modal="true"
             aria-labelledby="post-modal-title"
           >
+            <div className="flex justify-center pt-3 sm:hidden" aria-hidden="true">
+              <span className="h-1 w-10 rounded-full bg-slate-200" />
+            </div>
             <div className="relative overflow-hidden bg-gradient-to-br from-red-600 via-red-600 to-rose-800 px-5 pb-6 pt-4 sm:rounded-t-3xl sm:pt-5">
+              <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.06\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/svg%3E')] opacity-90" />
               <div className="relative flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wider text-red-100">
@@ -837,7 +908,9 @@ function AdminAnnouncements() {
                     {editingPost ? 'Edit post' : 'Create post'}
                   </h3>
                   <p className="mt-1 max-w-sm text-sm text-red-100/95">
-                    Publish Top Donors, Organizers, or Municipality to show on home page.
+                    {editingPost
+                      ? 'Changes apply immediately on the home page when published.'
+                      : 'Publish rankings and highlights for donors on the landing page.'}
                   </p>
                 </div>
                 <button
@@ -853,42 +926,102 @@ function AdminAnnouncements() {
                 </button>
               </div>
             </div>
-              <form className="space-y-3 overflow-y-auto bg-slate-50/40 px-4 py-5 sm:px-6" onSubmit={submitPost}>
-              <div>
-                <label htmlFor="post-title" className="block text-xs font-semibold text-slate-700">
-                  Title
-                </label>
-                <input
-                  id="post-title"
-                  value={postForm.title}
-                  onChange={(e) => setPostForm((f) => ({ ...f, title: e.target.value }))}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  placeholder="e.g. Top 10 Donors - April 2026"
-                />
+            <form onSubmit={submitPost} className="flex min-h-0 flex-1 flex-col bg-slate-50/40">
+              <div className="space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ring-1 ring-slate-100/80">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Content</p>
+                  <div className="mt-3 space-y-4">
+                    <div>
+                      <label htmlFor="post-title" className="block text-sm font-semibold text-slate-800">
+                        Title <span className="font-normal text-red-600">*</span>
+                      </label>
+                      <input
+                        id="post-title"
+                        required
+                        value={postForm.title}
+                        onChange={(e) => setPostForm((f) => ({ ...f, title: e.target.value }))}
+                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                        placeholder="e.g. Top 10 Donors - April 2026"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="post-body" className="block text-sm font-semibold text-slate-800">
+                        Content <span className="font-normal text-red-600">*</span>
+                      </label>
+                      <textarea
+                        id="post-body"
+                        required
+                        rows={8}
+                        value={postForm.body}
+                        onChange={(e) => setPostForm((f) => ({ ...f, body: e.target.value }))}
+                        className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm leading-relaxed text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                        placeholder="1. Name - value&#10;2. Name - value&#10;..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Image Upload */}
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ring-1 ring-slate-100/80">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Images</p>
+                  <p className="mt-1 text-xs text-slate-500">Upload images that will appear as the card cover on the landing page.</p>
+                  <label
+                    htmlFor="post-images"
+                    className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 py-6 text-center transition hover:border-red-300 hover:bg-red-50/30"
+                  >
+                    <svg className="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs font-semibold text-slate-600">Click to upload images</span>
+                    <span className="text-[11px] text-slate-400">PNG, JPG, GIF, WEBP — multiple allowed</span>
+                    <input
+                      id="post-images"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="sr-only"
+                      onChange={handleImageUpload}
+                    />
+                  </label>
+
+                  {postForm.imageUrls.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {postForm.imageUrls.map((url, idx) => (
+                        <div key={idx} className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                          <img src={url} alt={`Image ${idx + 1}`} className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(idx)}
+                            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition hover:bg-red-600 group-hover:opacity-100"
+                            aria-label="Remove image"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ring-1 ring-slate-100/80">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Visibility</p>
+                  <label className="mt-3 inline-flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={postForm.isPublished}
+                      onChange={(e) => setPostForm((f) => ({ ...f, isPublished: e.target.checked }))}
+                      className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                    />
+                    <span className="font-medium text-slate-800">Publish on home page</span>
+                  </label>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                    Unpublished posts stay as drafts and are hidden from the public home page.
+                  </p>
+                </div>
               </div>
-              <div>
-                <label htmlFor="post-body" className="block text-xs font-semibold text-slate-700">
-                  Content
-                </label>
-                <textarea
-                  id="post-body"
-                  rows={8}
-                  value={postForm.body}
-                  onChange={(e) => setPostForm((f) => ({ ...f, body: e.target.value }))}
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  placeholder="1. Name - value&#10;2. Name - value&#10;..."
-                />
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={postForm.isPublished}
-                  onChange={(e) => setPostForm((f) => ({ ...f, isPublished: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                />
-                Publish on home page
-              </label>
-              <div className="flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-white px-0 py-4 sm:flex-row sm:justify-end sm:gap-3">
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-white px-4 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
                 <button
                   type="button"
                   onClick={closePostModal}
@@ -902,7 +1035,7 @@ function AdminAnnouncements() {
                   disabled={savingPost}
                   className="min-h-11 rounded-2xl bg-red-600 px-5 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700 disabled:opacity-60"
                 >
-                  {savingPost ? 'Saving…' : editingPost ? 'Save post' : 'Publish post'}
+                  {savingPost ? 'Saving…' : editingPost ? 'Save changes' : 'Publish post'}
                 </button>
               </div>
             </form>

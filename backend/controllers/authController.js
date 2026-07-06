@@ -4,6 +4,7 @@ const { OAuth2Client } = require('google-auth-library')
 
 const {
   findUserByIdentifier,
+  findDonorByAssignedId,
   findUserByEmail,
   isUsernameTaken,
   isUsernameTakenByOtherUser,
@@ -53,14 +54,19 @@ async function login(req, res, next) {
   const identifier = String(req.body.identifier || '').trim()
 
   try {
-    const user = await findUserByIdentifier(identifier)
+    const normalizedRole = role === 'recipient' ? 'donor' : role
+    const isDonorIdLogin =
+      (loginMode === 'id' || loginMode === 'phone') && normalizedRole === 'donor'
+
+    const user = isDonorIdLogin
+      ? await findDonorByAssignedId(identifier)
+      : await findUserByIdentifier(identifier)
     if (!user) {
-      const error = new Error('Invalid credentials')
+      const error = new Error(isDonorIdLogin ? 'Invalid donor ID' : 'Invalid credentials')
       error.statusCode = 401
       throw error
     }
 
-    const normalizedRole = role === 'recipient' ? 'donor' : role
     if (normalizedRole) {
       if (normalizedRole === 'admin') {
         if (user.role !== 'admin') {
@@ -87,8 +93,7 @@ async function login(req, res, next) {
       throw error
     }
 
-    const isPhoneOnlyLogin = loginMode === 'phone' && normalizedRole === 'donor'
-    if (!isPhoneOnlyLogin) {
+    if (!isDonorIdLogin) {
       const passwordMatch = await bcrypt.compare(password, user.password_hash)
       if (!passwordMatch) {
         const error = new Error('Invalid credentials')

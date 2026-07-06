@@ -20,6 +20,24 @@ async function findUserByIdentifier(identifier) {
   return rows[0] || null
 }
 
+async function findDonorByAssignedId(assignedDonorId) {
+  const raw = String(assignedDonorId || '').trim()
+  if (!raw) return null
+  const [rows] = await pool.query(
+    `
+    SELECT id, username, email, password_hash, role, full_name, status, phone, blood_type, assigned_donor_id
+    FROM users
+    WHERE role = 'donor'
+      AND assigned_donor_id IS NOT NULL
+      AND TRIM(assigned_donor_id) <> ''
+      AND UPPER(TRIM(assigned_donor_id)) = UPPER(?)
+    LIMIT 1
+  `,
+    [raw],
+  )
+  return rows[0] || null
+}
+
 async function isUsernameTaken(username) {
   const [rows] = await pool.query('SELECT id FROM users WHERE username = ? LIMIT 1', [username])
   return rows.length > 0
@@ -126,6 +144,7 @@ async function updateDonorGoogleProfile({ userId, username, phone, bloodType }) 
 
 module.exports = {
   findUserByIdentifier,
+  findDonorByAssignedId,
   findUserByEmail,
   isUsernameTaken,
   isUsernameTakenByOtherUser,

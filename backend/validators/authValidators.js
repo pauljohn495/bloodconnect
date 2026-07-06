@@ -17,7 +17,7 @@ function validateLogin(req, res, next) {
     })
   }
 
-  if (loginMode && !['default', 'phone'].includes(loginMode)) {
+  if (loginMode && !['default', 'id', 'phone'].includes(loginMode)) {
     return errorResponse(res, {
       statusCode: 400,
       message: 'Invalid login mode',
@@ -25,18 +25,18 @@ function validateLogin(req, res, next) {
   }
 
   const normalizedRole = role === 'recipient' ? 'donor' : role
-  const isPhoneMode = loginMode === 'phone'
-  if (!isPhoneMode && !password) {
+  const isDonorIdMode = loginMode === 'id' || loginMode === 'phone'
+  if (!isDonorIdMode && !password) {
     return errorResponse(res, {
       statusCode: 400,
       message: 'Password is required',
     })
   }
 
-  if (isPhoneMode && normalizedRole && normalizedRole !== 'donor') {
+  if (isDonorIdMode && normalizedRole && normalizedRole !== 'donor') {
     return errorResponse(res, {
       statusCode: 400,
-      message: 'Phone-number-only login is only available for donor/recipient account type',
+      message: 'Donor ID login is only available for donor/recipient account type',
     })
   }
 

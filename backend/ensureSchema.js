@@ -303,6 +303,12 @@ async function ensureHomePostsTable() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
   console.log('Schema: ensured home_posts table')
+
+  // Add image_urls column for storing JSON array of base64 image data URLs
+  if (!(await columnExists('home_posts', 'image_urls'))) {
+    await pool.query('ALTER TABLE home_posts ADD COLUMN image_urls LONGTEXT NULL AFTER body')
+    console.log('Schema: added home_posts.image_urls')
+  }
 }
 
 /** Mobile blood donation (MBD) events and per-drive donor intake records (admin-managed). */

@@ -96,20 +96,16 @@ function UserDashboard() {
           return
         }
 
-        // Determine overall status from eligibility (if available)
+        // Determine overall status from whole blood eligibility (if available)
         const overallStatus = (() => {
           if (!eligibilityData) return 'Available'
-          const types = ['whole_blood', 'platelets', 'plasma']
+          const info = eligibilityData.whole_blood
+          if (!info) return 'Available'
           const now = Date.now()
-          const anyEligible = types.some((t) => {
-            const info = eligibilityData[t]
-            if (!info) return true
-            const serverEligible = info.isEligible
-            const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
-            const locallyEligible = serverEligible || (nextEligibleAt && nextEligibleAt <= now)
-            return locallyEligible
-          })
-          return anyEligible ? 'Available' : 'Ineligible'
+          const serverEligible = info.isEligible
+          const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
+          const locallyEligible = serverEligible || (nextEligibleAt && nextEligibleAt <= now)
+          return locallyEligible ? 'Available' : 'Ineligible'
         })()
 
         const donationCount = (donations || []).length
@@ -376,6 +372,19 @@ function UserDashboard() {
     return 'Less than 1 hour'
   }
 
+  const wholeBloodEligibility = (() => {
+    const info = eligibility?.whole_blood
+    const isEligible = (() => {
+      if (!info) return true
+      const serverEligible = info.isEligible
+      const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
+      return serverEligible || (nextEligibleAt && nextEligibleAt <= nowTs)
+    })()
+    const nextEligibleAt = info?.nextEligibleAt || null
+    const remaining = nextEligibleAt ? formatCooldownRemaining(nextEligibleAt) : null
+    return { isEligible, nextEligibleAt, remaining }
+  })()
+
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('role')
@@ -613,7 +622,7 @@ function UserDashboard() {
         )}
         <div className="mx-auto w-full max-w-4xl space-y-8 px-3 sm:px-6 lg:px-8">
         {/* Hero Section - Statistic Cards */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Blood Type Card */}
           <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90">
             <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -641,63 +650,36 @@ function UserDashboard() {
               {userData.totalDonations === 1 ? 'donation so far' : 'donations so far'}
             </p>
           </div>
-        </section>
 
-        {/* Donation Eligibility Section (per component type) */}
-        <section className="mb-8">
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Blood request eligibility</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  See which blood components you can request to schedule today
-                </p>
-              </div>
+          {/* Whole Blood Eligibility Card */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm ring-1 ring-slate-100/90 sm:col-span-2 lg:col-span-1">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Whole Blood Eligibility
+            </p>
+            <div className="mt-2">
+              {isLoading ? (
+                <span className="text-lg font-semibold text-slate-400">—</span>
+              ) : (
+                <span
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ring-1 ${
+                    wholeBloodEligibility.isEligible
+                      ? 'bg-green-100 text-green-700 ring-green-200'
+                      : 'bg-amber-100 text-amber-700 ring-amber-200'
+                  }`}
+                >
+                  {wholeBloodEligibility.isEligible ? 'Eligible now' : 'In cooldown'}
+                </span>
+              )}
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {['whole_blood', 'platelets', 'plasma'].map((type) => {
-                const info = eligibility?.[type]
-                const label =
-                  type === 'whole_blood' ? 'Whole Blood' : type === 'platelets' ? 'Platelets' : 'Plasma'
-                const isEligible = (() => {
-                  if (!info) return true
-                  const serverEligible = info.isEligible
-                  const nextEligibleAt = info.nextEligibleAt ? new Date(info.nextEligibleAt).getTime() : null
-                  return serverEligible || (nextEligibleAt && nextEligibleAt <= nowTs)
-                })()
-                const nextEligibleAt = info?.nextEligibleAt || null
-                const remaining = nextEligibleAt ? formatCooldownRemaining(nextEligibleAt) : null
-                const statusLabel = isEligible ? 'Eligible now' : 'In cooldown'
-                const statusColor = isEligible
-                  ? 'bg-green-100 text-green-700 ring-green-200'
-                  : 'bg-amber-100 text-amber-700 ring-amber-200'
-
-                return (
-                  <div
-                    key={type}
-                    className="rounded-xl border border-slate-100 bg-slate-50 p-4"
-                  >
-                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                      {label}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${statusColor}`}
-                      >
-                        {statusLabel}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
-                      {isEligible
-                        ? 'You can request this blood component now.'
-                        : nextEligibleAt
-                          ? `Available on ${new Date(nextEligibleAt).toLocaleDateString()} (${remaining}).`
-                          : 'Cooldown information unavailable.'}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              {isLoading
+                ? 'Checking eligibility…'
+                : wholeBloodEligibility.isEligible
+                  ? 'You can schedule a whole blood donation request today.'
+                  : wholeBloodEligibility.nextEligibleAt
+                    ? `Available ${new Date(wholeBloodEligibility.nextEligibleAt).toLocaleDateString()}${wholeBloodEligibility.remaining ? ` (${wholeBloodEligibility.remaining})` : ''}.`
+                    : 'Cooldown information unavailable.'}
+            </p>
           </div>
         </section>
 

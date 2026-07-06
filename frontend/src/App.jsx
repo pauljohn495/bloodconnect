@@ -22,6 +22,7 @@ import GoogleDonorProfileSetup from './user/google-donor-profile-setup.jsx'
 import AdminFeatureSettings from './admin/admin-feature-settings.jsx'
 import ModuleUnavailable from './ModuleUnavailable.jsx'
 import SuperadminLogin from './admin/superadmin-login.jsx'
+import Rankings from './rankings.jsx'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <FeatureRouteGuard>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/rankings" element={<Rankings />} />
             <Route path="/superadmin/login" element={<SuperadminLogin />} />
             <Route path="/register" element={<DonorRegistration />} />
             <Route path="/complete-google-donor-profile" element={<GoogleDonorProfileSetup />} />

@@ -2,11 +2,27 @@ const { pool } = require('../db')
 
 const ALLOWED_CATEGORIES = new Set(['top_donors', 'top_organizers', 'top_municipality'])
 
+/**
+ * Parse image_urls from DB (stored as JSON array string or null).
+ * Returns an array of data URL strings.
+ */
+function parseImageUrls(raw) {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 const mapPost = (row) => ({
   id: row.id,
   category: row.category,
   title: row.title,
   body: row.body,
+  image_urls: parseImageUrls(row.image_urls),
   is_published: !!row.is_published,
   created_at: row.created_at,
   updated_at: row.updated_at,
@@ -16,7 +32,7 @@ const getHomePostsController = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT id, category, title, body, is_published, created_at, updated_at
+      SELECT id, category, title, body, image_urls, is_published, created_at, updated_at
       FROM home_posts
       ORDER BY FIELD(category, 'top_donors', 'top_organizers', 'top_municipality'), updated_at DESC
     `,
@@ -38,20 +54,25 @@ const createHomePostController = async (req, res) => {
   const body = String(req.body?.body || '')
   const isPublished = req.body?.isPublished ? 1 : 0
 
+  // imageUrls: array of base64 data URL strings
+  const imageUrlsRaw = req.body?.imageUrls
+  const imageUrls = Array.isArray(imageUrlsRaw) ? imageUrlsRaw : []
+  const imageUrlsJson = imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
+
   if (!title) return res.status(400).json({ message: 'title is required' })
   if (!body.trim()) return res.status(400).json({ message: 'body is required' })
 
   try {
     const [result] = await pool.query(
       `
-      INSERT INTO home_posts (category, title, body, is_published)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO home_posts (category, title, body, image_urls, is_published)
+      VALUES (?, ?, ?, ?, ?)
     `,
-      [category, title, body, isPublished],
+      [category, title, body, imageUrlsJson, isPublished],
     )
     const [rows] = await pool.query(
       `
-      SELECT id, category, title, body, is_published, created_at, updated_at
+      SELECT id, category, title, body, image_urls, is_published, created_at, updated_at
       FROM home_posts
       WHERE id = ?
     `,
@@ -94,6 +115,12 @@ const updateHomePostController = async (req, res) => {
     values.push(body)
   }
 
+  if (req.body?.imageUrls !== undefined) {
+    const imageUrls = Array.isArray(req.body.imageUrls) ? req.body.imageUrls : []
+    fields.push('image_urls = ?')
+    values.push(imageUrls.length > 0 ? JSON.stringify(imageUrls) : null)
+  }
+
   if (req.body?.isPublished !== undefined) {
     fields.push('is_published = ?')
     values.push(req.body.isPublished ? 1 : 0)
@@ -110,7 +137,7 @@ const updateHomePostController = async (req, res) => {
     if (!result.affectedRows) return res.status(404).json({ message: 'Post not found' })
     const [rows] = await pool.query(
       `
-      SELECT id, category, title, body, is_published, created_at, updated_at
+      SELECT id, category, title, body, image_urls, is_published, created_at, updated_at
       FROM home_posts
       WHERE id = ?
     `,
@@ -139,13 +166,17 @@ const deleteHomePostController = async (req, res) => {
 
 const getPublicHomePostsController = async (req, res) => {
   try {
+    // Return up to 6 most recent published posts for the landing page
+    const limit = Math.min(Number(req.query?.limit) || 6, 20)
     const [rows] = await pool.query(
       `
-      SELECT id, category, title, body, is_published, created_at, updated_at
+      SELECT id, category, title, body, image_urls, is_published, created_at, updated_at
       FROM home_posts
       WHERE is_published = 1
-      ORDER BY FIELD(category, 'top_donors', 'top_organizers', 'top_municipality'), updated_at DESC
+      ORDER BY created_at DESC
+      LIMIT ?
     `,
+      [limit],
     )
     return res.json(rows.map(mapPost))
   } catch (error) {

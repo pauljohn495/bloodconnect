@@ -20,6 +20,10 @@ const {
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const { getPublicHomePostsController } = require('./controllers/adminHomePostController')
 const { getPublicFeatureFlagsController } = require('./controllers/featureFlagController')
+const {
+  getDonorDonationRankingController,
+  getOrganizationDonationRankingController,
+} = require('./controllers/adminDonationRankingController')
 const authRoutes = require('./routes/authRoutes')
 const adminRoutes = require('./routes/adminRoutes')
 const hospitalRoutes = require('./routes/hospitalRoutes')
@@ -61,7 +65,7 @@ app.use(
     },
   }),
 )
-app.use(express.json({ limit: '8mb' }))
+app.use(express.json({ limit: '16mb' }))
 
 // Simple health check
 app.get('/api/health', async (req, res) => {
@@ -83,6 +87,8 @@ app.get('/api/health', async (req, res) => {
 // Public announcements (donors / landing — no auth)
 app.get('/api/announcements', getPublicAnnouncementsController)
 app.get('/api/home-posts', getPublicHomePostsController)
+app.get('/api/rankings/donors', getDonorDonationRankingController)
+app.get('/api/rankings/organizations', getOrganizationDonationRankingController)
 
 // Effective feature flags for all portals (no auth; safe visibility only)
 app.get('/api/feature-flags', getPublicFeatureFlagsController)
