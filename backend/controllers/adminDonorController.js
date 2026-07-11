@@ -20,6 +20,36 @@ const getDonorsController = async (req, res) => {
   }
 }
 
+const searchDonorsController = async (req, res) => {
+  const q = String(req.query.q || '').trim()
+  if (!q || q.length < 1) {
+    return res.json([])
+  }
+  try {
+    const pattern = `%${q}%`
+    const [rows] = await pool.query(
+      `
+      SELECT id, full_name, phone, barcode, assigned_donor_id, blood_type, email, username
+      FROM users
+      WHERE role = 'donor'
+        AND (
+          full_name LIKE ?
+          OR barcode LIKE ?
+          OR phone LIKE ?
+          OR assigned_donor_id LIKE ?
+        )
+      ORDER BY full_name ASC
+      LIMIT 10
+      `,
+      [pattern, pattern, pattern, pattern],
+    )
+    res.json(rows)
+  } catch (error) {
+    console.error('Search donors error:', error)
+    res.status(500).json({ message: 'Failed to search donors' })
+  }
+}
+
 const createDonorController = async (req, res) => {
   const { donorName, bloodType, contactPhone, contactEmail, username, password, barcode } = req.body
 
@@ -626,6 +656,7 @@ const recordWalkInDonationController = async (req, res) => {
 
 module.exports = {
   getDonorsController,
+  searchDonorsController,
   createDonorController,
   getDonorDetailsController,
   updateDonorController,

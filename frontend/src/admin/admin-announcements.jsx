@@ -480,7 +480,7 @@ function AdminAnnouncements() {
                   No MBD announcements yet.
                 </div>
               ) : (
-                <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                   {mbdItems.map((a) => {
                     const urgent = a.announcement_type === 'urgent_need'
                     return (

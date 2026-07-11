@@ -3,6 +3,172 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
 
+// ── Donor Name Autocomplete Component ────────────────────────────────────────
+function DonorNameAutocomplete({ value, onChange, onSelectUser, inputCls, labelCls }) {
+  const [query, setQuery] = useState(value || '')
+  const [results, setResults] = useState([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const debounceRef = useRef(null)
+  const wrapperRef = useRef(null)
+  const inputRef = useRef(null)
+
+  // Sync if parent resets value to ''
+  useEffect(() => {
+    if (!value) {
+      setQuery('')
+      setSelectedUser(null)
+      setResults([])
+      setOpen(false)
+    }
+  }, [value])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const handleInputChange = (e) => {
+    const val = e.target.value
+    setQuery(val)
+    onChange(val)
+    setSelectedUser(null)
+    setOpen(false)
+    setResults([])
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!val.trim() || val.trim().length < 1) return
+
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const data = await apiRequest(`/api/admin/donors/search?q=${encodeURIComponent(val.trim())}`)
+        setResults(Array.isArray(data) ? data : [])
+        setOpen(true)
+      } catch {
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
+    }, 280)
+  }
+
+  const handleSelect = (user) => {
+    setQuery(user.full_name || '')
+    setSelectedUser(user)
+    setOpen(false)
+    setResults([])
+    onChange(user.full_name || '')
+    onSelectUser(user)
+  }
+
+  const handleClear = () => {
+    setQuery('')
+    setSelectedUser(null)
+    setResults([])
+    setOpen(false)
+    onChange('')
+    onSelectUser(null)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') setOpen(false)
+    // Prevent Enter from submitting the parent form while typing in the search field
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          id="donor-name"
+          className={inputCls}
+          value={query}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => { if (results.length > 0) setOpen(true) }}
+          autoComplete="off"
+          placeholder="Type name to search existing donors…"
+          required
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+        />
+        {loading && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2">
+            <svg className="h-4 w-4 animate-spin text-red-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </span>
+        )}
+      </div>
+
+      {selectedUser && (
+        <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+          <svg className="h-3.5 w-3.5 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="flex-1 text-xs font-medium text-emerald-800">
+            Linked to existing user
+            {selectedUser.phone ? ` · ${selectedUser.phone}` : ''}
+            {selectedUser.blood_type ? ` · ${selectedUser.blood_type}` : ''}
+          </span>
+          <button
+            type="button"
+            onClick={handleClear}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {open && results.length > 0 && (
+        <ul
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-100"
+        >
+          {results.map((user) => (
+            <li
+              key={user.id}
+              role="option"
+              aria-selected={false}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(user) }}
+              className="flex cursor-pointer flex-col gap-0.5 border-b border-slate-100 px-3 py-2.5 last:border-0 hover:bg-red-50"
+            >
+              <span className="font-semibold text-slate-900 text-sm">{user.full_name}</span>
+              <span className="text-[11px] text-slate-500">
+                {[user.phone, user.blood_type, user.barcode && `Barcode: ${user.barcode}`, user.assigned_donor_id && `ID: ${user.assigned_donor_id}`]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {open && !loading && results.length === 0 && query.trim().length >= 1 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-center text-xs text-slate-500 shadow-xl">
+          No existing donors found. You can enter details manually.
+        </div>
+      )}
+    </div>
+  )
+}
+
 const DONOR_BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
 const SUMMARY_BLOOD_TYPES = ['A', 'B', 'O', 'AB']
 
@@ -316,6 +482,8 @@ function AdminMbd() {
   const [notification, setNotification] = useState(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteMbdEventConfirmOpen, setDeleteMbdEventConfirmOpen] = useState(false)
+  const [deleteMbdEventTarget, setDeleteMbdEventTarget] = useState(null)
 
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
@@ -632,6 +800,23 @@ function AdminMbd() {
       showNotification(err.message || 'Could not add listed donors to donor list', 'destructive')
     } finally {
       setTransferAllLoading(false)
+    }
+  }
+
+  const handleDeleteMbdEvent = async () => {
+    if (!deleteMbdEventTarget) {
+      setDeleteMbdEventConfirmOpen(false)
+      return
+    }
+    try {
+      await apiRequest(`/api/admin/mbd-events/${deleteMbdEventTarget.id}`, { method: 'DELETE' })
+      showNotification(`MBD event "${deleteMbdEventTarget.name}" deleted.`, 'primary')
+      await loadEvents()
+    } catch (err) {
+      showNotification(err.message || 'Could not delete MBD event', 'destructive')
+    } finally {
+      setDeleteMbdEventConfirmOpen(false)
+      setDeleteMbdEventTarget(null)
     }
   }
 
@@ -1015,19 +1200,20 @@ function AdminMbd() {
                 <th className={`${p.th} px-4 py-3`}>Date</th>
                 <th className={`${p.th} px-4 py-3`}>Location</th>
                 <th className={`${p.th} px-4 py-3 text-right`}>Donors</th>
+                <th className={`${p.th} px-4 py-3 text-right`}>Actions</th>
               </tr>
             </thead>
             <tbody className={p.tbody}>
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && events.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                     No MBD events yet. Create one above.
                   </td>
                 </tr>
@@ -1056,6 +1242,23 @@ function AdminMbd() {
                       {row.location}
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-slate-800">{row.donor_count ?? 0}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          setDeleteMbdEventTarget(row)
+                          setDeleteMbdEventConfirmOpen(true)
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:text-red-800"
+                        title={`Delete "${row.name}"`}
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
             </tbody>
@@ -1121,12 +1324,57 @@ function AdminMbd() {
                     <label className={labelCls} htmlFor="donor-name">
                       Donor name
                     </label>
-                    <input
-                      id="donor-name"
-                      className={inputCls}
+                    <DonorNameAutocomplete
                       value={donorForm.donorName}
-                      onChange={(ev) => setDonorForm((f) => ({ ...f, donorName: ev.target.value }))}
-                      required
+                      onChange={(val) => setDonorForm((f) => ({ ...f, donorName: val }))}
+                      onSelectUser={(user) => {
+                        if (!user) {
+                          setEditingDonorId(null)
+                          setDonorForm(emptyDonorForm())
+                          return
+                        }
+                        // Check if this user already has an entry in the current MBD donor list.
+                        // If so, switch to edit mode for that record to avoid duplicates.
+                        const existingMbdDonor = donors.find(
+                          (d) =>
+                            String(d.donor_name || '').trim().toLowerCase() ===
+                            String(user.full_name || '').trim().toLowerCase(),
+                        )
+                        if (existingMbdDonor) {
+                          // Enter edit mode for the existing record, then override with fresh user profile data
+                          setEditingDonorId(existingMbdDonor.id)
+                          setDonorForm({
+                            donorName: user.full_name || existingMbdDonor.donor_name || '',
+                            barcode: user.barcode || existingMbdDonor.barcode || '',
+                            bloodType: normalizeDonorBloodType(user.blood_type || existingMbdDonor.blood_type),
+                            donorNumber: user.phone || existingMbdDonor.donor_number || '',
+                            assignedDonorId: user.assigned_donor_id || existingMbdDonor.assigned_donor_id || '',
+                            age: existingMbdDonor.age != null ? String(existingMbdDonor.age) : '',
+                            gender: existingMbdDonor.gender || '',
+                            bagType: normalizeBagGroup(existingMbdDonor.bag_type),
+                            remarksSd: existingMbdDonor.remarks_sd || '',
+                            donationType: Number(existingMbdDonor.num_donations) > 1 ? 'repeater' : 'first_timer',
+                            numDonations: existingMbdDonor.num_donations != null ? String(existingMbdDonor.num_donations) : '1',
+                          })
+                          showNotification(
+                            `"${user.full_name}" is already in the donor list — switched to edit mode.`,
+                            'primary',
+                          )
+                        } else {
+                          // New donor for this event — pre-fill from user profile
+                          setEditingDonorId(null)
+                          setDonorForm((f) => ({
+                            ...f,
+                            donorName: user.full_name || '',
+                            barcode: user.barcode || '',
+                            bloodType: normalizeDonorBloodType(user.blood_type),
+                            donorNumber: user.phone || '',
+                            assignedDonorId: user.assigned_donor_id || '',
+                          }))
+                        }
+                      }}
+                      inputCls={inputCls}
+                      labelCls={labelCls}
                     />
                   </div>
                   <div>
@@ -1508,6 +1756,21 @@ function AdminMbd() {
         onChange={setCustomDeferralNameDraft}
         onConfirm={confirmAddCustomDeferral}
         onCancel={closeCustomDeferralModal}
+      />
+      <ConfirmModal
+        open={deleteMbdEventConfirmOpen}
+        title="Delete MBD event?"
+        message={
+          deleteMbdEventTarget
+            ? `Permanently delete "${deleteMbdEventTarget.name}" and all ${deleteMbdEventTarget.donor_count ?? 0} donor record(s) for this event? This cannot be undone.`
+            : 'Delete this MBD event?'
+        }
+        confirmText="Delete event"
+        onCancel={() => {
+          setDeleteMbdEventConfirmOpen(false)
+          setDeleteMbdEventTarget(null)
+        }}
+        onConfirm={handleDeleteMbdEvent}
       />
       <ConfirmModal
         open={deleteConfirmOpen}

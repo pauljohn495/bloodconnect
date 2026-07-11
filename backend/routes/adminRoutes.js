@@ -15,6 +15,7 @@ const {
 } = require('../validators/adminHospitalValidators')
 const {
   getDonorsController,
+  searchDonorsController,
   createDonorController,
   getDonorDetailsController,
   updateDonorController,
@@ -84,6 +85,7 @@ const {
   createMbdDonorController,
   updateMbdDonorController,
   deleteMbdDonorController,
+  deleteMbdEventController,
   transferMbdDonorToDonorListController,
   getMbdDeferralsController,
   updateMbdDeferralsController,
@@ -131,6 +133,9 @@ router.get('/donors', getDonorsController)
 
 // POST /api/admin/donors - create donor user (admin side)
 router.post('/donors', createDonorController)
+
+// GET /api/admin/donors/search?q=<query> - search donors by name/barcode/phone (must be before /donors/:id)
+router.get('/donors/search', searchDonorsController)
 
 // Donor in-app notification broadcasts (must be before /donors/:id)
 router.post('/donors/notify/preview', previewDonorNotifyController)
@@ -285,6 +290,9 @@ router.get('/mbd-events', listMbdEventsController)
 
 // POST /api/admin/mbd-events
 router.post('/mbd-events', createMbdEventController)
+
+// DELETE /api/admin/mbd-events/:id
+router.delete('/mbd-events/:id', deleteMbdEventController)
 
 // GET /api/admin/mbd-events/:id/donors
 router.get('/mbd-events/:id/donors', listMbdDonorsController)

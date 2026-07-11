@@ -803,6 +803,30 @@ const updateMbdDeferralsController = async (req, res) => {
   }
 }
 
+const deleteMbdEventController = async (req, res) => {
+  const eventId = parseEventId(req)
+  if (!eventId) {
+    return res.status(400).json({ message: 'Invalid MBD event id' })
+  }
+  try {
+    // Delete donor records first (cascade-safe fallback)
+    await pool.query('DELETE FROM mbd_donor_records WHERE mbd_event_id = ?', [eventId])
+    const [result] = await pool.query('DELETE FROM mbd_events WHERE id = ?', [eventId])
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: 'MBD event not found' })
+    }
+    return res.json({ message: 'MBD event deleted' })
+  } catch (error) {
+    if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
+      return res.status(500).json({
+        message: 'MBD tables are missing. Restart the server to run schema migration.',
+      })
+    }
+    console.error('Delete MBD event error:', error)
+    return res.status(500).json({ message: 'Failed to delete MBD event' })
+  }
+}
+
 module.exports = {
   listMbdEventsController,
   createMbdEventController,
@@ -810,6 +834,7 @@ module.exports = {
   createMbdDonorController,
   updateMbdDonorController,
   deleteMbdDonorController,
+  deleteMbdEventController,
   transferMbdDonorToDonorListController,
   getMbdDeferralsController,
   updateMbdDeferralsController,
