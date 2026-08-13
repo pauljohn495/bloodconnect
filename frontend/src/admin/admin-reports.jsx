@@ -4,6 +4,45 @@ import { apiRequest } from '../api.js'
 import { adminReportLoading, adminReportSection, responsiveTableContainer } from './admin-ui.jsx'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 
+function StatusTooltipBadge({ className, tooltip, children }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [position, setPosition] = useState({ top: 0, left: 0 })
+
+  const showTooltip = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    setPosition({
+      top: Math.min(rect.bottom + 8, window.innerHeight - 72),
+      left: Math.min(Math.max(rect.left, 12), window.innerWidth - 292),
+    })
+    setIsOpen(true)
+  }
+
+  return (
+    <>
+      <span
+        tabIndex={0}
+        className={className}
+        onMouseEnter={showTooltip}
+        onMouseLeave={() => setIsOpen(false)}
+        onFocus={showTooltip}
+        onBlur={() => setIsOpen(false)}
+        aria-label={tooltip}
+      >
+        {children}
+      </span>
+      {isOpen && (
+        <span
+          role="tooltip"
+          className="fixed z-[60] w-[280px] rounded-lg bg-slate-900 px-3 py-2 text-left text-[11px] font-medium leading-snug text-white shadow-lg"
+          style={{ top: position.top, left: position.left }}
+        >
+          {tooltip}
+        </span>
+      )}
+    </>
+  )
+}
+
 function AdminReports() {
   const [activeTab, setActiveTab] = useState('prescriptive') // 'prescriptive' | 'predictive'
   const [componentFilter, setComponentFilter] = useState('all') // 'all' | 'whole_blood' | 'platelets' | 'plasma'
@@ -220,12 +259,12 @@ function AdminReports() {
       if (currentStock > 0 && expiringSoonUnits >= currentStock) {
         supplyStatusKey = 'near_expiry_only'
         statusLabel = 'Critical – Near-Expiry Stock'
-        estimatedDaysRemaining = '0.0'
+        estimatedDaysRemaining = '0'
         numericDaysRemaining = 0
       } else if (usage > 0) {
         supplyStatusKey = 'critical_out'
         statusLabel = 'Critical – Out of Stock'
-        estimatedDaysRemaining = '0.0'
+        estimatedDaysRemaining = '0'
         numericDaysRemaining = 0
       } else {
         supplyStatusKey = 'at_risk'
@@ -242,7 +281,7 @@ function AdminReports() {
       const averageDailyUsage = usage / usageWindowDays
       const daysRemaining = usableStock / averageDailyUsage
       numericDaysRemaining = daysRemaining
-      estimatedDaysRemaining = daysRemaining.toFixed(1)
+      estimatedDaysRemaining = String(Math.round(daysRemaining))
       if (daysRemaining < 7) {
         supplyStatusKey = 'critical'
         statusLabel = 'Critical'
@@ -451,6 +490,26 @@ function AdminReports() {
     return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
   }
 
+  const getSupplyStatusTooltip = (supplyStatusKey) => {
+    if (supplyStatusKey === 'critical_out') return 'Critical: no usable stock remains and there has been recent usage.'
+    if (supplyStatusKey === 'near_expiry_only') return 'Critical: all remaining stock expires within 7 days and is treated as unavailable.'
+    if (supplyStatusKey === 'critical') return 'Critical: usable stock is expected to last fewer than 7 days.'
+    if (supplyStatusKey === 'at_risk') return 'At risk: no usable stock remains, but there is no recent usage to calculate a shortage timeline.'
+    if (supplyStatusKey === 'low') return 'Low: usable stock is expected to last from 7 up to 14 days.'
+    if (supplyStatusKey === 'sufficient_no_usage') return 'Sufficient: stock is available, but no fulfilled requests were recorded in the last 30 days.'
+    return 'Sufficient: usable stock is expected to last at least 14 days at the recent usage rate.'
+  }
+
+  const getTrendRiskTooltip = (riskKey) => {
+    if (riskKey === 'high') {
+      return 'High risk: demand is increasing sharply and needs immediate attention.'
+    }
+    if (riskKey === 'moderate') {
+      return 'Moderate risk: demand is increasing or is expected to rise soon. Monitor closely.'
+    }
+    return 'Low risk: demand is stable or decreasing. Continue routine monitoring.'
+  }
+
   const bloodUsageTrendSuggestion = bloodUsageTrendBaseSuggestion
 
   // Donor Availability Prediction (recovery intervals aligned with admin donor details API)
@@ -550,6 +609,16 @@ function AdminReports() {
     if (levelKey === 'high') return 'bg-emerald-50 text-emerald-800 ring-emerald-200'
     if (levelKey === 'moderate') return 'bg-amber-50 text-amber-800 ring-amber-200'
     return 'bg-rose-50 text-rose-800 ring-rose-200'
+  }
+
+  const getDonorAvailabilityTooltip = (levelKey) => {
+    if (levelKey === 'high') {
+      return 'High availability: at least 55% of donors can donate in the selected window, or a sizable group will become eligible.'
+    }
+    if (levelKey === 'moderate') {
+      return 'Moderate availability: at least 30% of donors can donate in the selected window, or a moderate group will become eligible.'
+    }
+    return 'Low availability: fewer donors can donate in the selected window. Consider targeted outreach.'
   }
 
   // Blood Expiry Risk Detection
@@ -1368,13 +1437,14 @@ function AdminReports() {
                                   : `${row.estimatedDaysRemaining} days`}
                             </td>
                             <td className="px-3 py-2 text-xs">
-                              <span
+                              <StatusTooltipBadge
                                 className={`inline-flex max-w-56 items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${getSupplyStatusClasses(
                                   row.supplyStatusKey,
                                 )}`}
+                                tooltip={getSupplyStatusTooltip(row.supplyStatusKey)}
                               >
                                 {row.statusLabel}
-                              </span>
+                              </StatusTooltipBadge>
                             </td>
                           </tr>
                         ))
@@ -1502,17 +1572,18 @@ function AdminReports() {
                                 {Math.round(row.expectedDemandNext7Days)}
                               </td>
                               <td className="px-3 py-2">
-                                <span
+                                <StatusTooltipBadge
                                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${getTrendRiskClasses(
                                     row.demandRiskKey,
                                   )}`}
+                                  tooltip={getTrendRiskTooltip(row.demandRiskKey)}
                                 >
                                   {row.demandRiskKey === 'high'
                                     ? '🔴 High'
                                     : row.demandRiskKey === 'moderate'
                                       ? '🟡 Moderate'
                                       : '🟢 Low'}
-                                </span>
+                                </StatusTooltipBadge>
                               </td>
                             </tr>
                           ))}
@@ -1568,6 +1639,8 @@ function AdminReports() {
                       className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${getDonorAvailabilityClasses(
                         donorAvailabilityLevelKey,
                       )}`}
+                      title={getDonorAvailabilityTooltip(donorAvailabilityLevelKey)}
+                      aria-label={`${donorAvailabilityLabel}. ${getDonorAvailabilityTooltip(donorAvailabilityLevelKey)}`}
                     >
                       {donorAvailabilityLabel}
                     </span>

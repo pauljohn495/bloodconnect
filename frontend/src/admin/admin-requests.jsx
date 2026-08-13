@@ -176,7 +176,7 @@ function AdminRequests() {
                     Hospital
                   </th>
                   <th className={`whitespace-nowrap px-4 py-2 text-left text-xs ${adminPanel.amber.th}`}>
-                    Blood Type
+                    Blood Type / Submission
                   </th>
                   <th className={`whitespace-nowrap px-4 py-2 text-left text-xs ${adminPanel.amber.th}`}>
                     Component Type
@@ -232,6 +232,7 @@ function AdminRequests() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-xs font-semibold text-slate-900">
                         <BloodTypeBadge type={request.blood_type} />
+                        {request.request_group_id && <span className="ml-2 text-[10px] font-medium text-slate-500">Multi-type request</span>}
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 text-xs text-slate-700">
                         {request.component_type === 'whole_blood' ? 'Whole Blood' : request.component_type === 'platelets' ? 'Platelets' : request.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}
@@ -357,7 +358,7 @@ function AdminRequests() {
                       Hospital
                     </th>
                     <th className="whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                      Blood Type
+                      Blood Type / Submission
                     </th>
                     <th className="whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                       Component Type
@@ -388,6 +389,7 @@ function AdminRequests() {
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-slate-900">
                           <BloodTypeBadge type={request.blood_type} />
+                          {request.request_group_id && <span className="ml-2 text-[10px] text-slate-500">Multi-type request</span>}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-700">
                           {request.component_type === 'whole_blood' ? 'Whole Blood' : request.component_type === 'platelets' ? 'Platelets' : request.component_type === 'plasma' ? 'Plasma' : 'Whole Blood'}

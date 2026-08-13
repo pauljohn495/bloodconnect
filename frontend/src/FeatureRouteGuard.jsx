@@ -9,9 +9,6 @@ const EXACT_ALLOWLIST = new Set([
 
 const SUPERADMIN_ALLOWED_PATHS = new Set([
   '/superadmin/feature-settings',
-  '/admin/dashboard',
-  '/admin/users',
-  '/admin/mbd',
 ])
 const SUPERADMIN_HOME = '/superadmin/feature-settings'
 

@@ -13,6 +13,7 @@ const {
 } = require('../models/hospitalModel')
 const { logExpiredInventoryIfMissing } = require('../models/expiredUnitModel')
 const { successResponse, errorResponse } = require('../utils/response')
+const { notifyNewHospitalRequest } = require('../services/eventNotificationService')
 
 async function resolveHospitalIdOrBadRequest(userId, res) {
   const hospitalId = await getHospitalIdForUser(userId)
@@ -167,16 +168,20 @@ async function createRequestHandler(req, res, next) {
     const hospitalId = await resolveHospitalIdOrBadRequest(req.user.id, res)
     if (!hospitalId) return
 
-    const { bloodType, componentType, unitsRequested, notes, priority } = req.validatedRequest
+    const { items, bloodType, componentType, unitsRequested, notes, priority } = req.validatedRequest
 
     const created = await createHospitalRequest({
       hospitalId,
       bloodType,
+      items,
       componentType,
       unitsRequested,
       notes,
       priority,
     })
+    notifyNewHospitalRequest({ hospitalId, items: created.items, requestGroupId: created.requestGroupId }).catch((error) =>
+      console.error('[Hospital request notification] Failed:', error.message),
+    )
 
     return successResponse(res, {
       statusCode: 201,

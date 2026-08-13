@@ -958,42 +958,36 @@ function Home() {
                   color: 'from-red-500 to-rose-500',
                   title: 'Save Up to 3 Lives',
                   body: 'A single blood donation can save up to three lives. Your blood is separated into red cells, plasma, and platelets — each used for different patients.',
-                  tag: 'Impact'
                 },
                 {
                   icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
                   color: 'from-orange-500 to-red-500',
                   title: 'Free Health Screening',
                   body: 'Before each donation, you receive a mini health check: blood pressure, pulse, hemoglobin, and temperature — all at no cost to you.',
-                  tag: 'Health Benefit'
                 },
                 {
                   icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />,
                   color: 'from-rose-500 to-pink-500',
                   title: 'Reduces Heart Risk',
                   body: 'Regular donors may have lower risk of cardiovascular disease. Donating reduces iron levels in the blood, which can help protect arteries from damage.',
-                  tag: 'Science'
                 },
                 {
                   icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />,
                   color: 'from-red-600 to-rose-600',
                   title: 'Donate Every 3 Months',
                   body: 'Healthy adults can donate whole blood every 56 days (about 3 months). Your body fully replenishes donated blood within 24–48 hours.',
-                  tag: 'Know-How'
                 },
                 {
                   icon: <><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></>,
                   color: 'from-red-500 to-red-600',
                   title: 'Blood Cannot Be Manufactured',
                   body: 'There is no artificial substitute for human blood. Hospitals rely entirely on volunteer donors to maintain supply for surgeries, emergencies, and treatments.',
-                  tag: 'Did You Know'
                 },
                 {
                   icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
                   color: 'from-rose-600 to-red-700',
                   title: 'Who Can Donate',
                   body: 'Most healthy adults aged 17–65 weighing at least 50kg can donate. You must not have donated in the last 3 months and be free of illness on donation day.',
-                  tag: 'Eligibility'
                 },
               ].map((card, idx) => (
                 <div key={idx} className="group rounded-3xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition duration-300 hover:-translate-y-0.5">
@@ -1003,9 +997,6 @@ function Home() {
                         {card.icon}
                       </svg>
                     </div>
-                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-red-600 ring-1 ring-red-100">
-                      {card.tag}
-                    </span>
                   </div>
                   <h3 className="text-base font-bold text-slate-900">{card.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-slate-600">{card.body}</p>

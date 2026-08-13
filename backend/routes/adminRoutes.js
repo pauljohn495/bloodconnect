@@ -90,6 +90,7 @@ const {
   getMbdDeferralsController,
   updateMbdDeferralsController,
 } = require('../controllers/adminMbdController')
+const { listMbdRequestsController, updateMbdRequestStatusController } = require('../controllers/mbdRequestController')
 const {
   listPrcActivitiesController,
   createPrcActivityController,
@@ -286,6 +287,8 @@ router.delete('/home-posts/:id', deleteHomePostController)
 // ===== MBD (Mobile Blood Donation) — drive records & donor intake =====
 
 // GET /api/admin/mbd-events
+router.get('/mbd-requests', listMbdRequestsController)
+router.put('/mbd-requests/:id/status', updateMbdRequestStatusController)
 router.get('/mbd-events', listMbdEventsController)
 
 // POST /api/admin/mbd-events

@@ -14,8 +14,10 @@ const {
   ensureFeatureFlagTables,
   ensureHomePostsTable,
   ensureMbdTables,
+  ensureMbdRequestsTable,
   ensureDonorNotificationBroadcastsTable,
   ensurePrcActivitiesTable,
+  ensureRequestGroupsAndEventNotifications,
 } = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const { getPublicHomePostsController } = require('./controllers/adminHomePostController')
@@ -33,6 +35,7 @@ const errorHandler = require('./middleware/errorHandler')
 const { successResponse, errorResponse } = require('./utils/response')
 const { startHospitalInventoryAlertScheduler } = require('./services/hospitalInventoryAlertService')
 const { startDonorRecallScheduler } = require('./services/donorRecallScheduler')
+const { startEventNotificationScheduler } = require('./services/eventNotificationService')
 
 dotenv.config()
 
@@ -127,10 +130,13 @@ async function start() {
         await ensureFeatureFlagTables()
         await ensureHomePostsTable()
         await ensureMbdTables()
+        await ensureMbdRequestsTable()
         await ensureDonorNotificationBroadcastsTable()
         await ensurePrcActivitiesTable()
+        await ensureRequestGroupsAndEventNotifications()
         startHospitalInventoryAlertScheduler()
         startDonorRecallScheduler()
+        startEventNotificationScheduler()
       } catch (migrationError) {
         console.error('❌ Schema migration failed:', migrationError.message)
         process.exit(1)

@@ -3,6 +3,8 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
 
+const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
+
 // ── Donor Name Autocomplete Component ────────────────────────────────────────
 function DonorNameAutocomplete({ value, onChange, onSelectUser, inputCls, labelCls }) {
   const [query, setQuery] = useState(value || '')
@@ -484,6 +486,17 @@ function AdminMbd() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteMbdEventConfirmOpen, setDeleteMbdEventConfirmOpen] = useState(false)
   const [deleteMbdEventTarget, setDeleteMbdEventTarget] = useState(null)
+  const [mbdRequestsOpen, setMbdRequestsOpen] = useState(false)
+  const [mbdRequests, setMbdRequests] = useState([])
+  const [mbdRequestsLoading, setMbdRequestsLoading] = useState(false)
+  const [registeredVolunteers] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(RC143_VOLUNTEERS_KEY) || '[]')
+      return Array.isArray(saved) ? saved : []
+    } catch {
+      return []
+    }
+  })
 
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
@@ -500,6 +513,32 @@ function AdminMbd() {
       setEvents([])
     }
   }, [])
+
+  const openMbdRequests = async () => {
+    setMbdRequestsOpen(true)
+    setMbdRequestsLoading(true)
+    try {
+      const data = await apiRequest('/api/admin/mbd-requests')
+      setMbdRequests(Array.isArray(data) ? data : [])
+    } catch (e) {
+      showNotification(e.message || 'Failed to load MBD requests', 'destructive')
+    } finally {
+      setMbdRequestsLoading(false)
+    }
+  }
+
+  const updateMbdRequestStatus = async (requestId, status) => {
+    try {
+      await apiRequest(`/api/admin/mbd-requests/${requestId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      })
+      setMbdRequests((requests) => requests.map((request) => (request.id === requestId ? { ...request, status } : request)))
+      showNotification(`MBD request ${status}.`, 'primary')
+    } catch (error) {
+      showNotification(error.message || 'Failed to update MBD request', 'destructive')
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -1134,16 +1173,18 @@ function AdminMbd() {
             </div>
             <div>
               <label className={labelCls} htmlFor="mbd-organizer">
-                Organizer name
+                Volunteer
               </label>
-              <input
+              <select
                 id="mbd-organizer"
                 className={inputCls}
                 value={createForm.organizerName}
                 onChange={(ev) => setCreateForm((f) => ({ ...f, organizerName: ev.target.value }))}
-                placeholder="Organization or contact person"
-                autoComplete="off"
-              />
+                required
+              >
+                <option value="">Select registered volunteer</option>
+                {registeredVolunteers.map((volunteer) => <option key={volunteer.id} value={volunteer.fullName}>{volunteer.fullName}</option>)}
+              </select>
             </div>
             <div>
               <label className={labelCls} htmlFor="mbd-date">
@@ -1171,7 +1212,14 @@ function AdminMbd() {
               />
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={openMbdRequests}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
+            >
+              MBD Request
+            </button>
             <button
               type="submit"
               disabled={creating}
@@ -1783,6 +1831,33 @@ function AdminMbd() {
         }}
         onConfirm={confirmDeleteDonor}
       />
+      {mbdRequestsOpen && (
+        <div className="fixed inset-0 z-90 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">MBD Requests</h3>
+                <p className="mt-1 text-sm text-slate-500">Requests submitted by registered volunteers.</p>
+              </div>
+              <button type="button" onClick={() => setMbdRequestsOpen(false)} className="text-slate-500 hover:text-slate-700" aria-label="Close">×</button>
+            </div>
+            <div className="mt-4 max-h-[65vh] overflow-y-auto rounded-xl border border-slate-200">
+              {mbdRequestsLoading ? (
+                <p className="px-4 py-10 text-center text-sm text-slate-500">Loading requests…</p>
+              ) : mbdRequests.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-slate-500">No MBD requests yet.</p>
+              ) : (
+                <table className="min-w-full divide-y divide-slate-100 text-sm">
+                  <thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Volunteer</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Title</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Message</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Location</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Submitted</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Actions</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {mbdRequests.map((request) => <tr key={request.id}><td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">{request.volunteer_name}<div className="mt-1 text-xs font-normal text-slate-500">{request.volunteer_phone || '—'}</div></td><td className="px-4 py-3 font-medium text-slate-900">{request.title}</td><td className="px-4 py-3 text-slate-700">{request.message}</td><td className="px-4 py-3 text-slate-700">{request.location}</td><td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${request.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : request.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{request.status || 'pending'}</span></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{new Date(request.created_at).toLocaleString()}</td><td className="whitespace-nowrap px-4 py-3"><div className="flex gap-2"><button type="button" disabled={request.status === 'approved'} onClick={() => updateMbdRequestStatus(request.id, 'approved')} className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Approve</button><button type="button" disabled={request.status === 'rejected'} onClick={() => updateMbdRequestStatus(request.id, 'rejected')} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Reject</button></div></td></tr>)}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {notification && (
         <div className="fixed right-4 top-4 z-95 transition-all duration-300 ease-in-out">
           <div

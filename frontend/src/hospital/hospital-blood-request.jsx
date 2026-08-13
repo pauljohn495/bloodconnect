@@ -5,9 +5,8 @@ import { adminPanel } from '../admin/admin-ui.jsx'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 
 function HospitalBloodRequest() {
-  const [bloodType, setBloodType] = useState('')
+  const [requestItems, setRequestItems] = useState([{ bloodType: '', unitsRequested: '' }])
   const [componentType, setComponentType] = useState('whole_blood')
-  const [unitsRequested, setUnitsRequested] = useState('')
   const [notes, setNotes] = useState('')
   const [requestPriority, setRequestPriority] = useState('normal')
   const [notification, setNotification] = useState(null)
@@ -48,9 +47,8 @@ function HospitalBloodRequest() {
   }, [])
 
   const resetForm = () => {
-    setBloodType('')
+    setRequestItems([{ bloodType: '', unitsRequested: '' }])
     setComponentType('whole_blood')
-    setUnitsRequested('')
     setNotes('')
     setRequestPriority('normal')
   }
@@ -58,14 +56,17 @@ function HospitalBloodRequest() {
   const handleSubmitRequest = async (e) => {
     e.preventDefault()
 
-    if (!bloodType || !unitsRequested) {
-      showNotification('Blood type and units requested are required', 'destructive')
+    const seen = new Set()
+    const items = requestItems.map((item) => ({
+      bloodType: item.bloodType,
+      unitsRequested: Number.parseInt(item.unitsRequested, 10),
+    }))
+    if (items.some((item) => !item.bloodType || !Number.isInteger(item.unitsRequested) || item.unitsRequested <= 0)) {
+      showNotification('Every blood type needs a positive whole-unit quantity', 'destructive')
       return
     }
-
-    const units = parseInt(unitsRequested, 10)
-    if (Number.isNaN(units) || units <= 0) {
-      showNotification('Units requested must be a positive number', 'destructive')
+    if (items.some((item) => seen.has(item.bloodType) || !seen.add(item.bloodType))) {
+      showNotification('Duplicate blood types are not allowed in one request', 'destructive')
       return
     }
 
@@ -73,9 +74,8 @@ function HospitalBloodRequest() {
       await apiRequest('/api/hospital/requests', {
         method: 'POST',
         body: JSON.stringify({
-          bloodType,
+          items,
           componentType,
-          unitsRequested: units,
           notes: notes || null,
           priority: requestPriority,
         }),
@@ -261,37 +261,22 @@ function HospitalBloodRequest() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700">
-                  Blood Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={bloodType}
-                  onChange={(e) => setBloodType(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  required
-                >
-                  <option value="">Select blood type</option>
-                  {bloodTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-slate-700">Blood types and quantities <span className="text-red-500">*</span></label>
+                  <button type="button" onClick={() => setRequestItems((items) => [...items, { bloodType: '', unitsRequested: '' }])} className="text-xs font-semibold text-red-600 hover:text-red-700">+ Add blood type</button>
+                </div>
+                <div className="mt-1 space-y-2">
+                  {requestItems.map((item, index) => (
+                    <div key={index} className="flex gap-2">
+                      <select value={item.bloodType} onChange={(e) => setRequestItems((items) => items.map((row, i) => i === index ? { ...row, bloodType: e.target.value } : row))} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" required>
+                        <option value="">Select blood type</option>
+                        {bloodTypes.map((type) => <option key={type} value={type} disabled={requestItems.some((row, i) => i !== index && row.bloodType === type)}>{type}</option>)}
+                      </select>
+                      <input type="number" min="1" value={item.unitsRequested} onChange={(e) => setRequestItems((items) => items.map((row, i) => i === index ? { ...row, unitsRequested: e.target.value } : row))} className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" placeholder="Units" required />
+                      {requestItems.length > 1 && <button type="button" onClick={() => setRequestItems((items) => items.filter((_, i) => i !== index))} className="rounded-lg px-2 text-xs font-semibold text-red-600 hover:bg-red-50" aria-label={`Remove ${item.bloodType || 'blood type'}`}>Remove</button>}
+                    </div>
                   ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700">
-                  Units Requested <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={unitsRequested}
-                  onChange={(e) => setUnitsRequested(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
-                  placeholder="Enter number of units"
-                  required
-                />
+                </div>
               </div>
 
               <div>

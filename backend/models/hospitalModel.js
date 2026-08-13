@@ -99,49 +99,31 @@ async function getHospitalDonations(hospitalId) {
   return rows
 }
 
-async function createHospitalRequest({ hospitalId, bloodType, componentType, unitsRequested, notes, priority }) {
+async function createHospitalRequest({ hospitalId, bloodType, items, componentType, unitsRequested, notes, priority }) {
   const component = componentType || 'whole_blood'
   const safePriority = priority || 'normal'
+  const requestItems = items?.length ? items : [{ bloodType, unitsRequested }]
+  const requestGroupId = requestItems.length > 1 ? require('crypto').randomUUID() : null
+  const conn = await pool.getConnection()
 
-  let result
   try {
-    const [result1] = await pool.query(
-      `
-      INSERT INTO blood_requests (hospital_id, blood_type, component_type, units_requested, notes, priority)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `,
-      [hospitalId, bloodType, component, unitsRequested, notes || null, safePriority],
-    )
-    result = result1
-  } catch (error) {
-    if (error.code === 'ER_BAD_FIELD_ERROR' || (error.message && error.message.includes('component_type'))) {
-      // Fallback when priority/component_type columns don't exist:
-      // embed priority as a tag in notes so we can recover it later.
-      const priorityTag = `[PRIORITY:${safePriority}]`
-      const storedNotes = notes && notes.length > 0 ? `${priorityTag} ${notes}` : priorityTag
-
-      const [result2] = await pool.query(
-        `
-        INSERT INTO blood_requests (hospital_id, blood_type, units_requested, notes)
-        VALUES (?, ?, ?, ?)
-      `,
-        [hospitalId, bloodType, unitsRequested, storedNotes],
+    await conn.beginTransaction()
+    const created = []
+    for (const item of requestItems) {
+      const [result] = await conn.query(
+        `INSERT INTO blood_requests (hospital_id, blood_type, component_type, units_requested, notes, priority, request_group_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [hospitalId, item.bloodType, component, item.unitsRequested, notes || null, safePriority, requestGroupId],
       )
-      result = result2
-    } else {
-      throw error
+      created.push({ id: result.insertId, bloodType: item.bloodType, unitsRequested: item.unitsRequested })
     }
-  }
-
-  return {
-    id: result.insertId,
-    hospitalId,
-    bloodType,
-    componentType: component,
-    unitsRequested,
-    notes: notes || null,
-    priority: safePriority,
-    status: 'pending',
+    await conn.commit()
+    return { id: created[0].id, requestGroupId, hospitalId, items: created, componentType: component, notes: notes || null, priority: safePriority, status: 'pending' }
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
   }
 }
 

@@ -963,6 +963,7 @@ function AdminDonation() {
     setRc143VolAddress('')
     setRc143VolContactNumber('')
     if (firstUserId) fillRc143VolunteerFromUser(firstUserId)
+    loadOrganizations()
     setIsRc143VolunteerModalOpen(true)
   }
 
@@ -976,6 +977,7 @@ function AdminDonation() {
       showNotification('No donor/recipient users available to assign.', 'destructive')
       return
     }
+    loadOrganizations()
     setEditingRc143VolunteerId(volunteer.id)
     const preferredId = volunteer.sourceUserId ? String(volunteer.sourceUserId) : String(rc143AssignableUsers[0].id)
     setRc143VolunteerUserId(preferredId)
@@ -1168,7 +1170,7 @@ function AdminDonation() {
               <div>
                 <h2 className={adminPanel.emerald.title}>RC143 — Volunteers</h2>
                 <p className={adminPanel.emerald.subtitle}>
-                  Register volunteers and review their requested blood donation activities.
+                  Register and manage RC143 volunteers.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1264,7 +1266,7 @@ function AdminDonation() {
                 </div>
               </div>
 
-              <div>
+              {false && (<div>
                 <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
                   <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
                   Volunteer activity requests
@@ -1350,7 +1352,7 @@ function AdminDonation() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </div>)}
 
             </div>
           </div>
@@ -1980,13 +1982,16 @@ function AdminDonation() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700">Organization</label>
-                <input
-                  type="text"
+                <select
                   value={rc143VolOrganization}
                   onChange={(e) => setRc143VolOrganization(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
-                  placeholder="Company, school, or chapter"
-                />
+                >
+                  <option value="">Select organization</option>
+                  {organizations.map((organization) => (
+                    <option key={organization.id} value={organization.name}>{organization.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700">Occupation</label>

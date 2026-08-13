@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useLayoutEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { FeatureFlagsProvider } from './featureFlagsContext.jsx'
 import FeatureRouteGuard from './FeatureRouteGuard.jsx'
 import Home from './home.jsx'
@@ -24,9 +25,24 @@ import ModuleUnavailable from './ModuleUnavailable.jsx'
 import SuperadminLogin from './admin/superadmin-login.jsx'
 import Rankings from './rankings.jsx'
 
+function ScrollToTop() {
+  const { pathname } = useLocation()
+
+  useLayoutEffect(() => {
+    // React Router preserves the previous viewport position by default. Reset it
+    // before the new page is painted so dashboard sign-ins always start at the top.
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [pathname])
+
+  return null
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <FeatureFlagsProvider>
         <FeatureRouteGuard>
           <Routes>

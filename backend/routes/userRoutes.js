@@ -11,6 +11,7 @@ const {
   createScheduleRequestController,
 } = require('../controllers/userController')
 const { validateUpdateMe, validateScheduleRequest } = require('../validators/userValidators')
+const { createMbdRequestController, listMyMbdRequestsController } = require('../controllers/mbdRequestController')
 
 const router = express.Router()
 
@@ -39,6 +40,9 @@ router.get('/schedule-requests', getScheduleRequestsController)
 
 // POST /api/user/schedule-requests - create schedule request
 router.post('/schedule-requests', validateScheduleRequest, createScheduleRequestController)
+
+router.post('/mbd-requests', auth(['donor']), createMbdRequestController)
+router.get('/mbd-requests', auth(['donor']), listMyMbdRequestsController)
 
 module.exports = router
 

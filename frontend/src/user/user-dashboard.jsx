@@ -34,6 +34,10 @@ function UserDashboard() {
   const [rc143MyRequests, setRc143MyRequests] = useState([])
   const [isRequestActivityModalOpen, setIsRequestActivityModalOpen] = useState(false)
   const [isRequestHistoryModalOpen, setIsRequestHistoryModalOpen] = useState(false)
+  const [isMbdRequestModalOpen, setIsMbdRequestModalOpen] = useState(false)
+  const [mbdRequestForm, setMbdRequestForm] = useState({ title: '', message: '', location: '' })
+  const [myMbdRequests, setMyMbdRequests] = useState([])
+  const [isMbdRequestSubmitting, setIsMbdRequestSubmitting] = useState(false)
   const [activityRequestForm, setActivityRequestForm] = useState({
     title: '',
     details: '',
@@ -79,12 +83,14 @@ function UserDashboard() {
           scheduleRequests,
           notificationsData,
           eligibilityData,
+          mbdRequestsData,
         ] = await Promise.all([
           apiRequest('/api/user/me'),
           apiRequest('/api/user/donations'),
           apiRequest('/api/user/schedule-requests').catch(() => []),
           apiRequest('/api/notifications').catch(() => []),
           apiRequest('/api/user/donation-eligibility').catch(() => null),
+          apiRequest('/api/user/mbd-requests').catch(() => []),
         ])
 
         const username = (me.username || '').toLowerCase()
@@ -159,6 +165,7 @@ function UserDashboard() {
 
         const meId = me?.id ? String(me.id) : ''
         setCurrentUserId(meId)
+        setMyMbdRequests(Array.isArray(mbdRequestsData) ? mbdRequestsData : [])
 
         // Volunteer requests are stored locally from admin-donations RC143.
         let volunteerEntries = []
@@ -248,14 +255,14 @@ function UserDashboard() {
     }
   }, [currentUserId])
 
-  // Tick "now" while schedule modal is open so cooldown countdowns update
+  // Keep the whole-blood eligibility countdown current.
   useEffect(() => {
-    if (!isScheduleModalOpen) return
+    if (!eligibility?.whole_blood?.nextEligibleAt) return
     const interval = setInterval(() => {
       setNowTs(Date.now())
     }, 60000) // update every minute
     return () => clearInterval(interval)
-  }, [isScheduleModalOpen])
+  }, [eligibility])
 
   const handleOpenScheduleModal = async () => {
     setError('')
@@ -389,6 +396,34 @@ function UserDashboard() {
     localStorage.removeItem('token')
     localStorage.removeItem('role')
     navigate('/')
+  }
+
+  const openMbdRequestModal = () => {
+    setMbdRequestForm({ title: '', message: '', location: '' })
+    setIsMbdRequestModalOpen(true)
+  }
+
+  const handleSubmitMbdRequest = async (e) => {
+    e.preventDefault()
+    const title = mbdRequestForm.title.trim()
+    const message = mbdRequestForm.message.trim()
+    const location = mbdRequestForm.location.trim()
+    if (!title || !message || !location) return
+    try {
+      setIsMbdRequestSubmitting(true)
+      await apiRequest('/api/user/mbd-requests', {
+        method: 'POST',
+        body: JSON.stringify({ title, message, location }),
+      })
+      setIsMbdRequestModalOpen(false)
+      setMbdRequestForm({ title: '', message: '', location: '' })
+      const requests = await apiRequest('/api/user/mbd-requests')
+      setMyMbdRequests(Array.isArray(requests) ? requests : [])
+    } catch (err) {
+      setError(err.message || 'Failed to submit MBD request')
+    } finally {
+      setIsMbdRequestSubmitting(false)
+    }
   }
 
   const openRequestActivityModal = () => {
@@ -571,44 +606,27 @@ function UserDashboard() {
 
             {/* User Profile */}
             {showProfile && (
-              <button
-                type="button"
-                onClick={() => navigate('/profile')}
-                className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:px-0"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white ring-1 ring-red-700/20">
-                  {userData.avatar ? (
-                    <img
-                      src={userData.avatar}
-                      alt={userData.name}
-                      className="h-full w-full rounded-full object-cover"
-                    />
-                  ) : (
-                    userData.name.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <span className="hidden text-sm font-medium text-slate-700 sm:inline-block">
-                  {userData.name}
-                </span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/profile')}
+                  className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2 sm:px-0"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white ring-1 ring-red-700/20">
+                    {userData.avatar ? <img src={userData.avatar} alt={userData.name} className="h-full w-full rounded-full object-cover" /> : userData.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden text-sm font-medium text-slate-700 sm:inline-block">{userData.name}</span>
+                </button>
+                <button type="button" onClick={handleLogout} className="ml-1 inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/40" aria-label="Logout">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Logout
+                </button>
+              </div>
             )}
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:ring-offset-2"
-              title="Logout"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              <span className="hidden sm:inline-block">Logout</span>
-            </button>
           </div>
         </div>
       </header>
@@ -677,7 +695,7 @@ function UserDashboard() {
                 : wholeBloodEligibility.isEligible
                   ? 'You can schedule a whole blood donation request today.'
                   : wholeBloodEligibility.nextEligibleAt
-                    ? `Available ${new Date(wholeBloodEligibility.nextEligibleAt).toLocaleDateString()}${wholeBloodEligibility.remaining ? ` (${wholeBloodEligibility.remaining})` : ''}.`
+                    ? `Available ${new Date(wholeBloodEligibility.nextEligibleAt).toLocaleDateString()}. Countdown: ${wholeBloodEligibility.remaining || 'calculating...'}.`
                     : 'Cooldown information unavailable.'}
             </p>
           </div>
@@ -749,17 +767,10 @@ function UserDashboard() {
                 <>
                   <button
                     type="button"
-                    onClick={openRequestActivityModal}
+                    onClick={openMbdRequestModal}
                     className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 sm:w-auto sm:py-2"
                   >
-                    Request Activity
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openRequestHistoryModal}
-                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto sm:py-2"
-                  >
-                    Request History
+                    Request MBD
                   </button>
                 </>
               )}
@@ -767,7 +778,7 @@ function UserDashboard() {
           </section>
         )}
 
-        {isRc143Volunteer && (
+        {false && isRc143Volunteer && (
           <section className="mb-8">
             <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
               <div className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
@@ -804,6 +815,25 @@ function UserDashboard() {
                         </tr>
                       ))
                     )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {isRc143Volunteer && (
+          <section className="mb-8">
+            <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
+              <div className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
+                <h2 className="text-base font-semibold text-slate-900 sm:text-lg">Request MBD List</h2>
+                <p className="mt-1 text-sm text-slate-500">Your submitted mobile blood donation requests.</p>
+              </div>
+              <div className={responsiveTableContainer}>
+                <table className="min-w-[680px] divide-y divide-slate-100 sm:min-w-full">
+                  <thead className="bg-slate-50/95"><tr><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">Title</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">Message</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">Location</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">Status</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 sm:px-6">Submitted</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {myMbdRequests.length === 0 ? <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-500">No MBD requests yet.</td></tr> : myMbdRequests.map((request) => <tr key={request.id}><td className="px-4 py-3 font-medium text-slate-900 sm:px-6">{request.title}</td><td className="px-4 py-3 text-slate-700 sm:px-6">{request.message}</td><td className="px-4 py-3 text-slate-700 sm:px-6">{request.location}</td><td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${request.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : request.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{request.status || 'pending'}</span></td><td className="whitespace-nowrap px-4 py-3 text-slate-600 sm:px-6">{new Date(request.created_at).toLocaleDateString()}</td></tr>)}
                   </tbody>
                 </table>
               </div>
@@ -1291,6 +1321,46 @@ function UserDashboard() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+      {isMbdRequestModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl ring-1 ring-slate-100">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Request MBD</h3>
+                <p className="mt-1 text-sm text-slate-500">Send your mobile blood donation request to the admin.</p>
+              </div>
+              <button type="button" onClick={() => setIsMbdRequestModalOpen(false)} className="text-slate-500 hover:text-slate-700" aria-label="Close">×</button>
+            </div>
+            <form onSubmit={handleSubmitMbdRequest} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor="mbd-request-title">Title</label>
+                <input id="mbd-request-title" type="text" required maxLength={255} value={mbdRequestForm.title} onChange={(e) => setMbdRequestForm((form) => ({ ...form, title: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" placeholder="e.g. Community Blood Drive" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor="mbd-request-message">Message</label>
+                <textarea
+                  id="mbd-request-message"
+                  rows={5}
+                  required
+                  maxLength={2000}
+                  value={mbdRequestForm.message}
+                  onChange={(e) => setMbdRequestForm((form) => ({ ...form, message: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
+                  placeholder="Describe the proposed MBD activity."
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor="mbd-request-location">Location</label>
+                <input id="mbd-request-location" type="text" required maxLength={512} value={mbdRequestForm.location} onChange={(e) => setMbdRequestForm((form) => ({ ...form, location: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" placeholder="Venue or address" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsMbdRequestModalOpen(false)} disabled={isMbdRequestSubmitting} className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Cancel</button>
+                <button type="submit" disabled={isMbdRequestSubmitting} className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60">{isMbdRequestSubmitting ? 'Sending…' : 'Send request'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

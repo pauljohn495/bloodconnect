@@ -443,6 +443,53 @@ async function ensurePrcActivitiesTable() {
   console.log('Schema: ensured prc_activities table')
 }
 
+async function ensureMbdRequestsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS mbd_requests (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      volunteer_user_id INT NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      message MEDIUMTEXT NOT NULL,
+      location VARCHAR(512) NOT NULL,
+      status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_mbd_requests_created (created_at),
+      INDEX idx_mbd_requests_volunteer (volunteer_user_id),
+      CONSTRAINT fk_mbd_requests_volunteer FOREIGN KEY (volunteer_user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  if (!(await columnExists('mbd_requests', 'title'))) {
+    await pool.query("ALTER TABLE mbd_requests ADD COLUMN title VARCHAR(255) NOT NULL DEFAULT '' AFTER volunteer_user_id")
+  }
+  if (!(await columnExists('mbd_requests', 'location'))) {
+    await pool.query("ALTER TABLE mbd_requests ADD COLUMN location VARCHAR(512) NOT NULL DEFAULT '' AFTER message")
+  }
+  if (!(await columnExists('mbd_requests', 'status'))) {
+    await pool.query("ALTER TABLE mbd_requests ADD COLUMN status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending' AFTER location")
+  }
+  console.log('Schema: ensured mbd_requests table')
+}
+
+async function ensureRequestGroupsAndEventNotifications() {
+  if (!(await columnExists('blood_requests', 'request_group_id'))) {
+    await pool.query('ALTER TABLE blood_requests ADD COLUMN request_group_id CHAR(36) NULL, ADD INDEX idx_blood_requests_group (request_group_id)')
+    console.log('Schema: added blood_requests.request_group_id')
+  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS announcement_notification_deliveries (
+      announcement_id INT PRIMARY KEY,
+      delivered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_event_notification_deliveries (
+      event_key VARCHAR(255) PRIMARY KEY,
+      delivered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured request groups and notification delivery tables')
+}
+
 module.exports = {
   ensureUserRoleEnumIncludesSuperAdmin,
   ensureDonorProfileColumns,
@@ -454,6 +501,8 @@ module.exports = {
   ensureFeatureFlagTables,
   ensureHomePostsTable,
   ensureMbdTables,
+  ensureMbdRequestsTable,
   ensureDonorNotificationBroadcastsTable,
   ensurePrcActivitiesTable,
+  ensureRequestGroupsAndEventNotifications,
 }

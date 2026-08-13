@@ -27,21 +27,35 @@ function validateInventoryDonation(req, res, next) {
 }
 
 function validateHospitalRequest(req, res, next) {
-  const { bloodType, componentType, unitsRequested, notes, priority } = req.body
+  const { bloodType, bloodTypes, componentType, unitsRequested, notes, priority } = req.body
 
-  if (!bloodType || !unitsRequested) {
+  // `items` is the current multi-type format. Keep the original single-type
+  // payload working for existing integrations.
+  const rawItems = Array.isArray(req.body.items)
+    ? req.body.items
+    : bloodTypes
+      ? bloodTypes.map((type, index) => ({ bloodType: type, unitsRequested: Array.isArray(unitsRequested) ? unitsRequested[index] : unitsRequested }))
+      : [{ bloodType, unitsRequested }]
+
+  if (!rawItems.length) {
     return errorResponse(res, {
       statusCode: 400,
-      message: 'bloodType and unitsRequested are required',
+      message: 'At least one blood type and quantity are required',
     })
   }
-
-  const intUnits = parseInt(unitsRequested, 10)
-  if (Number.isNaN(intUnits) || intUnits <= 0) {
-    return errorResponse(res, {
-      statusCode: 400,
-      message: 'unitsRequested must be a positive integer',
-    })
+  const seenBloodTypes = new Set()
+  const items = []
+  for (const item of rawItems) {
+    const itemBloodType = String(item?.bloodType || '').trim().toUpperCase()
+    const intUnits = parseInt(item?.unitsRequested, 10)
+    if (!itemBloodType || Number.isNaN(intUnits) || intUnits <= 0) {
+      return errorResponse(res, { statusCode: 400, message: 'Each blood type must have a positive whole-unit quantity' })
+    }
+    if (seenBloodTypes.has(itemBloodType)) {
+      return errorResponse(res, { statusCode: 400, message: 'Duplicate blood types are not allowed in one request' })
+    }
+    seenBloodTypes.add(itemBloodType)
+    items.push({ bloodType: itemBloodType, unitsRequested: intUnits })
   }
 
   // Normalize and validate priority (optional)
@@ -55,9 +69,11 @@ function validateHospitalRequest(req, res, next) {
   }
 
   req.validatedRequest = {
-    bloodType,
+    items,
+    // Legacy fields keep controller callers compatible.
+    bloodType: items[0].bloodType,
     componentType: componentType || 'whole_blood',
-    unitsRequested: intUnits,
+    unitsRequested: items[0].unitsRequested,
     notes: notes || null,
     priority: normalizedPriority,
   }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../BrandLogo.jsx'
 import { useFeatureFlags } from '../featureFlagsContext.jsx'
+import { apiRequest } from '../api.js'
 
 const ADMIN_SIDEBAR_HOVER_KEY = 'adminSidebarHovered'
 const iconClassName = 'h-5 w-5 shrink-0'
@@ -73,7 +74,6 @@ function AnnouncementsIcon() {
     </svg>
   )
 }
-
 function MbdIcon() {
   return (
     <svg className={iconClassName} viewBox="0 0 24 24" aria-hidden="true">
@@ -96,11 +96,9 @@ function SettingsIcon() {
   )
 }
 
-/** Superadmin sidebar: only these two destinations. */
+/** Superadmin sidebar: only Module visibility. */
 const superAdminSidebarItems = [
   { name: 'Module visibility', path: '/superadmin/feature-settings', icon: SettingsIcon, flagKey: null },
-  { name: 'Manage Users', path: '/admin/users', icon: UsersIcon, flagKey: 'admin.users' },
-  { name: 'MBD', path: '/admin/mbd', icon: MbdIcon, flagKey: 'admin.mbd' },
 ]
 
 const allSidebarItems = [
@@ -172,6 +170,8 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
   }, [isFlagEnabled, role])
   const isSuperAdmin = role === 'super_admin'
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState([])
   const [desktopSidebarExpanded, setDesktopSidebarExpanded] = useState(() => {
     if (typeof window === 'undefined') return false
     return localStorage.getItem(ADMIN_SIDEBAR_HOVER_KEY) === 'true'
@@ -180,6 +180,19 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
   useEffect(() => {
     setMobileOpen(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    apiRequest('/api/notifications').then((data) => setNotifications(data || [])).catch(() => setNotifications([]))
+  }, [location.pathname])
+
+  const markNotificationRead = async (id) => {
+    try {
+      await apiRequest(`/api/notifications/${id}/read`, { method: 'PATCH' })
+      setNotifications((items) => items.map((item) => item.id === id ? { ...item, is_read: true } : item))
+    } catch (_) {
+      // The notification remains unread if the update fails.
+    }
+  }
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -251,33 +264,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
               <div className="flex-1 overflow-y-auto px-3 py-4">
                 <NavLinks items={sidebarItems} isExpanded={desktopSidebarExpanded} />
               </div>
-              <div className="px-3 pb-3">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  title={!desktopSidebarExpanded ? 'Log out' : undefined}
-                  className={`flex min-h-[44px] w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-red-500/20 hover:text-white ${
-                    desktopSidebarExpanded ? 'gap-3' : 'justify-center'
-                  }`}
-                >
-                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                      d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span
-                    className={`whitespace-nowrap transition-all duration-200 ${
-                      desktopSidebarExpanded ? 'max-w-[180px] opacity-100' : 'max-w-0 overflow-hidden opacity-0'
-                    }`}
-                  >
-                    Log out
-                  </span>
-                </button>
-              </div>
+
               <div className={`border-t border-white/10 px-5 py-4 ${desktopSidebarExpanded ? 'block' : 'hidden'}`}>
                 <p className="text-[11px] leading-relaxed text-slate-300">
                   Secure access to donor and hospital operations. Log out when finished on shared devices.
@@ -322,29 +309,46 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
               <div className="flex-1 overflow-y-auto px-3 py-3">
                 <NavLinks items={sidebarItems} onNavigate={() => setMobileOpen(false)} isExpanded />
               </div>
-              <div className="border-t border-white/10 px-3 py-3">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-red-500/20 hover:text-white"
-                >
-                  <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                      d="M15 17l5-5m0 0-5-5m5 5H9m6 5v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span>Log out</span>
-                </button>
-              </div>
             </aside>
         </>
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <header className="z-30 mx-3 mt-3 flex min-h-13 items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_8px_25px_-20px_rgba(15,23,42,0.45)] sm:mx-6 sm:mt-5 sm:gap-4 sm:px-6 sm:py-3 lg:mx-8">
+          <div className="flex items-center justify-end gap-2 px-3 pt-2 sm:px-6 lg:px-8">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen((open) => !open)}
+                className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                {notifications.some((item) => !item.is_read) && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-600" />}
+              </button>
+              {notificationsOpen && (
+                <div className="fixed left-3 right-3 top-12 z-50 max-h-96 overflow-y-auto rounded-xl bg-white p-2 shadow-xl ring-1 ring-slate-200 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
+                  <div className="border-b border-slate-100 px-2 py-2 text-sm font-semibold text-slate-900">Notifications</div>
+                  {notifications.length === 0 ? <p className="px-2 py-4 text-sm text-slate-500">No notifications yet.</p> : notifications.map((item) => (
+                    <button key={item.id} type="button" onClick={() => !item.is_read && markNotificationRead(item.id)} className={`my-1 block w-full rounded-lg px-3 py-2 text-left text-sm ${item.is_read ? 'bg-slate-50 text-slate-600' : 'bg-red-50 text-slate-900'}`}>
+                      <span className="block font-semibold">{item.title}</span><span className="mt-1 block text-xs">{item.message}</span><span className="mt-1 block text-[11px] text-slate-400">{item.created_at ? new Date(item.created_at).toLocaleString() : ''}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition focus:outline-none focus:ring-2 focus:ring-red-500/40"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              Log out
+            </button>
+          </div>
+          <header className="z-30 mx-3 mt-2 flex min-h-13 items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_8px_25px_-20px_rgba(15,23,42,0.45)] sm:mx-6 sm:mt-3 sm:gap-4 sm:px-6 sm:py-3 lg:mx-8">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <button
                 type="button"
