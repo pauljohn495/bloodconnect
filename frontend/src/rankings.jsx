@@ -93,13 +93,28 @@ function OrgRow({ org, rank }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-900">{org.organizationName || 'Unknown'}</p>
-          <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide">Municipality / Organization</p>
+          <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide">Organization</p>
         </div>
       </div>
       <div className="shrink-0 text-right">
         <p className="text-base font-extrabold text-slate-900">{org.totalUnitsDonated}</p>
         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">units</p>
       </div>
+    </li>
+  )
+}
+
+function MunicipalityRow({ municipality, rank }) {
+  return (
+    <li className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white px-5 py-4 transition hover:border-red-100 hover:bg-red-50/30">
+      <RankBadge rank={rank} />
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sm font-bold text-sky-700">
+          {(municipality.municipalityName || '?')[0].toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-slate-900">{municipality.municipalityName}</p><p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Municipality</p></div>
+      </div>
+      <div className="shrink-0 text-right"><p className="text-base font-extrabold text-slate-900">{municipality.donorCount}</p><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">donors</p></div>
     </li>
   )
 }
@@ -120,9 +135,11 @@ export default function Rankings() {
   const navigate = useNavigate()
   const [donors, setDonors] = useState([])
   const [orgs, setOrgs] = useState([])
+  const [municipalities, setMunicipalities] = useState([])
   const [donorsLoading, setDonorsLoading] = useState(true)
   const [orgsLoading, setOrgsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('donors') // 'donors' | 'municipalities'
+  const [municipalitiesLoading, setMunicipalitiesLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('donors')
 
   useEffect(() => {
     let cancelled = false
@@ -131,6 +148,16 @@ export default function Rankings() {
       .then((data) => { if (!cancelled) setDonors(Array.isArray(data) ? data : []) })
       .catch(() => { if (!cancelled) setDonors([]) })
       .finally(() => { if (!cancelled) setDonorsLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setMunicipalitiesLoading(true)
+    apiRequest('/api/rankings/municipalities?limit=50')
+      .then((data) => { if (!cancelled) setMunicipalities(Array.isArray(data) ? data : []) })
+      .catch(() => { if (!cancelled) setMunicipalities([]) })
+      .finally(() => { if (!cancelled) setMunicipalitiesLoading(false) })
     return () => { cancelled = true }
   }, [])
 
@@ -193,7 +220,7 @@ export default function Rankings() {
             Rankings
           </h1>
           <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">
-            Celebrating our top contributors — donors and municipalities — who make life-saving possible.
+            Celebrating our top contributors — donors and organizations — who make life-saving possible.
           </p>
         </div>
 
@@ -216,9 +243,9 @@ export default function Rankings() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('municipalities')}
+              onClick={() => setActiveTab('organizations')}
               className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition duration-200 ${
-                activeTab === 'municipalities'
+                activeTab === 'organizations'
                   ? 'bg-white text-red-600 shadow ring-1 ring-slate-200/60'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
@@ -226,6 +253,9 @@ export default function Rankings() {
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
+              Organizations
+            </button>
+            <button type="button" onClick={() => setActiveTab('municipalities')} className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition duration-200 ${activeTab === 'municipalities' ? 'bg-white text-red-600 shadow ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800'}`}>
               Municipalities
             </button>
           </div>
@@ -271,11 +301,11 @@ export default function Rankings() {
         )}
 
         {/* Municipality Rankings */}
-        {activeTab === 'municipalities' && (
+        {activeTab === 'organizations' && (
           <div>
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900">Top Municipalities</h2>
+                <h2 className="text-lg font-extrabold text-slate-900">Top Organizations</h2>
                 <p className="text-xs text-slate-500 mt-0.5">Ranked by total units donated</p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
@@ -298,7 +328,7 @@ export default function Rankings() {
                 ))}
               </ul>
             ) : orgs.length === 0 ? (
-              <EmptyState label="municipality rankings" />
+              <EmptyState label="organizations rankings" />
             ) : (
               <ul className="space-y-3">
                 {orgs.map((org, idx) => (
@@ -306,6 +336,13 @@ export default function Rankings() {
                 ))}
               </ul>
             )}
+          </div>
+        )}
+
+        {activeTab === 'municipalities' && (
+          <div>
+            <div className="mb-5 flex items-center justify-between"><div><h2 className="text-lg font-extrabold text-slate-900">Top Municipalities</h2><p className="mt-0.5 text-xs text-slate-500">Ranked by registered MBD donors</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{municipalities.length} entries</span></div>
+            {municipalitiesLoading ? <div className="py-12 text-center text-sm text-slate-500">Loading municipalities...</div> : municipalities.length === 0 ? <EmptyState label="municipality rankings" /> : <ul className="space-y-3">{municipalities.map((municipality, idx) => <MunicipalityRow key={municipality.municipalityId} municipality={municipality} rank={idx + 1} />)}</ul>}
           </div>
         )}
       </main>

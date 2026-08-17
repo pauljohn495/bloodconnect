@@ -65,6 +65,7 @@ const {
 const {
   getOrganizationDonationRankingController,
   getDonorDonationRankingController,
+  getMunicipalityDonationRankingController,
 } = require('../controllers/adminDonationRankingController')
 const {
   getAnnouncementsController,
@@ -91,6 +92,8 @@ const {
   updateMbdDeferralsController,
 } = require('../controllers/adminMbdController')
 const { listMbdRequestsController, updateMbdRequestStatusController } = require('../controllers/mbdRequestController')
+const { listRc143VolunteersController, createRc143VolunteerController, updateRc143VolunteerController, deleteRc143VolunteerController } = require('../controllers/rc143VolunteerController')
+const { listMunicipalitiesController, createMunicipalityController } = require('../controllers/municipalityController')
 const {
   listPrcActivitiesController,
   createPrcActivityController,
@@ -179,6 +182,7 @@ router.post('/organization-donations', createOrganizationDonationController)
 router.get('/donation-rankings/organizations', getOrganizationDonationRankingController)
 // GET /api/admin/donation-rankings/donors
 router.get('/donation-rankings/donors', getDonorDonationRankingController)
+router.get('/donation-rankings/municipalities', getMunicipalityDonationRankingController)
 
 // ===== Blood Inventory =====
 
@@ -285,6 +289,12 @@ router.put('/home-posts/:id', updateHomePostController)
 router.delete('/home-posts/:id', deleteHomePostController)
 
 // ===== MBD (Mobile Blood Donation) — drive records & donor intake =====
+router.get('/rc143-volunteers', listRc143VolunteersController)
+router.post('/rc143-volunteers', createRc143VolunteerController)
+router.put('/rc143-volunteers/:id', updateRc143VolunteerController)
+router.delete('/rc143-volunteers/:id', deleteRc143VolunteerController)
+router.get('/municipalities', listMunicipalitiesController)
+router.post('/municipalities', createMunicipalityController)
 
 // GET /api/admin/mbd-events
 router.get('/mbd-requests', listMbdRequestsController)

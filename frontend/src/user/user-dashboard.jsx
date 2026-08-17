@@ -84,6 +84,7 @@ function UserDashboard() {
           notificationsData,
           eligibilityData,
           mbdRequestsData,
+          rc143VolunteerStatus,
         ] = await Promise.all([
           apiRequest('/api/user/me'),
           apiRequest('/api/user/donations'),
@@ -91,6 +92,7 @@ function UserDashboard() {
           apiRequest('/api/notifications').catch(() => []),
           apiRequest('/api/user/donation-eligibility').catch(() => null),
           apiRequest('/api/user/mbd-requests').catch(() => []),
+          apiRequest('/api/user/rc143-volunteer-status').catch(() => ({ isRc143Volunteer: false })),
         ])
 
         const username = (me.username || '').toLowerCase()
@@ -167,7 +169,7 @@ function UserDashboard() {
         setCurrentUserId(meId)
         setMyMbdRequests(Array.isArray(mbdRequestsData) ? mbdRequestsData : [])
 
-        // Volunteer requests are stored locally from admin-donations RC143.
+        // RC143 membership is stored server-side so it follows this account on every device.
         let volunteerEntries = []
         let allRequests = []
         try {
@@ -185,7 +187,7 @@ function UserDashboard() {
           allRequests = []
         }
         const matchedVolunteer = volunteerEntries.find((v) => String(v.sourceUserId || '') === meId)
-        setIsRc143Volunteer(Boolean(matchedVolunteer))
+        setIsRc143Volunteer(Boolean(rc143VolunteerStatus?.isRc143Volunteer))
         if (matchedVolunteer) {
           const mine = allRequests
             .filter((r) => String(r.volunteerId) === String(matchedVolunteer.id))

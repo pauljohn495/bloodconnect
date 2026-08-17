@@ -57,7 +57,9 @@ async function createHospitalController(req, res, next) {
 
 async function updateHospitalController(req, res, next) {
   try {
-    const { hospitalId } = req
+    // The route validator verifies and normalizes this value before the controller.
+    // Read it explicitly so the update always targets the hospital in the URL.
+    const hospitalId = req.hospitalId
     const { hospitalName, email, username, password, latitude, longitude } = req.body
 
     await updateHospital({

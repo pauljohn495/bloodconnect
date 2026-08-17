@@ -3,8 +3,6 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
 
-const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
-
 // ── Donor Name Autocomplete Component ────────────────────────────────────────
 function DonorNameAutocomplete({ value, onChange, onSelectUser, inputCls, labelCls }) {
   const [query, setQuery] = useState(value || '')
@@ -16,15 +14,18 @@ function DonorNameAutocomplete({ value, onChange, onSelectUser, inputCls, labelC
   const wrapperRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Sync if parent resets value to ''
+  // Keep the uncontrolled autocomplete display synchronized with form data, including edit mode.
   useEffect(() => {
-    if (!value) {
-      setQuery('')
+    const nextValue = value || ''
+    if (nextValue !== query) {
+      setQuery(nextValue)
+      if (!nextValue) {
       setSelectedUser(null)
       setResults([])
       setOpen(false)
+      }
     }
-  }, [value])
+  }, [value, query])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -440,8 +441,10 @@ function ConfirmModal({ open, title, message, confirmText = 'Confirm', cancelTex
 const emptyCreateForm = () => ({
   name: '',
   organizerName: '',
+  rc143VolunteerId: '',
   eventDate: '',
   location: '',
+  municipalityId: '',
 })
 
 const emptyDonorForm = () => ({
@@ -450,6 +453,8 @@ const emptyDonorForm = () => ({
   bloodType: 'O+',
   donorNumber: '',
   assignedDonorId: '',
+  municipalityId: '',
+  rc143VolunteerId: '',
   age: '',
   gender: '',
   bagType: '',
@@ -489,14 +494,8 @@ function AdminMbd() {
   const [mbdRequestsOpen, setMbdRequestsOpen] = useState(false)
   const [mbdRequests, setMbdRequests] = useState([])
   const [mbdRequestsLoading, setMbdRequestsLoading] = useState(false)
-  const [registeredVolunteers] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(RC143_VOLUNTEERS_KEY) || '[]')
-      return Array.isArray(saved) ? saved : []
-    } catch {
-      return []
-    }
-  })
+  const [registeredVolunteers, setRegisteredVolunteers] = useState([])
+  const [municipalities, setMunicipalities] = useState([])
 
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
@@ -511,6 +510,25 @@ function AdminMbd() {
     } catch (e) {
       setError(e.message || 'Failed to load MBD events')
       setEvents([])
+    }
+  }, [])
+
+  const loadRegisteredVolunteers = useCallback(async () => {
+    try {
+      const data = await apiRequest('/api/admin/rc143-volunteers')
+      setRegisteredVolunteers(Array.isArray(data) ? data : [])
+    } catch (e) {
+      showNotification(e.message || 'Failed to load registered volunteers', 'destructive')
+      setRegisteredVolunteers([])
+    }
+  }, [])
+  const loadMunicipalities = useCallback(async () => {
+    try {
+      const data = await apiRequest('/api/admin/municipalities')
+      setMunicipalities(Array.isArray(data) ? data : [])
+    } catch (e) {
+      showNotification(e.message || 'Failed to load municipalities', 'destructive')
+      setMunicipalities([])
     }
   }, [])
 
@@ -544,19 +562,19 @@ function AdminMbd() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      await loadEvents()
+      await Promise.all([loadEvents(), loadRegisteredVolunteers(), loadMunicipalities()])
       if (!cancelled) setLoading(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [loadEvents])
+  }, [loadEvents, loadRegisteredVolunteers, loadMunicipalities])
 
   const openModal = async (row) => {
     setSelectedEvent(row)
     setModalOpen(true)
     setEditingDonorId(null)
-    setDonorForm(emptyDonorForm())
+    setDonorForm({ ...emptyDonorForm(), municipalityId: row.municipality_id != null ? String(row.municipality_id) : '', rc143VolunteerId: row.rc143_volunteer_id != null ? String(row.rc143_volunteer_id) : '' })
     const initialCounts = hydrateLegacyDeferralCounts(row?.deferral_counts || {})
     setDeferralForm(buildDeferralFormState(initialCounts))
     setCustomDeferralFields(parseCustomDeferralFields(initialCounts))
@@ -592,8 +610,8 @@ function AdminMbd() {
 
   const handleCreateMbd = async (e) => {
     e.preventDefault()
-    if (!createForm.name.trim() || !createForm.organizerName.trim() || !createForm.eventDate || !createForm.location.trim()) {
-      showNotification('Fill in MBD name, organizer, date, and location.', 'destructive')
+    if (!createForm.name.trim() || !createForm.organizerName.trim() || !createForm.eventDate || !createForm.location.trim() || !createForm.municipalityId) {
+      showNotification('Fill in MBD name, organizer, date, location, and municipality.', 'destructive')
       return
     }
     setCreating(true)
@@ -603,8 +621,10 @@ function AdminMbd() {
         body: JSON.stringify({
           name: createForm.name.trim(),
           organizerName: createForm.organizerName.trim(),
+          rc143VolunteerId: Number(createForm.rc143VolunteerId),
           eventDate: createForm.eventDate,
           location: createForm.location.trim(),
+          municipalityId: Number(createForm.municipalityId),
         }),
       })
       setCreateForm(emptyCreateForm())
@@ -623,6 +643,8 @@ function AdminMbd() {
     bloodType: donorForm.bloodType,
     donorNumber: donorForm.donorNumber.trim(),
     assignedDonorId: donorForm.assignedDonorId.trim(),
+    municipalityId: Number(donorForm.municipalityId),
+    rc143VolunteerId: donorForm.rc143VolunteerId === '' ? null : Number(donorForm.rc143VolunteerId),
     age: donorForm.age === '' ? '' : Number(donorForm.age),
     gender: donorForm.gender,
     bagType: donorForm.bagType,
@@ -638,6 +660,10 @@ function AdminMbd() {
     if (!selectedEvent) return
     if (!donorForm.donorName.trim()) {
       showNotification('Donor name is required.', 'destructive')
+      return
+    }
+    if (!donorForm.municipalityId) {
+      showNotification('Municipality is required.', 'destructive')
       return
     }
     setDonorSaving(true)
@@ -657,7 +683,7 @@ function AdminMbd() {
         showNotification('Donor added.', 'primary')
       }
       setEditingDonorId(null)
-      setDonorForm(emptyDonorForm())
+      setDonorForm({ ...emptyDonorForm(), municipalityId: selectedEvent.municipality_id != null ? String(selectedEvent.municipality_id) : '', rc143VolunteerId: selectedEvent.rc143_volunteer_id != null ? String(selectedEvent.rc143_volunteer_id) : '' })
       const data = await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors`)
       setDonors(Array.isArray(data) ? data : [])
       await loadEvents()
@@ -676,6 +702,8 @@ function AdminMbd() {
       bloodType: normalizeDonorBloodType(d.blood_type),
       donorNumber: d.donor_number || '',
       assignedDonorId: d.assigned_donor_id || '',
+      municipalityId: d.municipality_id != null ? String(d.municipality_id) : '',
+      rc143VolunteerId: d.rc143_volunteer_id != null ? String(d.rc143_volunteer_id) : '',
       age: d.age != null ? String(d.age) : '',
       gender: d.gender || '',
       bagType: normalizeBagGroup(d.bag_type),
@@ -695,7 +723,7 @@ function AdminMbd() {
 
   const cancelEditDonor = () => {
     setEditingDonorId(null)
-    setDonorForm(emptyDonorForm())
+    setDonorForm({ ...emptyDonorForm(), municipalityId: selectedEvent?.municipality_id != null ? String(selectedEvent.municipality_id) : '', rc143VolunteerId: selectedEvent?.rc143_volunteer_id != null ? String(selectedEvent.rc143_volunteer_id) : '' })
   }
 
   const openCustomDeferralModal = () => {
@@ -1157,7 +1185,7 @@ function AdminMbd() {
           </div>
         </div>
         <form onSubmit={handleCreateMbd} className="border-b border-slate-100 px-5 py-5 sm:px-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <label className={labelCls} htmlFor="mbd-name">
                 MBD name
@@ -1178,12 +1206,19 @@ function AdminMbd() {
               <select
                 id="mbd-organizer"
                 className={inputCls}
-                value={createForm.organizerName}
-                onChange={(ev) => setCreateForm((f) => ({ ...f, organizerName: ev.target.value }))}
+                value={createForm.rc143VolunteerId}
+                onChange={(ev) => { const volunteer = registeredVolunteers.find((item) => String(item.id) === ev.target.value); setCreateForm((f) => ({ ...f, rc143VolunteerId: ev.target.value, organizerName: volunteer?.fullName || '' })) }}
                 required
               >
                 <option value="">Select registered volunteer</option>
-                {registeredVolunteers.map((volunteer) => <option key={volunteer.id} value={volunteer.fullName}>{volunteer.fullName}</option>)}
+                {registeredVolunteers.map((volunteer) => <option key={volunteer.id} value={volunteer.id}>{volunteer.fullName}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="mbd-municipality">Municipality</label>
+              <select id="mbd-municipality" required className={inputCls} value={createForm.municipalityId} onChange={(ev) => setCreateForm((f) => ({ ...f, municipalityId: ev.target.value }))}>
+                <option value="">Select municipality</option>
+                {municipalities.map((municipality) => <option key={municipality.id} value={municipality.id}>{municipality.name}</option>)}
               </select>
             </div>
             <div>
@@ -1247,6 +1282,7 @@ function AdminMbd() {
                 <th className={`${p.th} px-4 py-3`}>Organizer</th>
                 <th className={`${p.th} px-4 py-3`}>Date</th>
                 <th className={`${p.th} px-4 py-3`}>Location</th>
+                <th className={`${p.th} px-4 py-3`}>Municipality</th>
                 <th className={`${p.th} px-4 py-3 text-right`}>Donors</th>
                 <th className={`${p.th} px-4 py-3 text-right`}>Actions</th>
               </tr>
@@ -1254,14 +1290,14 @@ function AdminMbd() {
             <tbody className={p.tbody}>
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && events.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
                     No MBD events yet. Create one above.
                   </td>
                 </tr>
@@ -1289,6 +1325,7 @@ function AdminMbd() {
                     <td className="max-w-[280px] truncate px-4 py-3 text-slate-700" title={row.location}>
                       {row.location}
                     </td>
+                    <td className="px-4 py-3 text-slate-700">{row.municipality_name || '—'}</td>
                     <td className="px-4 py-3 text-right font-medium text-slate-800">{row.donor_count ?? 0}</td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -1397,8 +1434,10 @@ function AdminMbd() {
                             bloodType: normalizeDonorBloodType(user.blood_type || existingMbdDonor.blood_type),
                             donorNumber: user.phone || existingMbdDonor.donor_number || '',
                             assignedDonorId: user.assigned_donor_id || existingMbdDonor.assigned_donor_id || '',
-                            age: existingMbdDonor.age != null ? String(existingMbdDonor.age) : '',
-                            gender: existingMbdDonor.gender || '',
+                            municipalityId: existingMbdDonor.municipality_id != null ? String(existingMbdDonor.municipality_id) : '',
+                            rc143VolunteerId: existingMbdDonor.rc143_volunteer_id != null ? String(existingMbdDonor.rc143_volunteer_id) : '',
+                            age: user.age != null ? String(user.age) : existingMbdDonor.age != null ? String(existingMbdDonor.age) : '',
+                            gender: user.gender || existingMbdDonor.gender || '',
                             bagType: normalizeBagGroup(existingMbdDonor.bag_type),
                             remarksSd: existingMbdDonor.remarks_sd || '',
                             donationType: Number(existingMbdDonor.num_donations) > 1 ? 'repeater' : 'first_timer',
@@ -1418,6 +1457,8 @@ function AdminMbd() {
                             bloodType: normalizeDonorBloodType(user.blood_type),
                             donorNumber: user.phone || '',
                             assignedDonorId: user.assigned_donor_id || '',
+                            age: user.age != null ? String(user.age) : '',
+                            gender: user.gender || '',
                           }))
                         }
                       }}

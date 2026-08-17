@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { isRc143Volunteer } = require('./rc143VolunteerController')
 
 async function createMbdRequestController(req, res) {
   const title = String(req.body?.title || '').trim()
@@ -8,6 +9,7 @@ async function createMbdRequestController(req, res) {
   if (title.length > 255 || location.length > 512) return res.status(400).json({ message: 'Title or location is too long' })
   if (message.length > 2000) return res.status(400).json({ message: 'Message must be 2,000 characters or fewer' })
   try {
+    if (!(await isRc143Volunteer(req.user.id))) return res.status(403).json({ message: 'Only registered RC143 volunteers can submit MBD requests' })
     const [result] = await pool.query(
       'INSERT INTO mbd_requests (volunteer_user_id, title, message, location) VALUES (?, ?, ?, ?)',
       [req.user.id, title, message, location],

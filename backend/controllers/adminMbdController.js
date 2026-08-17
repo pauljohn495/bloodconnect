@@ -66,6 +66,9 @@ const mapEventRow = (row) => ({
   organizer_name: row.organizer_name != null ? String(row.organizer_name) : '',
   event_date: row.event_date,
   location: row.location,
+  municipality_id: row.municipality_id != null ? Number(row.municipality_id) : null,
+  municipality_name: row.municipality_name || null,
+  rc143_volunteer_id: row.rc143_volunteer_id != null ? Number(row.rc143_volunteer_id) : null,
   donor_count: row.donor_count != null ? Number(row.donor_count) : 0,
   deferral_counts: normalizeDeferralCounts(row.deferral_counts_json || null),
   created_at: row.created_at,
@@ -75,6 +78,10 @@ const mapEventRow = (row) => ({
 const mapDonorRow = (row) => ({
   id: row.id,
   mbd_event_id: row.mbd_event_id,
+  municipality_id: row.municipality_id != null ? Number(row.municipality_id) : null,
+  municipality_name: row.municipality_name || null,
+  rc143_volunteer_id: row.rc143_volunteer_id != null ? Number(row.rc143_volunteer_id) : null,
+  volunteer_name: row.volunteer_name || null,
   donor_name: row.donor_name,
   barcode: row.barcode,
   blood_type: row.blood_type,
@@ -151,11 +158,14 @@ const listMbdEventsController = async (req, res) => {
         e.organizer_name,
         e.event_date,
         e.location,
+        e.municipality_id,
+        m.name AS municipality_name,
+        e.rc143_volunteer_id,
         e.deferral_counts_json,
         e.created_at,
         e.updated_at,
         (SELECT COUNT(*) FROM mbd_donor_records d WHERE d.mbd_event_id = e.id) AS donor_count
-      FROM mbd_events e
+      FROM mbd_events e LEFT JOIN municipalities m ON m.id = e.municipality_id
       ORDER BY e.event_date DESC, e.id DESC
     `,
     )
@@ -183,6 +193,8 @@ const createMbdEventController = async (req, res) => {
   const eventDateAlt = req.body.event_date != null ? String(req.body.event_date).trim() : ''
   const dateNorm = eventDate || eventDateAlt
   const location = req.body.location != null ? String(req.body.location).trim() : ''
+  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
+  const volunteerId = Number(req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id)
 
   if (!name) {
     return res.status(400).json({ message: 'name is required' })
@@ -199,14 +211,20 @@ const createMbdEventController = async (req, res) => {
   if (!location) {
     return res.status(400).json({ message: 'location is required' })
   }
+  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
+  if (!Number.isInteger(volunteerId) || volunteerId < 1) return res.status(400).json({ message: 'Select a volunteer' })
 
   try {
+    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
+    if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
     const [result] = await pool.query(
       `
-      INSERT INTO mbd_events (name, organizer_name, event_date, location, deferral_counts_json)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO mbd_events (name, organizer_name, event_date, location, municipality_id, rc143_volunteer_id, deferral_counts_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
-      [name, organizerName, dateNorm, location, JSON.stringify(normalizeDeferralCounts(null))],
+      [name, organizerName, dateNorm, location, municipalityId, volunteerId, JSON.stringify(normalizeDeferralCounts(null))],
     )
 
     const [rows] = await pool.query(
@@ -254,24 +272,29 @@ const listMbdDonorsController = async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT
-        id,
-        mbd_event_id,
-        donor_name,
-        barcode,
-        blood_type,
-        donor_number,
-        assigned_donor_id,
-        age,
-        gender,
-        bag_type,
-        remarks_sd,
-        num_donations,
-        transferred_donor_user_id,
-        created_at,
-        updated_at
-      FROM mbd_donor_records
-      WHERE mbd_event_id = ?
-      ORDER BY id ASC
+        d.id,
+        d.mbd_event_id,
+        d.municipality_id, m.name AS municipality_name,
+        d.rc143_volunteer_id, v.full_name AS volunteer_name,
+        d.donor_name,
+        d.barcode,
+        d.blood_type,
+        d.donor_number,
+        d.assigned_donor_id,
+        d.age,
+        d.gender,
+        d.bag_type,
+        d.remarks_sd,
+        d.num_donations,
+        d.transferred_donor_user_id,
+        d.created_at,
+        d.updated_at
+      FROM mbd_donor_records d
+      LEFT JOIN municipalities m ON m.id = d.municipality_id
+      LEFT JOIN rc143_volunteers rv ON rv.id = d.rc143_volunteer_id
+      LEFT JOIN users v ON v.id = rv.user_id
+      WHERE d.mbd_event_id = ?
+      ORDER BY d.id ASC
     `,
       [eventId],
     )
@@ -330,10 +353,15 @@ const createMbdDonorController = async (req, res) => {
         : ''
   const remarks = remarksRaw ? remarksRaw : null
   const numRaw = req.body.numDonations != null ? req.body.numDonations : req.body.num_donations
+  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
+  const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
+  const volunteerId = volunteerRaw === '' || volunteerRaw == null ? null : Number(volunteerRaw)
 
   if (!donorName) {
     return res.status(400).json({ message: 'donorName is required' })
   }
+  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
+  if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
   if (!BLOOD_TYPES.has(bloodType)) {
     return res.status(400).json({
       message: 'bloodType must be one of A+, A-, B+, B-, O+, O-, AB+, AB-',
@@ -364,11 +392,19 @@ const createMbdDonorController = async (req, res) => {
     if (!exists.length) {
       return res.status(404).json({ message: 'MBD event not found' })
     }
+    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    if (volunteerId != null) {
+      const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
+      if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+    }
 
     const [result] = await pool.query(
       `
       INSERT INTO mbd_donor_records (
         mbd_event_id,
+        municipality_id,
+        rc143_volunteer_id,
         donor_name,
         barcode,
         blood_type,
@@ -380,10 +416,12 @@ const createMbdDonorController = async (req, res) => {
         remarks_sd,
         num_donations
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         eventId,
+        municipalityId,
+        volunteerId,
         donorName,
         barcode || null,
         bloodType,
@@ -400,23 +438,25 @@ const createMbdDonorController = async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT
-        id,
-        mbd_event_id,
-        donor_name,
-        barcode,
-        blood_type,
-        donor_number,
-        assigned_donor_id,
-        age,
-        gender,
-        bag_type,
-        remarks_sd,
-        num_donations,
-        transferred_donor_user_id,
-        created_at,
-        updated_at
-      FROM mbd_donor_records
-      WHERE id = ?
+        d.id,
+        d.mbd_event_id,
+        d.municipality_id, m.name AS municipality_name,
+        d.rc143_volunteer_id, v.full_name AS volunteer_name,
+        d.donor_name,
+        d.barcode,
+        d.blood_type,
+        d.donor_number,
+        d.assigned_donor_id,
+        d.age,
+        d.gender,
+        d.bag_type,
+        d.remarks_sd,
+        d.num_donations,
+        d.transferred_donor_user_id,
+        d.created_at,
+        d.updated_at
+      FROM mbd_donor_records d LEFT JOIN municipalities m ON m.id = d.municipality_id LEFT JOIN rc143_volunteers rv ON rv.id = d.rc143_volunteer_id LEFT JOIN users v ON v.id = rv.user_id
+      WHERE d.id = ?
     `,
       [result.insertId],
     )
@@ -477,10 +517,15 @@ const updateMbdDonorController = async (req, res) => {
         : ''
   const remarks = remarksRaw ? remarksRaw : null
   const numRaw = req.body.numDonations != null ? req.body.numDonations : req.body.num_donations
+  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
+  const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
+  const volunteerId = volunteerRaw === '' || volunteerRaw == null ? null : Number(volunteerRaw)
 
   if (!donorName) {
     return res.status(400).json({ message: 'donorName is required' })
   }
+  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
+  if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
   if (!BLOOD_TYPES.has(bloodType)) {
     return res.status(400).json({
       message: 'bloodType must be one of A+, A-, B+, B-, O+, O-, AB+, AB-',
@@ -507,11 +552,19 @@ const updateMbdDonorController = async (req, res) => {
   }
 
   try {
+    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    if (volunteerId != null) {
+      const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
+      if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+    }
     const [result] = await pool.query(
       `
       UPDATE mbd_donor_records
       SET
         donor_name = ?,
+        municipality_id = ?,
+        rc143_volunteer_id = ?,
         barcode = ?,
         blood_type = ?,
         donor_number = ?,
@@ -525,6 +578,8 @@ const updateMbdDonorController = async (req, res) => {
     `,
       [
         donorName,
+        municipalityId,
+        volunteerId,
         barcode || null,
         bloodType,
         donorNumber || null,
@@ -546,23 +601,25 @@ const updateMbdDonorController = async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT
-        id,
-        mbd_event_id,
-        donor_name,
-        barcode,
-        blood_type,
-        donor_number,
-        assigned_donor_id,
-        age,
-        gender,
-        bag_type,
-        remarks_sd,
-        num_donations,
-        transferred_donor_user_id,
-        created_at,
-        updated_at
-      FROM mbd_donor_records
-      WHERE id = ? AND mbd_event_id = ?
+        d.id,
+        d.mbd_event_id,
+        d.municipality_id, m.name AS municipality_name,
+        d.rc143_volunteer_id, v.full_name AS volunteer_name,
+        d.donor_name,
+        d.barcode,
+        d.blood_type,
+        d.donor_number,
+        d.assigned_donor_id,
+        d.age,
+        d.gender,
+        d.bag_type,
+        d.remarks_sd,
+        d.num_donations,
+        d.transferred_donor_user_id,
+        d.created_at,
+        d.updated_at
+      FROM mbd_donor_records d LEFT JOIN municipalities m ON m.id = d.municipality_id LEFT JOIN rc143_volunteers rv ON rv.id = d.rc143_volunteer_id LEFT JOIN users v ON v.id = rv.user_id
+      WHERE d.id = ? AND d.mbd_event_id = ?
     `,
       [donorId, eventId],
     )

@@ -12,6 +12,7 @@ const {
 } = require('../controllers/userController')
 const { validateUpdateMe, validateScheduleRequest } = require('../validators/userValidators')
 const { createMbdRequestController, listMyMbdRequestsController } = require('../controllers/mbdRequestController')
+const { getMyRc143VolunteerStatusController } = require('../controllers/rc143VolunteerController')
 
 const router = express.Router()
 
@@ -43,6 +44,7 @@ router.post('/schedule-requests', validateScheduleRequest, createScheduleRequest
 
 router.post('/mbd-requests', auth(['donor']), createMbdRequestController)
 router.get('/mbd-requests', auth(['donor']), listMyMbdRequestsController)
+router.get('/rc143-volunteer-status', auth(['donor']), getMyRc143VolunteerStatusController)
 
 module.exports = router
 

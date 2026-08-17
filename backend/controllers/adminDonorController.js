@@ -6,7 +6,7 @@ const getDonorsController = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT id, username, email, full_name, phone, barcode, assigned_donor_id, blood_type, last_donation_date, created_at, status,
+      SELECT id, username, email, full_name, phone, barcode, assigned_donor_id, blood_type, age, gender, last_donation_date, created_at, status,
              profile_image_url, pending_profile_json, profile_update_requested_at
       FROM users
       WHERE role = 'donor'
@@ -29,7 +29,7 @@ const searchDonorsController = async (req, res) => {
     const pattern = `%${q}%`
     const [rows] = await pool.query(
       `
-      SELECT id, full_name, phone, barcode, assigned_donor_id, blood_type, email, username
+      SELECT id, full_name, phone, barcode, assigned_donor_id, blood_type, age, gender, email, username
       FROM users
       WHERE role = 'donor'
         AND (
@@ -51,13 +51,27 @@ const searchDonorsController = async (req, res) => {
 }
 
 const createDonorController = async (req, res) => {
-  const { donorName, bloodType, contactPhone, contactEmail, username, password, barcode } = req.body
+  const {
+    donorName,
+    bloodType,
+    contactPhone,
+    contactEmail,
+    username,
+    password,
+    barcode,
+    assignedDonorId,
+    age: rawAge,
+    gender: rawGender,
+  } = req.body
 
   if (!donorName || !bloodType || !contactPhone) {
     return res
       .status(400)
       .json({ message: 'donorName, bloodType and contactPhone are required' })
   }
+  const age = rawAge === '' || rawAge == null ? null : Number(rawAge)
+  if (age != null && (!Number.isInteger(age) || age < 0 || age > 130)) return res.status(400).json({ message: 'age must be between 0 and 130' })
+  const gender = String(rawGender || '').trim()
 
   try {
     let finalUsername =
@@ -101,10 +115,21 @@ const createDonorController = async (req, res) => {
 
     const [result] = await pool.query(
       `
-      INSERT INTO users (username, email, password_hash, role, full_name, phone, barcode, blood_type, status, last_donation_date, is_manual_donor)
-      VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, 'active', NULL, 1)
+      INSERT INTO users (username, email, password_hash, role, full_name, phone, barcode, assigned_donor_id, blood_type, age, gender, status, last_donation_date, is_manual_donor)
+      VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, ?, ?, ?, 'active', NULL, 1)
     `,
-      [finalUsername, safeEmail, passwordHash, donorName, contactPhone, barcode || null, bloodType],
+      [
+        finalUsername,
+        safeEmail,
+        passwordHash,
+        donorName,
+        contactPhone,
+        barcode || null,
+        assignedDonorId?.trim() || null,
+        bloodType,
+        age,
+        gender || null,
+      ],
     )
 
     res.status(201).json({
@@ -113,7 +138,10 @@ const createDonorController = async (req, res) => {
       bloodType,
       contactPhone,
       barcode: barcode || null,
+      assignedDonorId: assignedDonorId?.trim() || null,
       contactEmail: contactEmail || null,
+      age,
+      gender: gender || null,
       username: finalUsername,
     })
   } catch (error) {

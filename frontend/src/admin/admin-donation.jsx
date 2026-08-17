@@ -47,12 +47,15 @@ function AdminDonation() {
   const WHOLE_BLOOD_COOLDOWN_DAYS = 90
   const BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
-  const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations' | 'rc143'
+  const [activeSection, setActiveSection] = useState('donors') // 'donors' | 'organizations' | 'municipalities' | 'rc143'
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [donorName, setDonorName] = useState('')
   const [donorBarcode, setDonorBarcode] = useState('')
+  const [assignedDonorId, setAssignedDonorId] = useState('')
   const [bloodType, setBloodType] = useState('')
   const [contactDonor, setContactDonor] = useState('')
+  const [donorAge, setDonorAge] = useState('')
+  const [donorGender, setDonorGender] = useState('')
   const [donors, setDonors] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -110,6 +113,10 @@ function AdminDonation() {
   const [organizationEmailAddress, setOrganizationEmailAddress] = useState('')
   const [organizationAddress, setOrganizationAddress] = useState('')
   const [isCreatingOrganization, setIsCreatingOrganization] = useState(false)
+  const [municipalities, setMunicipalities] = useState([])
+  const [municipalitiesLoading, setMunicipalitiesLoading] = useState(false)
+  const [municipalityName, setMunicipalityName] = useState('')
+  const [municipalityModalOpen, setMunicipalityModalOpen] = useState(false)
 
   const [isOrgDonationModalOpen, setIsOrgDonationModalOpen] = useState(false)
   const [orgDonationOrganizationId, setOrgDonationOrganizationId] = useState('')
@@ -127,38 +134,13 @@ function AdminDonation() {
   const [isRankingLoading, setIsRankingLoading] = useState(false)
   const [rankingError, setRankingError] = useState('')
 
-  const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
-  const RC143_REQUESTS_KEY = 'bloodconnect_rc143_activity_requests'
-
-  const [rc143Volunteers, setRc143Volunteers] = useState(() => {
-    try {
-      const raw = localStorage.getItem(RC143_VOLUNTEERS_KEY)
-      if (raw) {
-        const p = JSON.parse(raw)
-        if (Array.isArray(p)) return p
-      }
-    } catch {
-      /* ignore */
-    }
-    return []
-  })
+  const [rc143Volunteers, setRc143Volunteers] = useState([])
   const [isRc143VolunteerModalOpen, setIsRc143VolunteerModalOpen] = useState(false)
   const [editingRc143VolunteerId, setEditingRc143VolunteerId] = useState(null)
   const [isDeleteRc143VolunteerModalOpen, setIsDeleteRc143VolunteerModalOpen] = useState(false)
   const [rc143VolunteerToDelete, setRc143VolunteerToDelete] = useState(null)
   const [isRc143HistoryModalOpen, setIsRc143HistoryModalOpen] = useState(false)
-  const [rc143Requests, setRc143Requests] = useState(() => {
-    try {
-      const raw = localStorage.getItem(RC143_REQUESTS_KEY)
-      if (raw) {
-        const p = JSON.parse(raw)
-        if (Array.isArray(p)) return p
-      }
-    } catch {
-      /* ignore */
-    }
-    return []
-  })
+  const [rc143Requests, setRc143Requests] = useState([])
   const [rc143VolunteerUserId, setRc143VolunteerUserId] = useState('')
   const [rc143VolFullName, setRc143VolFullName] = useState('')
   const [rc143VolOrganization, setRc143VolOrganization] = useState('')
@@ -231,6 +213,25 @@ function AdminDonation() {
       setIsOrganizationsLoading(false)
     }
   }
+  const loadMunicipalities = async () => {
+    try {
+      setMunicipalitiesLoading(true)
+      setMunicipalities(await apiRequest('/api/admin/municipalities'))
+    } catch (err) {
+      showNotification(err.message || 'Failed to load municipalities', 'destructive')
+    } finally {
+      setMunicipalitiesLoading(false)
+    }
+  }
+
+  const loadRc143Volunteers = async () => {
+    try {
+      const data = await apiRequest('/api/admin/rc143-volunteers')
+      setRc143Volunteers(Array.isArray(data) ? data : [])
+    } catch (err) {
+      showNotification(err.message || 'Failed to load RC143 volunteers', 'destructive')
+    }
+  }
 
   useEffect(() => {
     loadDonors()
@@ -243,43 +244,26 @@ function AdminDonation() {
   }, [activeSection])
 
   useEffect(() => {
-    try {
-      localStorage.setItem(RC143_VOLUNTEERS_KEY, JSON.stringify(rc143Volunteers))
-    } catch {
-      /* quota / private mode */
-    }
-  }, [rc143Volunteers])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RC143_REQUESTS_KEY, JSON.stringify(rc143Requests))
-    } catch {
-      /* quota / private mode */
-    }
-  }, [rc143Requests])
-
-  useEffect(() => {
-    const syncRc143RequestsFromStorage = () => {
-      try {
-        const raw = localStorage.getItem(RC143_REQUESTS_KEY)
-        const parsed = raw ? JSON.parse(raw) : []
-        setRc143Requests(Array.isArray(parsed) ? parsed : [])
-      } catch {
-        setRc143Requests([])
-      }
-    }
-
-    // Refresh whenever admin opens/switches to RC143 and when storage changes.
     if (activeSection === 'rc143') {
-      syncRc143RequestsFromStorage()
-    }
-    window.addEventListener('storage', syncRc143RequestsFromStorage)
-    window.addEventListener('focus', syncRc143RequestsFromStorage)
-    return () => {
-      window.removeEventListener('storage', syncRc143RequestsFromStorage)
-      window.removeEventListener('focus', syncRc143RequestsFromStorage)
+      loadRc143Volunteers()
     }
   }, [activeSection])
+  useEffect(() => {
+    if (activeSection === 'municipalities') loadMunicipalities()
+  }, [activeSection])
+
+  const createMunicipality = async (e) => {
+    e.preventDefault()
+    try {
+      await apiRequest('/api/admin/municipalities', { method: 'POST', body: JSON.stringify({ name: municipalityName }) })
+      setMunicipalityModalOpen(false)
+      setMunicipalityName('')
+      await loadMunicipalities()
+      showNotification('Municipality added successfully.', 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Failed to add municipality', 'destructive')
+    }
+  }
 
   useEffect(() => {
     const handleScroll = () => {
@@ -406,8 +390,11 @@ function AdminDonation() {
     setIsModalOpen(false)
     setDonorName('')
     setDonorBarcode('')
+    setAssignedDonorId('')
     setBloodType('')
     setContactDonor('')
+    setDonorAge('')
+    setDonorGender('')
   }
 
   const handleOpenAddOrganizationModal = () => {
@@ -551,8 +538,11 @@ function AdminDonation() {
         body: JSON.stringify({
           donorName,
           barcode: donorBarcode,
+          assignedDonorId,
           bloodType,
           contactPhone: contactDonor,
+          age: donorAge,
+          gender: donorGender,
         }),
       })
       // Refresh table so new donor appears immediately
@@ -1002,13 +992,17 @@ function AdminDonation() {
     setRc143VolunteerToDelete(null)
   }
 
-  const handleConfirmDeleteRc143Volunteer = () => {
+  const handleConfirmDeleteRc143Volunteer = async () => {
     if (!rc143VolunteerToDelete) return
     const volunteerId = String(rc143VolunteerToDelete.id)
-    setRc143Volunteers((prev) => prev.filter((v) => String(v.id) !== volunteerId))
-    setRc143Requests((prev) => prev.filter((r) => String(r.volunteerId) !== volunteerId))
-    handleCloseDeleteRc143VolunteerModal()
-    showNotification('Volunteer deleted.', 'primary')
+    try {
+      await apiRequest(`/api/admin/rc143-volunteers/${volunteerId}`, { method: 'DELETE' })
+      setRc143Volunteers((prev) => prev.filter((v) => String(v.id) !== volunteerId))
+      handleCloseDeleteRc143VolunteerModal()
+      showNotification('Volunteer deleted.', 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Failed to delete volunteer.', 'destructive')
+    }
   }
 
   const handleUpdateRc143RequestStatus = (requestId, nextStatus) => {
@@ -1022,7 +1016,7 @@ function AdminDonation() {
     showNotification(`Request marked as ${nextStatus}.`, 'primary')
   }
 
-  const handleSubmitRc143Volunteer = (e) => {
+  const handleSubmitRc143Volunteer = async (e) => {
     e.preventDefault()
     if (!rc143VolunteerUserId) {
       showNotification('Please select an existing donor/recipient user.', 'destructive')
@@ -1039,9 +1033,7 @@ function AdminDonation() {
       return
     }
     const baseVolunteer = {
-      fullName,
-      sourceUserId: selectedUser.id,
-      sourceUserRole: selectedUser.role,
+      userId: selectedUser.id,
       organization: rc143VolOrganization.trim(),
       occupation: rc143VolOccupation.trim(),
       contact: rc143VolContact.trim(),
@@ -1049,31 +1041,24 @@ function AdminDonation() {
       contactNumber: rc143VolContactNumber.trim(),
     }
     if (editingRc143VolunteerId) {
-      setRc143Volunteers((prev) =>
-        prev.map((v) =>
-          String(v.id) === String(editingRc143VolunteerId)
-            ? { ...v, ...baseVolunteer, updatedAt: new Date().toISOString() }
-            : v,
-        ),
-      )
-      closeRc143VolunteerModal()
-      showNotification('Volunteer updated.', 'primary')
+      try {
+        await apiRequest(`/api/admin/rc143-volunteers/${editingRc143VolunteerId}`, { method: 'PUT', body: JSON.stringify(baseVolunteer) })
+        await loadRc143Volunteers()
+        closeRc143VolunteerModal()
+        showNotification('Volunteer updated.', 'primary')
+      } catch (err) {
+        showNotification(err.message || 'Failed to update volunteer.', 'destructive')
+      }
       return
     }
-    const rid =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `v-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    setRc143Volunteers((prev) => [
-      {
-        id: rid,
-        ...baseVolunteer,
-        registeredAt: new Date().toISOString(),
-      },
-      ...prev,
-    ])
-    closeRc143VolunteerModal()
-    showNotification('Volunteer registered.', 'primary')
+    try {
+      await apiRequest('/api/admin/rc143-volunteers', { method: 'POST', body: JSON.stringify(baseVolunteer) })
+      await loadRc143Volunteers()
+      closeRc143VolunteerModal()
+      showNotification('Volunteer registered.', 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Failed to register volunteer.', 'destructive')
+    }
   }
 
   const openRc143HistoryModal = () => {
@@ -1106,6 +1091,8 @@ function AdminDonation() {
           ? 'Organizations'
           : activeSection === 'rc143'
             ? 'RC143'
+            : activeSection === 'municipalities'
+              ? 'Municipalities'
             : 'Donors'
       }
       pageDescription={
@@ -1113,6 +1100,8 @@ function AdminDonation() {
           ? 'View and manage registered organizations.'
           : activeSection === 'rc143'
             ? 'Register volunteers and review their activity requests.'
+            : activeSection === 'municipalities'
+              ? 'Manage municipalities and their donor totals.'
             : 'View and manage registered blood donors.'
       }
     >
@@ -1149,6 +1138,9 @@ function AdminDonation() {
             >
               Organizations
             </button>
+            <button type="button" role="tab" aria-selected={activeSection === 'municipalities'} onClick={() => setActiveSection('municipalities')} className={`rounded-md px-3.5 py-2 text-sm font-medium transition ${activeSection === 'municipalities' ? 'border border-slate-200/90 bg-white text-red-900 shadow-sm shadow-slate-200/80' : 'border border-transparent bg-transparent text-slate-600 hover:text-slate-800'}`}>
+              Municipalities
+            </button>
             <button
               type="button"
               role="tab"
@@ -1164,7 +1156,12 @@ function AdminDonation() {
             </button>
           </div>
         </div>
-        {activeSection === 'rc143' ? (
+        {activeSection === 'municipalities' ? (
+          <div className={adminPanel.emerald.outer}>
+            <div className={adminPanel.emerald.header}><div><h2 className={adminPanel.emerald.title}>Municipalities</h2><p className={adminPanel.emerald.subtitle}>Donor totals are calculated from MBD donor records.</p></div><button type="button" onClick={() => setMunicipalityModalOpen(true)} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700">Add Municipality</button></div>
+            <div className={adminPanel.emerald.tableScroll}><table className="min-w-full divide-y divide-slate-100 text-sm"><thead className={adminPanel.emerald.thead}><tr><th className={`px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>Municipality Name</th><th className={`px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>Donors</th></tr></thead><tbody className={adminPanel.emerald.tbody}>{municipalitiesLoading ? <tr><td colSpan={2} className="px-4 py-8 text-center text-slate-500">Loading municipalities...</td></tr> : municipalities.length === 0 ? <tr><td colSpan={2} className="px-4 py-8 text-center text-slate-500">No municipalities registered yet.</td></tr> : municipalities.map((m) => <tr key={m.id}><td className="px-4 py-2 font-semibold text-slate-900">{m.name}</td><td className="px-4 py-2 text-slate-700">{m.donor_count}</td></tr>)}</tbody></table></div>
+          </div>
+        ) : activeSection === 'rc143' ? (
           <div className={adminPanel.emerald.outer}>
             <div className={adminPanel.emerald.header}>
               <div>
@@ -1743,6 +1740,8 @@ function AdminDonation() {
         )}
       </section>
 
+      {municipalityModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40"><form onSubmit={createMunicipality} className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"><h3 className="text-base font-semibold text-slate-900">Add Municipality</h3><label className="mt-4 block text-sm font-medium text-slate-700">Municipality Name<input required autoFocus value={municipalityName} onChange={(e) => setMunicipalityName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => { setMunicipalityModalOpen(false); setMunicipalityName('') }} className="rounded-lg border px-3 py-2 text-sm">Cancel</button><button className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white">Add Municipality</button></div></form></div>}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
@@ -1786,6 +1785,19 @@ function AdminDonation() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-700">
+                  Donor ID
+                </label>
+                <input
+                  type="text"
+                  value={assignedDonorId}
+                  onChange={(e) => setAssignedDonorId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter donor ID"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
                   Blood Type
                 </label>
                 <select
@@ -1803,6 +1815,21 @@ function AdminDonation() {
                   <option value="AB-">AB-</option>
                   <option value="O+">O+</option>
                   <option value="O-">O-</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Age</label>
+                <input type="number" min="0" max="130" value={donorAge} onChange={(e) => setDonorAge(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500" placeholder="Age" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Gender</label>
+                <select value={donorGender} onChange={(e) => setDonorGender(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500">
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 

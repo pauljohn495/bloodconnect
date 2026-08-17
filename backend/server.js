@@ -15,6 +15,7 @@ const {
   ensureHomePostsTable,
   ensureMbdTables,
   ensureMbdRequestsTable,
+  ensureRc143VolunteersTable,
   ensureDonorNotificationBroadcastsTable,
   ensurePrcActivitiesTable,
   ensureRequestGroupsAndEventNotifications,
@@ -25,6 +26,7 @@ const { getPublicFeatureFlagsController } = require('./controllers/featureFlagCo
 const {
   getDonorDonationRankingController,
   getOrganizationDonationRankingController,
+  getMunicipalityDonationRankingController,
 } = require('./controllers/adminDonationRankingController')
 const authRoutes = require('./routes/authRoutes')
 const adminRoutes = require('./routes/adminRoutes')
@@ -92,6 +94,7 @@ app.get('/api/announcements', getPublicAnnouncementsController)
 app.get('/api/home-posts', getPublicHomePostsController)
 app.get('/api/rankings/donors', getDonorDonationRankingController)
 app.get('/api/rankings/organizations', getOrganizationDonationRankingController)
+app.get('/api/rankings/municipalities', getMunicipalityDonationRankingController)
 
 // Effective feature flags for all portals (no auth; safe visibility only)
 app.get('/api/feature-flags', getPublicFeatureFlagsController)
@@ -129,6 +132,7 @@ async function start() {
         await ensureScheduleDonationTrackingColumns()
         await ensureFeatureFlagTables()
         await ensureHomePostsTable()
+        await ensureRc143VolunteersTable()
         await ensureMbdTables()
         await ensureMbdRequestsTable()
         await ensureDonorNotificationBroadcastsTable()

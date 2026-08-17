@@ -118,9 +118,11 @@ function AdminDashboard() {
         setRecentTransfers(transfersData || [])
 
         // Calculate total available blood units
-        const total = inventoryData.reduce((sum, item) => {
+        const total = nonExpiredStocks.reduce((sum, item) => {
+          if (item.status !== 'available' && item.status !== 'near_expiry') return sum
           const units = item.available_units ?? item.availableUnits ?? 0
-          return sum + units
+          const numericUnits = Number(units)
+          return sum + (Number.isFinite(numericUnits) && numericUnits > 0 ? numericUnits : 0)
         }, 0)
         setTotalAvailableBlood(total)
 

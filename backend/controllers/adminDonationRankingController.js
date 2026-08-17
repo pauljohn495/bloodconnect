@@ -104,8 +104,30 @@ const getDonorDonationRankingController = async (req, res) => {
   }
 }
 
+const getMunicipalityDonationRankingController = async (req, res) => {
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 200)
+  try {
+    const [rows] = await pool.query(
+      `
+        SELECT m.id AS municipality_id, m.name AS municipality_name, COUNT(d.id) AS donor_count
+        FROM municipalities m
+        LEFT JOIN mbd_donor_records d ON d.municipality_id = m.id
+        GROUP BY m.id, m.name
+        ORDER BY donor_count DESC, m.name ASC
+        LIMIT ?
+      `,
+      [limit],
+    )
+    return res.json(rows.map((r) => ({ municipalityId: r.municipality_id, municipalityName: r.municipality_name, donorCount: Number(r.donor_count || 0) })))
+  } catch (error) {
+    console.error('Fetch municipality ranking error:', error)
+    return res.status(500).json({ message: 'Failed to fetch municipality ranking' })
+  }
+}
+
 module.exports = {
   getOrganizationDonationRankingController,
   getDonorDonationRankingController,
+  getMunicipalityDonationRankingController,
 }
 

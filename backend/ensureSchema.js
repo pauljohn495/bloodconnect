@@ -314,12 +314,22 @@ async function ensureHomePostsTable() {
 /** Mobile blood donation (MBD) events and per-drive donor intake records (admin-managed). */
 async function ensureMbdTables() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS municipalities (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_municipality_name (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS mbd_events (
       id INT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(255) NOT NULL,
       organizer_name VARCHAR(255) NOT NULL DEFAULT '',
       event_date DATE NOT NULL,
       location VARCHAR(512) NOT NULL,
+      municipality_id INT NULL,
+      rc143_volunteer_id INT NULL,
       deferral_counts_json MEDIUMTEXT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -461,6 +471,34 @@ async function ensureMbdRequestsTable() {
   if (!(await columnExists('mbd_requests', 'title'))) {
     await pool.query("ALTER TABLE mbd_requests ADD COLUMN title VARCHAR(255) NOT NULL DEFAULT '' AFTER volunteer_user_id")
   }
+  if (!(await columnExists('users', 'age'))) {
+    await pool.query('ALTER TABLE users ADD COLUMN age INT NULL')
+    console.log('Schema: added users.age')
+  }
+  if (!(await columnExists('users', 'gender'))) {
+    await pool.query('ALTER TABLE users ADD COLUMN gender VARCHAR(32) NULL')
+    console.log('Schema: added users.gender')
+  }
+  if (!(await columnExists('mbd_events', 'municipality_id'))) {
+    await pool.query('ALTER TABLE mbd_events ADD COLUMN municipality_id INT NULL AFTER location')
+    await pool.query('ALTER TABLE mbd_events ADD INDEX idx_mbd_event_municipality (municipality_id)')
+    await pool.query('ALTER TABLE mbd_events ADD CONSTRAINT fk_mbd_event_municipality FOREIGN KEY (municipality_id) REFERENCES municipalities(id) ON DELETE RESTRICT')
+  }
+  if (!(await columnExists('mbd_events', 'rc143_volunteer_id'))) {
+    await pool.query('ALTER TABLE mbd_events ADD COLUMN rc143_volunteer_id INT NULL AFTER municipality_id')
+    await pool.query('ALTER TABLE mbd_events ADD INDEX idx_mbd_event_volunteer (rc143_volunteer_id)')
+    await pool.query('ALTER TABLE mbd_events ADD CONSTRAINT fk_mbd_event_volunteer FOREIGN KEY (rc143_volunteer_id) REFERENCES rc143_volunteers(id) ON DELETE SET NULL')
+  }
+  if (!(await columnExists('mbd_donor_records', 'municipality_id'))) {
+    await pool.query('ALTER TABLE mbd_donor_records ADD COLUMN municipality_id INT NULL AFTER mbd_event_id')
+    await pool.query('ALTER TABLE mbd_donor_records ADD INDEX idx_mbd_donor_municipality (municipality_id)')
+    await pool.query('ALTER TABLE mbd_donor_records ADD CONSTRAINT fk_mbd_donor_municipality FOREIGN KEY (municipality_id) REFERENCES municipalities(id) ON DELETE RESTRICT')
+  }
+  if (!(await columnExists('mbd_donor_records', 'rc143_volunteer_id'))) {
+    await pool.query('ALTER TABLE mbd_donor_records ADD COLUMN rc143_volunteer_id INT NULL AFTER municipality_id')
+    await pool.query('ALTER TABLE mbd_donor_records ADD INDEX idx_mbd_donor_volunteer (rc143_volunteer_id)')
+    await pool.query('ALTER TABLE mbd_donor_records ADD CONSTRAINT fk_mbd_donor_volunteer FOREIGN KEY (rc143_volunteer_id) REFERENCES rc143_volunteers(id) ON DELETE SET NULL')
+  }
   if (!(await columnExists('mbd_requests', 'location'))) {
     await pool.query("ALTER TABLE mbd_requests ADD COLUMN location VARCHAR(512) NOT NULL DEFAULT '' AFTER message")
   }
@@ -468,6 +506,26 @@ async function ensureMbdRequestsTable() {
     await pool.query("ALTER TABLE mbd_requests ADD COLUMN status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending' AFTER location")
   }
   console.log('Schema: ensured mbd_requests table')
+}
+
+/** RC143 assignments must be shared by every session, not stored in a browser. */
+async function ensureRc143VolunteersTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rc143_volunteers (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      user_id INT NOT NULL,
+      organization VARCHAR(255) NULL,
+      occupation VARCHAR(255) NULL,
+      contact VARCHAR(255) NULL,
+      address VARCHAR(512) NULL,
+      contact_number VARCHAR(64) NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_rc143_volunteer_user (user_id),
+      CONSTRAINT fk_rc143_volunteer_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  console.log('Schema: ensured rc143_volunteers table')
 }
 
 async function ensureRequestGroupsAndEventNotifications() {
@@ -502,6 +560,7 @@ module.exports = {
   ensureHomePostsTable,
   ensureMbdTables,
   ensureMbdRequestsTable,
+  ensureRc143VolunteersTable,
   ensureDonorNotificationBroadcastsTable,
   ensurePrcActivitiesTable,
   ensureRequestGroupsAndEventNotifications,
