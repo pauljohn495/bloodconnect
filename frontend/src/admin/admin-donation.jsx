@@ -54,6 +54,7 @@ function AdminDonation() {
   const [assignedDonorId, setAssignedDonorId] = useState('')
   const [bloodType, setBloodType] = useState('')
   const [contactDonor, setContactDonor] = useState('')
+  const [donorEmail, setDonorEmail] = useState('')
   const [donorAge, setDonorAge] = useState('')
   const [donorGender, setDonorGender] = useState('')
   const [donors, setDonors] = useState([])
@@ -98,8 +99,12 @@ function AdminDonation() {
   const [editingDonor, setEditingDonor] = useState(null)
   const [editDonorName, setEditDonorName] = useState('')
   const [editBarcode, setEditBarcode] = useState('')
+  const [editAssignedDonorId, setEditAssignedDonorId] = useState('')
   const [editBloodType, setEditBloodType] = useState('')
   const [editContactDonor, setEditContactDonor] = useState('')
+  const [editDonorEmail, setEditDonorEmail] = useState('')
+  const [editDonorAge, setEditDonorAge] = useState('')
+  const [editDonorGender, setEditDonorGender] = useState('')
   const [editStatus, setEditStatus] = useState('active')
   const [isDeleteDonorModalOpen, setIsDeleteDonorModalOpen] = useState(false)
   const [donorToDelete, setDonorToDelete] = useState(null)
@@ -393,6 +398,7 @@ function AdminDonation() {
     setAssignedDonorId('')
     setBloodType('')
     setContactDonor('')
+    setDonorEmail('')
     setDonorAge('')
     setDonorGender('')
   }
@@ -541,6 +547,7 @@ function AdminDonation() {
           assignedDonorId,
           bloodType,
           contactPhone: contactDonor,
+          contactEmail: donorEmail.trim() || undefined,
           age: donorAge,
           gender: donorGender,
         }),
@@ -838,8 +845,13 @@ function AdminDonation() {
     setEditingDonor(donor)
     setEditDonorName(donor.full_name || donor.fullName || donor.donor_name || donor.donorName || '')
     setEditBarcode(donor.barcode || '')
+    setEditAssignedDonorId(donor.assigned_donor_id || donor.assignedDonorId || '')
     setEditBloodType(donor.blood_type || donor.bloodType || '')
     setEditContactDonor(donor.phone || donor.contact_phone || donor.contactPhone || '')
+    const email = donor.email || donor.contact_email || donor.contactEmail || ''
+    setEditDonorEmail(email.endsWith('@noemail.bloodconnect') ? '' : email)
+    setEditDonorAge(donor.age != null ? String(donor.age) : '')
+    setEditDonorGender(donor.gender || '')
     setEditStatus(donor.status || 'active')
     setIsEditDonorModalOpen(true)
   }
@@ -849,8 +861,12 @@ function AdminDonation() {
     setEditingDonor(null)
     setEditDonorName('')
     setEditBarcode('')
+    setEditAssignedDonorId('')
     setEditBloodType('')
     setEditContactDonor('')
+    setEditDonorEmail('')
+    setEditDonorAge('')
+    setEditDonorGender('')
     setEditStatus('active')
   }
 
@@ -863,8 +879,12 @@ function AdminDonation() {
         body: JSON.stringify({
           donorName: editDonorName,
           barcode: editBarcode,
+          assignedDonorId: editAssignedDonorId,
           bloodType: editBloodType,
           contactPhone: editContactDonor,
+          contactEmail: editDonorEmail.trim(),
+          age: editDonorAge,
+          gender: editDonorGender,
           status: editStatus,
         }),
       })
@@ -1846,6 +1866,19 @@ function AdminDonation() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Email address <span className="font-normal text-slate-500">(optional)</span>
+                </label>
+                <input
+                  type="email"
+                  value={donorEmail}
+                  onChange={(e) => setDonorEmail(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="donor@example.com"
+                />
+              </div>
+
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
@@ -1903,6 +1936,19 @@ function AdminDonation() {
                   onChange={(e) => setOrganizationContactNumber(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">
+                  Email Address <span className="font-normal text-slate-500">(optional)</span>
+                </label>
+                <input
+                  type="email"
+                  value={editDonorEmail}
+                  onChange={(e) => setEditDonorEmail(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="donor@example.com"
                 />
               </div>
 
@@ -2666,6 +2712,17 @@ function AdminDonation() {
               </div>
 
               <div>
+                <label className="block text-xs font-medium text-slate-700">Donor ID</label>
+                <input
+                  type="text"
+                  value={editAssignedDonorId}
+                  onChange={(e) => setEditAssignedDonorId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Enter donor ID"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-slate-700">Blood Type</label>
                 <select
                   value={editBloodType}
@@ -2694,6 +2751,33 @@ function AdminDonation() {
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Age</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="130"
+                  value={editDonorAge}
+                  onChange={(e) => setEditDonorAge(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  placeholder="Age"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Gender</label>
+                <select
+                  value={editDonorGender}
+                  onChange={(e) => setEditDonorGender(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
 
               <div>

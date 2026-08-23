@@ -50,6 +50,59 @@ async function notifyNewHospitalRequest({ hospitalId, items, requestGroupId }) {
   return notifyAdmins('New hospital blood request', `${hospitalName} submitted a blood request: ${summary}.`, `hospital-request:${requestGroupId || items[0]?.id}`)
 }
 
+/**
+ * Send a newly published announcement immediately.  Claiming the announcement
+ * in the same delivery table used by the scheduler prevents a second message
+ * when the event's start time is reached.
+ */
+async function notifyNewAnnouncement(announcement) {
+  const message = [
+    announcement.description,
+    announcement.location ? `Location: ${announcement.location}` : '',
+    announcement.event_starts_at ? `Starts: ${new Date(announcement.event_starts_at).toLocaleString('en-PH', { timeZone: process.env.NOTIFICATION_TIMEZONE || 'Asia/Manila' })}` : '',
+  ].filter(Boolean).join('\n\n') || 'New announcement from BloodConnect.'
+
+  const conn = await pool.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [claim] = await conn.query(
+      'INSERT IGNORE INTO announcement_notification_deliveries (announcement_id) VALUES (?)',
+      [announcement.id],
+    )
+    if (!claim.affectedRows) {
+      await conn.rollback()
+      return false
+    }
+    const [donors] = await conn.query("SELECT id, email FROM users WHERE role = 'donor' AND status = 'active'")
+    await insertNotificationsBulk(donors.map((donor) => donor.id), announcement.title, message, 'info', conn)
+    await conn.commit()
+    sendEmailRecipients(donors, announcement.title, message).catch((error) => console.error('[Announcements] Email delivery failed:', error.message))
+    return true
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
+  }
+}
+
+async function notifyNewMbdEvent(event) {
+  const message = [
+    `A mobile blood donation (MBD) schedule has been posted.`,
+    `Date: ${event.event_date}`,
+    `Location: ${event.location}`,
+    event.organizer_name ? `Organizer: ${event.organizer_name}` : '',
+  ].filter(Boolean).join('\n\n')
+
+  return notifyUsers({
+    whereSql: "role = 'donor' AND status = 'active'",
+    title: event.name,
+    message,
+    type: 'info',
+    deliveryKey: `mbd-event:${event.id}`,
+  })
+}
+
 async function deliverDueAnnouncementNotifications() {
   const [announcements] = await pool.query(`
     SELECT a.id, a.title, a.description, a.location, a.event_starts_at
@@ -88,4 +141,10 @@ function startEventNotificationScheduler() {
   notifyExpiringInventory().catch((error) => console.error('[Expiry notifications] Startup check failed:', error.message))
 }
 
-module.exports = { startEventNotificationScheduler, deliverDueAnnouncementNotifications, notifyNewHospitalRequest }
+module.exports = {
+  startEventNotificationScheduler,
+  deliverDueAnnouncementNotifications,
+  notifyNewHospitalRequest,
+  notifyNewAnnouncement,
+  notifyNewMbdEvent,
+}

@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { notifyNewAnnouncement } = require('../services/eventNotificationService')
 
 const ALLOWED_TYPES = new Set(['blood_drive', 'urgent_need', 'general'])
 const ALLOWED_STATUS = new Set(['upcoming', 'ongoing', 'completed'])
@@ -107,7 +108,11 @@ const createAnnouncementController = async (req, res) => {
       [result.insertId],
     )
 
-    return res.status(201).json(mapRow(rows[0]))
+    const announcement = mapRow(rows[0])
+    notifyNewAnnouncement(announcement).catch((error) =>
+      console.error('[Announcements] Failed to notify donors:', error.message),
+    )
+    return res.status(201).json(announcement)
   } catch (error) {
     if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
       return res.status(500).json({

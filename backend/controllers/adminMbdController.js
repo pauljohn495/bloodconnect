@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { notifyNewMbdEvent } = require('../services/eventNotificationService')
 const bcrypt = require('bcryptjs')
 
 const BLOOD_TYPES = new Set(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', 'A', 'B', 'O', 'AB'])
@@ -245,7 +246,11 @@ const createMbdEventController = async (req, res) => {
       [result.insertId],
     )
 
-    return res.status(201).json(mapEventRow(rows[0]))
+    const event = mapEventRow(rows[0])
+    notifyNewMbdEvent(event).catch((error) =>
+      console.error('[MBD] Failed to notify donors:', error.message),
+    )
+    return res.status(201).json(event)
   } catch (error) {
     if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
       return res.status(500).json({

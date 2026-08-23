@@ -363,7 +363,17 @@ const getDonorDetailsController = async (req, res) => {
 
 const updateDonorController = async (req, res) => {
   const donorId = parseInt(req.params.id, 10)
-  const { donorName, bloodType, contactPhone, barcode, status } = req.body
+  const {
+    donorName,
+    bloodType,
+    contactPhone,
+    contactEmail,
+    barcode,
+    assignedDonorId,
+    age: rawAge,
+    gender: rawGender,
+    status,
+  } = req.body
 
   if (Number.isNaN(donorId)) {
     return res.status(400).json({ message: 'Invalid donor id' })
@@ -372,6 +382,11 @@ const updateDonorController = async (req, res) => {
   if (!donorName || !bloodType || !contactPhone) {
     return res.status(400).json({ message: 'donorName, bloodType and contactPhone are required' })
   }
+  const age = rawAge === '' || rawAge == null ? null : Number(rawAge)
+  if (age != null && (!Number.isInteger(age) || age < 0 || age > 130)) {
+    return res.status(400).json({ message: 'age must be between 0 and 130' })
+  }
+  const gender = String(rawGender || '').trim()
 
   try {
     const [existingDonor] = await pool.query(
@@ -390,6 +405,17 @@ const updateDonorController = async (req, res) => {
       return res.status(400).json({ message: 'Mobile number is already registered' })
     }
 
+    const email = String(contactEmail || '').trim()
+    if (email) {
+      const [existingEmail] = await pool.query(
+        'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
+        [email, donorId],
+      )
+      if (existingEmail.length > 0) {
+        return res.status(400).json({ message: 'Email is already registered' })
+      }
+    }
+
     const statusNorm = String(status || '').trim().toLowerCase()
     const finalStatus =
       statusNorm === 'inactive'
@@ -400,11 +426,22 @@ const updateDonorController = async (req, res) => {
     await pool.query(
       `
       UPDATE users
-      SET full_name = ?, blood_type = ?, phone = ?, barcode = ?, status = ?,
+      SET full_name = ?, blood_type = ?, phone = ?, email = ?, barcode = ?, assigned_donor_id = ?, age = ?, gender = ?, status = ?,
           pending_profile_json = NULL, profile_update_requested_at = NULL
       WHERE id = ? AND role = 'donor'
     `,
-      [donorName, bloodType, contactPhone, barcode || null, finalStatus, donorId],
+      [
+        donorName,
+        bloodType,
+        contactPhone,
+        email || `${contactPhone}@noemail.bloodconnect`,
+        barcode || null,
+        assignedDonorId?.trim() || null,
+        age,
+        gender || null,
+        finalStatus,
+        donorId,
+      ],
     )
 
     return res.json({ message: 'Donor updated successfully' })
