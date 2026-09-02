@@ -114,10 +114,10 @@ function buildEmailBody(hospitalName, items) {
   return [
     `Dear ${hospitalName},`,
     '',
-    `The following blood inventory units are about to expire in ${daysMention.join(', ')} day(s):`,
+    `Action required: the following blood inventory units are approaching expiration in ${daysMention.join(', ')} day(s):`,
     ...lines,
     '',
-    'Please prioritize these units to reduce wastage.',
+    'Please review the inventory in BloodConnect and prioritize these units to reduce wastage.',
     '',
     'BloodConnect System',
   ].join('\n')

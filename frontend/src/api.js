@@ -1,14 +1,17 @@
 /**
  * In Vite dev, default to same-origin + `/api` proxy (see vite.config.js) to avoid CORS.
- * Set VITE_API_BASE_URL when the API is on another host (e.g. production).
+ * Set VITE_API_URL when the API is on another host (e.g. staging/production).
+ * VITE_API_BASE_URL remains supported for existing local setups.
  */
 export function getApiBaseUrl() {
-  const raw = import.meta.env.VITE_API_BASE_URL
+  const raw = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL
   if (raw != null && String(raw).trim() !== '') {
     return String(raw).replace(/\/$/, '')
   }
   if (import.meta.env.DEV) return ''
-  return 'http://localhost:3000'
+  // Never fall back to localhost in a deployed browser. Configure VITE_API_URL
+  // in Vercel so requests are sent to the Render service.
+  return ''
 }
 
 const API_BASE_URL = getApiBaseUrl()

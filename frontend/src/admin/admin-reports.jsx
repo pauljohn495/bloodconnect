@@ -48,6 +48,7 @@ function AdminReports() {
   const [componentFilter, setComponentFilter] = useState('all') // 'all' | 'whole_blood' | 'platelets' | 'plasma'
   const [usageTrendPeriodDays, setUsageTrendPeriodDays] = useState(30) // 7 | 30
   const [donorAvailabilityHorizonDays, setDonorAvailabilityHorizonDays] = useState(30) // 7 | 30
+  const [donorSuggestionBloodFilter, setDonorSuggestionBloodFilter] = useState('all')
   const [inventory, setInventory] = useState([])
   const [requests, setRequests] = useState([])
   const [donors, setDonors] = useState([])
@@ -865,6 +866,12 @@ function AdminReports() {
     return true
   })
 
+  const filteredDonorSuggestions = eligibleDonorSuggestions.filter((item) => {
+    if (donorSuggestionBloodFilter === 'all') return true
+    const bloodGroup = normalizeBloodType(item.bloodType).replace(/[+-]$/, '')
+    return bloodGroup === donorSuggestionBloodFilter
+  })
+
   // Expiring Blood Action Suggestions
   const usageByHospitalAndBlood = requests.reduce((acc, req) => {
     const bt = normalizeBloodType(req.blood_type || req.bloodType)
@@ -1345,18 +1352,53 @@ function AdminReports() {
                     </p>
                   </div>
                   <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
-                    {eligibleDonorSuggestions.length} suggested
+                    {filteredDonorSuggestions.length} suggested
                   </span>
                 </div>
-                {eligibleDonorSuggestions.length === 0 ? (
+                <div
+                  className="mb-3 flex flex-wrap gap-2"
+                  role="group"
+                  aria-label="Filter donor suggestions by blood type"
+                >
+                  {[
+                    ['all', 'All'],
+                    ['A', 'A'],
+                    ['B', 'B'],
+                    ['O', 'O'],
+                    ['AB', 'AB'],
+                  ].map(([value, label]) => {
+                    const isActive = donorSuggestionBloodFilter === value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setDonorSuggestionBloodFilter(value)}
+                        className={
+                          'rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ' +
+                          (isActive
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700')
+                        }
+                        aria-pressed={isActive}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {filteredDonorSuggestions.length === 0 ? (
                   <p className="text-sm text-slate-500">
-                    No eligible donors to suggest at the moment.
+                    No eligible {donorSuggestionBloodFilter === 'all' ? '' : `${donorSuggestionBloodFilter} `}
+                    donors to suggest at the moment.
                   </p>
                 ) : (
-                  <ul className="space-y-2 text-xs text-slate-700">
-                    {eligibleDonorSuggestions.slice(0, 15).map((d, idx) => (
+                  <ul
+                    className="max-h-[336px] space-y-2 overflow-y-auto pr-1 text-xs text-slate-700"
+                    aria-label="Donor contact suggestions"
+                  >
+                    {filteredDonorSuggestions.map((d) => (
                       <li
-                        key={idx}
+                        key={`${d.donorId || d.donorName}|${d.bloodType}`}
                         className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
                       >
                         <span className="font-semibold text-slate-900 truncate">

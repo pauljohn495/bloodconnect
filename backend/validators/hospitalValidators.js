@@ -43,7 +43,7 @@ function validateHospitalRequest(req, res, next) {
       message: 'At least one blood type and quantity are required',
     })
   }
-  const seenBloodTypes = new Set()
+  const seenRequests = new Set()
   const items = []
   for (const item of rawItems) {
     const itemBloodType = String(item?.bloodType || '').trim().toUpperCase()
@@ -51,11 +51,20 @@ function validateHospitalRequest(req, res, next) {
     if (!itemBloodType || Number.isNaN(intUnits) || intUnits <= 0) {
       return errorResponse(res, { statusCode: 400, message: 'Each blood type must have a positive whole-unit quantity' })
     }
-    if (seenBloodTypes.has(itemBloodType)) {
-      return errorResponse(res, { statusCode: 400, message: 'Duplicate blood types are not allowed in one request' })
+    const itemComponentType = String(item?.componentType || componentType || 'whole_blood').toLowerCase()
+    const itemPriority = String(item?.priority || priority || 'normal').toLowerCase()
+    if (!['whole_blood', 'platelets', 'plasma'].includes(itemComponentType)) {
+      return errorResponse(res, { statusCode: 400, message: 'componentType must be whole_blood, platelets, or plasma' })
     }
-    seenBloodTypes.add(itemBloodType)
-    items.push({ bloodType: itemBloodType, unitsRequested: intUnits })
+    if (!['normal', 'urgent', 'critical'].includes(itemPriority)) {
+      return errorResponse(res, { statusCode: 400, message: 'priority must be one of: normal, urgent, critical' })
+    }
+    const requestKey = `${itemBloodType}:${itemComponentType}:${itemPriority}`
+    if (seenRequests.has(requestKey)) {
+      return errorResponse(res, { statusCode: 400, message: 'Duplicate blood type, component, and priority combinations are not allowed' })
+    }
+    seenRequests.add(requestKey)
+    items.push({ bloodType: itemBloodType, unitsRequested: intUnits, componentType: itemComponentType, priority: itemPriority, notes: item?.notes ?? notes ?? null })
   }
 
   // Normalize and validate priority (optional)
@@ -72,10 +81,10 @@ function validateHospitalRequest(req, res, next) {
     items,
     // Legacy fields keep controller callers compatible.
     bloodType: items[0].bloodType,
-    componentType: componentType || 'whole_blood',
+    componentType: items[0].componentType,
     unitsRequested: items[0].unitsRequested,
-    notes: notes || null,
-    priority: normalizedPriority,
+    notes: items[0].notes,
+    priority: items[0].priority || normalizedPriority,
   }
 
   return next()

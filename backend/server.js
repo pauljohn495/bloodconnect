@@ -2,6 +2,8 @@ const express = require('express')
 const cors = require('cors')
 const dotenv = require('dotenv')
 
+dotenv.config()
+
 const { pool, testConnection } = require('./db')
 const {
   ensureUserRoleEnumIncludesSuperAdmin,
@@ -34,15 +36,17 @@ const hospitalRoutes = require('./routes/hospitalRoutes')
 const userRoutes = require('./routes/userRoutes')
 const notificationRoutes = require('./routes/notificationRoutes')
 const errorHandler = require('./middleware/errorHandler')
-const { successResponse, errorResponse } = require('./utils/response')
 const { startHospitalInventoryAlertScheduler } = require('./services/hospitalInventoryAlertService')
 const { startDonorRecallScheduler } = require('./services/donorRecallScheduler')
 const { startEventNotificationScheduler } = require('./services/eventNotificationService')
 
-dotenv.config()
-
 const app = express()
 const PORT = process.env.PORT || 3000
+const HOST = process.env.HOST || '0.0.0.0'
+
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set when NODE_ENV=production')
+}
 
 // Allow requests from the frontend (no cookies/sessions, we use JWT headers)
 const DEFAULT_DEV_ORIGINS = [
@@ -51,7 +55,9 @@ const DEFAULT_DEV_ORIGINS = [
   'http://localhost:4173',
   'http://127.0.0.1:4173',
 ]
-const envOrigins = (process.env.FRONTEND_ORIGIN || '')
+const envOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_ORIGIN]
+  .filter(Boolean)
+  .join(',')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
@@ -72,20 +78,25 @@ app.use(
 )
 app.use(express.json({ limit: '16mb' }))
 
+// Lightweight request timing for staging performance checks. It logs no bodies,
+// credentials, tokens, or query-string values.
+app.use('/api', (req, res, next) => {
+  const startedAt = process.hrtime.bigint()
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6
+    console.log(`[api] ${req.method} ${req.path} ${res.statusCode} ${durationMs.toFixed(1)}ms`)
+  })
+  next()
+})
+
 // Simple health check
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1')
-    return successResponse(res, {
-      message: 'Health check OK',
-      data: { ok: true },
-    })
+    return res.json({ status: 'ok', database: 'connected' })
   } catch (error) {
     console.error('Health check failed:', error)
-    return errorResponse(res, {
-      statusCode: 500,
-      message: 'Database not available',
-    })
+    return res.status(503).json({ status: 'degraded', database: 'unavailable' })
   }
 })
 
@@ -152,8 +163,8 @@ async function start() {
     console.error('❌ Database connection failed:', error.message)
   }
 
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`)
+  app.listen(PORT, HOST, () => {
+    console.log(`Server is running on ${HOST}:${PORT}`)
   })
 }
 

@@ -480,6 +480,7 @@ function AdminMbd() {
   const [donorForm, setDonorForm] = useState(emptyDonorForm)
   const [donorSaving, setDonorSaving] = useState(false)
   const [editingDonorId, setEditingDonorId] = useState(null)
+  const [selectedExistingDonorId, setSelectedExistingDonorId] = useState(null)
   const [deferralForm, setDeferralForm] = useState(emptyDeferralForm)
   const [customDeferralFields, setCustomDeferralFields] = useState([])
   const [customDeferralModalOpen, setCustomDeferralModalOpen] = useState(false)
@@ -574,6 +575,7 @@ function AdminMbd() {
     setSelectedEvent(row)
     setModalOpen(true)
     setEditingDonorId(null)
+    setSelectedExistingDonorId(null)
     setDonorForm({ ...emptyDonorForm(), municipalityId: row.municipality_id != null ? String(row.municipality_id) : '', rc143VolunteerId: row.rc143_volunteer_id != null ? String(row.rc143_volunteer_id) : '' })
     const initialCounts = hydrateLegacyDeferralCounts(row?.deferral_counts || {})
     setDeferralForm(buildDeferralFormState(initialCounts))
@@ -601,6 +603,7 @@ function AdminMbd() {
     setSelectedEvent(null)
     setDonors([])
     setEditingDonorId(null)
+    setSelectedExistingDonorId(null)
     setDonorForm(emptyDonorForm())
     setDeferralForm(emptyDeferralForm())
     setCustomDeferralFields([])
@@ -649,10 +652,14 @@ function AdminMbd() {
     gender: donorForm.gender,
     bagType: donorForm.bagType,
     remarksSd: donorForm.remarksSd,
-    numDonations: Math.max(
-      donorForm.donationType === 'repeater' ? 2 : 1,
-      donorForm.numDonations === '' ? (donorForm.donationType === 'repeater' ? 2 : 1) : Number(donorForm.numDonations),
-    ),
+    ...(selectedExistingDonorId != null
+      ? { existingDonorUserId: selectedExistingDonorId, incrementDonation: Boolean(editingDonorId) }
+      : {
+          numDonations: Math.max(
+            donorForm.donationType === 'repeater' ? 2 : 1,
+            donorForm.numDonations === '' ? (donorForm.donationType === 'repeater' ? 2 : 1) : Number(donorForm.numDonations),
+          ),
+        }),
   })
 
   const handleSaveDonor = async (e) => {
@@ -683,6 +690,7 @@ function AdminMbd() {
         showNotification('Donor added.', 'primary')
       }
       setEditingDonorId(null)
+      setSelectedExistingDonorId(null)
       setDonorForm({ ...emptyDonorForm(), municipalityId: selectedEvent.municipality_id != null ? String(selectedEvent.municipality_id) : '', rc143VolunteerId: selectedEvent.rc143_volunteer_id != null ? String(selectedEvent.rc143_volunteer_id) : '' })
       const data = await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors`)
       setDonors(Array.isArray(data) ? data : [])
@@ -696,6 +704,7 @@ function AdminMbd() {
 
   const startEditDonor = (d) => {
     setEditingDonorId(d.id)
+    setSelectedExistingDonorId(null)
     setDonorForm({
       donorName: d.donor_name || '',
       barcode: d.barcode || '',
@@ -723,6 +732,7 @@ function AdminMbd() {
 
   const cancelEditDonor = () => {
     setEditingDonorId(null)
+    setSelectedExistingDonorId(null)
     setDonorForm({ ...emptyDonorForm(), municipalityId: selectedEvent?.municipality_id != null ? String(selectedEvent.municipality_id) : '', rc143VolunteerId: selectedEvent?.rc143_volunteer_id != null ? String(selectedEvent.rc143_volunteer_id) : '' })
   }
 
@@ -997,17 +1007,26 @@ function AdminMbd() {
       const cells = BAG_GROUPS.map((bag) => `<td class="num">${summary.bagByType[bag][bt]}</td>`).join('')
       return `<tr><td>${bt}</td><td>${discontinuedText}</td>${cells}</tr>`
     }).join('')
-    const deferralRows = [
+    const deferralEntries = [
       ...DEFERRAL_FIELDS.map((field) => {
         const count = Number(deferralForm[field.key] || 0)
-        return `<tr><td>${escapeHtml(field.label)}</td><td class="num">${count}</td></tr>`
+        return { label: field.label, count }
       }),
       ...customDeferralFields.map((field) => {
         const count = Number(deferralForm[field.key] || 0)
         const label = String(field.label || '').trim() || field.key
-        return `<tr><td>${escapeHtml(label)}</td><td class="num">${count}</td></tr>`
+        return { label, count }
       }),
-    ].join('')
+    ]
+    const deferralRows = Array.from({ length: Math.ceil(deferralEntries.length / 2) }, (_, index) => {
+      const left = deferralEntries[index]
+      const right = deferralEntries[index + Math.ceil(deferralEntries.length / 2)]
+      return `
+        <tr>
+          <td>${escapeHtml(left.label)}</td><td class="num">${left.count}</td>
+          <td>${right ? escapeHtml(right.label) : ''}</td><td class="num">${right ? right.count : ''}</td>
+        </tr>`
+    }).join('')
     const deferralTotal = deferralCountTotal
 
     const printHtml = `
@@ -1029,11 +1048,12 @@ function AdminMbd() {
             .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 10px; }
             .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
             .tight th, .tight td { padding: 3px 5px; }
+            .deferrals th, .deferrals td { padding: 2px 4px; font-size: 10px; }
             .section-title { font-size: 12px; font-weight: 700; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .03em; }
             .page-break-before { break-before: page; page-break-before: always; }
             @media print {
-              body { margin: 12mm; }
-              @page { size: A4 portrait; margin: 12mm; }
+              body { margin: 0; }
+              @page { size: A4 portrait; margin: 8mm; }
             }
           </style>
         </head>
@@ -1102,10 +1122,12 @@ function AdminMbd() {
             </tbody>
           </table>
 
-          <div class="section-title page-break-before">Deferral Breakdown</div>
-          <table class="tight" style="max-width: 520px">
+          <div class="section-title">Deferral Breakdown</div>
+          <table class="tight deferrals">
             <thead>
               <tr>
+                <th>REASON</th>
+                <th class="num">TOTAL</th>
                 <th>REASON</th>
                 <th class="num">TOTAL</th>
               </tr>
@@ -1113,13 +1135,13 @@ function AdminMbd() {
             <tbody>
               ${deferralRows}
               <tr>
-                <td><strong>TOTAL</strong></td>
+                <td colspan="3"><strong>TOTAL</strong></td>
                 <td class="num"><strong>${deferralTotal}</strong></td>
               </tr>
             </tbody>
           </table>
 
-          <div class="section-title">Donor List</div>
+          <div class="section-title page-break-before">Donor List</div>
           <table>
             <thead>
               <tr>
@@ -1411,19 +1433,26 @@ function AdminMbd() {
                     </label>
                     <DonorNameAutocomplete
                       value={donorForm.donorName}
-                      onChange={(val) => setDonorForm((f) => ({ ...f, donorName: val }))}
+                      onChange={(val) => {
+                        setSelectedExistingDonorId(null)
+                        setDonorForm((f) => ({ ...f, donorName: val }))
+                      }}
                       onSelectUser={(user) => {
                         if (!user) {
                           setEditingDonorId(null)
+                          setSelectedExistingDonorId(null)
                           setDonorForm(emptyDonorForm())
                           return
                         }
+                        setSelectedExistingDonorId(user.id)
                         // Check if this user already has an entry in the current MBD donor list.
                         // If so, switch to edit mode for that record to avoid duplicates.
                         const existingMbdDonor = donors.find(
                           (d) =>
-                            String(d.donor_name || '').trim().toLowerCase() ===
-                            String(user.full_name || '').trim().toLowerCase(),
+                            Number(d.transferred_donor_user_id) === Number(user.id) ||
+                            (!d.transferred_donor_user_id &&
+                              String(d.donor_name || '').trim().toLowerCase() ===
+                                String(user.full_name || '').trim().toLowerCase()),
                         )
                         if (existingMbdDonor) {
                           // Enter edit mode for the existing record, then override with fresh user profile data
@@ -1582,53 +1611,57 @@ function AdminMbd() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className={labelCls} htmlFor="donor-type">
-                      Donation type
-                    </label>
-                    <select
-                      id="donor-type"
-                      className={inputCls}
-                      value={donorForm.donationType}
-                      onChange={(ev) => {
-                        const nextType = ev.target.value
-                        setDonorForm((f) => ({
-                          ...f,
-                          donationType: nextType,
-                          numDonations:
-                            nextType === 'first_timer'
-                              ? '1'
-                              : f.numDonations && Number(f.numDonations) > 1
-                                ? f.numDonations
-                                : '2',
-                        }))
-                      }}
-                    >
-                      {DONATION_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="donor-nd">
-                      Number of donations
-                    </label>
-                    <input
-                      id="donor-nd"
-                      type="number"
-                      min={1}
-                      className={inputCls}
-                      value={donorForm.numDonations}
-                      onChange={(ev) =>
-                        setDonorForm((f) => ({
-                          ...f,
-                          numDonations: toDigits(ev.target.value),
-                        }))
-                      }
-                    />
-                  </div>
+                  {selectedExistingDonorId == null && (
+                    <>
+                      <div>
+                        <label className={labelCls} htmlFor="donor-type">
+                          Donation type
+                        </label>
+                        <select
+                          id="donor-type"
+                          className={inputCls}
+                          value={donorForm.donationType}
+                          onChange={(ev) => {
+                            const nextType = ev.target.value
+                            setDonorForm((f) => ({
+                              ...f,
+                              donationType: nextType,
+                              numDonations:
+                                nextType === 'first_timer'
+                                  ? '1'
+                                  : f.numDonations && Number(f.numDonations) > 1
+                                    ? f.numDonations
+                                    : '2',
+                            }))
+                          }}
+                        >
+                          {DONATION_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelCls} htmlFor="donor-nd">
+                          Number of donations
+                        </label>
+                        <input
+                          id="donor-nd"
+                          type="number"
+                          min={1}
+                          className={inputCls}
+                          value={donorForm.numDonations}
+                          onChange={(ev) =>
+                            setDonorForm((f) => ({
+                              ...f,
+                              numDonations: toDigits(ev.target.value),
+                            }))
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
@@ -1636,7 +1669,7 @@ function AdminMbd() {
                     disabled={donorSaving}
                     className="inline-flex min-h-10 items-center justify-center rounded-xl bg-red-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
                   >
-                    {donorSaving ? 'Saving…' : editingDonorId ? 'Update donor' : 'Add donor'}
+                    {donorSaving ? 'Saving…' : selectedExistingDonorId != null ? 'Record donation' : editingDonorId ? 'Update donor' : 'Add donor'}
                   </button>
                   {editingDonorId && (
                     <button

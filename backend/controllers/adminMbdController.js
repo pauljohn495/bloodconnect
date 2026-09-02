@@ -134,6 +134,20 @@ function parseDonorId(req) {
   return id
 }
 
+async function getDonorDonationBaseline(conn, donorUserId) {
+  const [[mbdTotals]] = await conn.query(
+    `SELECT MAX(COALESCE(num_donations, 0)) AS total
+     FROM mbd_donor_records
+     WHERE transferred_donor_user_id = ?`,
+    [donorUserId],
+  )
+  const [[recordedTotals]] = await conn.query(
+    `SELECT COUNT(*) AS total FROM donations WHERE user_id = ? AND status = 'completed'`,
+    [donorUserId],
+  )
+  return Math.max(Number(mbdTotals?.total || 0), Number(recordedTotals?.total || 0))
+}
+
 async function generateUniqueUsername(base = 'mbd_donor') {
   const seed = String(base || 'mbd_donor')
     .toLowerCase()
@@ -358,6 +372,8 @@ const createMbdDonorController = async (req, res) => {
         : ''
   const remarks = remarksRaw ? remarksRaw : null
   const numRaw = req.body.numDonations != null ? req.body.numDonations : req.body.num_donations
+  const existingDonorUserIdRaw = req.body.existingDonorUserId
+  const existingDonorUserId = existingDonorUserIdRaw == null || existingDonorUserIdRaw === '' ? null : Number(existingDonorUserIdRaw)
   const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
   const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
   const volunteerId = volunteerRaw === '' || volunteerRaw == null ? null : Number(volunteerRaw)
@@ -367,6 +383,7 @@ const createMbdDonorController = async (req, res) => {
   }
   if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
   if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
+  if (existingDonorUserId != null && (!Number.isInteger(existingDonorUserId) || existingDonorUserId < 1)) return res.status(400).json({ message: 'Invalid existing donor' })
   if (!BLOOD_TYPES.has(bloodType)) {
     return res.status(400).json({
       message: 'bloodType must be one of A+, A-, B+, B-, O+, O-, AB+, AB-',
@@ -392,19 +409,40 @@ const createMbdDonorController = async (req, res) => {
     }
   }
 
+  const conn = await pool.getConnection()
   try {
-    const [exists] = await pool.query('SELECT id FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
+    await conn.beginTransaction()
+    const [exists] = await conn.query('SELECT id FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
     if (!exists.length) {
+      await conn.rollback()
       return res.status(404).json({ message: 'MBD event not found' })
     }
-    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
-    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    const [municipalities] = await conn.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+    if (!municipalities.length) {
+      await conn.rollback()
+      return res.status(400).json({ message: 'Selected municipality was not found' })
+    }
     if (volunteerId != null) {
-      const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
-      if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+      const [volunteers] = await conn.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
+      if (!volunteers.length) {
+        await conn.rollback()
+        return res.status(400).json({ message: 'Selected volunteer was not found' })
+      }
     }
 
-    const [result] = await pool.query(
+    if (existingDonorUserId != null) {
+      const [existingUsers] = await conn.query(
+        "SELECT id FROM users WHERE id = ? AND role = 'donor' LIMIT 1 FOR UPDATE",
+        [existingDonorUserId],
+      )
+      if (!existingUsers.length) {
+        await conn.rollback()
+        return res.status(400).json({ message: 'Selected donor profile was not found' })
+      }
+      numDonations = (await getDonorDonationBaseline(conn, existingDonorUserId)) + 1
+    }
+
+    const [result] = await conn.query(
       `
       INSERT INTO mbd_donor_records (
         mbd_event_id,
@@ -419,9 +457,10 @@ const createMbdDonorController = async (req, res) => {
         gender,
         bag_type,
         remarks_sd,
-        num_donations
+        num_donations,
+        transferred_donor_user_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         eventId,
@@ -437,8 +476,11 @@ const createMbdDonorController = async (req, res) => {
         bagType || null,
         remarks,
         numDonations,
+        existingDonorUserId,
       ],
     )
+
+    await conn.commit()
 
     const [rows] = await pool.query(
       `
@@ -468,6 +510,7 @@ const createMbdDonorController = async (req, res) => {
 
     return res.status(201).json(mapDonorRow(rows[0]))
   } catch (error) {
+    await conn.rollback()
     if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
       return res.status(500).json({
         message: 'MBD tables are missing. Restart the server to run schema migration.',
@@ -475,6 +518,8 @@ const createMbdDonorController = async (req, res) => {
     }
     console.error('Create MBD donor error:', error)
     return res.status(500).json({ message: 'Failed to create donor record' })
+  } finally {
+    conn.release()
   }
 }
 
@@ -522,6 +567,9 @@ const updateMbdDonorController = async (req, res) => {
         : ''
   const remarks = remarksRaw ? remarksRaw : null
   const numRaw = req.body.numDonations != null ? req.body.numDonations : req.body.num_donations
+  const incrementDonation = req.body.incrementDonation === true
+  const existingDonorUserIdRaw = req.body.existingDonorUserId
+  const existingDonorUserId = existingDonorUserIdRaw == null || existingDonorUserIdRaw === '' ? null : Number(existingDonorUserIdRaw)
   const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
   const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
   const volunteerId = volunteerRaw === '' || volunteerRaw == null ? null : Number(volunteerRaw)
@@ -531,6 +579,7 @@ const updateMbdDonorController = async (req, res) => {
   }
   if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
   if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
+  if (existingDonorUserId != null && (!Number.isInteger(existingDonorUserId) || existingDonorUserId < 1)) return res.status(400).json({ message: 'Invalid existing donor' })
   if (!BLOOD_TYPES.has(bloodType)) {
     return res.status(400).json({
       message: 'bloodType must be one of A+, A-, B+, B-, O+, O-, AB+, AB-',
@@ -578,7 +627,8 @@ const updateMbdDonorController = async (req, res) => {
         gender = ?,
         bag_type = ?,
         remarks_sd = ?,
-        num_donations = ?
+        num_donations = CASE WHEN ? THEN num_donations + 1 ELSE ? END,
+        transferred_donor_user_id = COALESCE(?, transferred_donor_user_id)
       WHERE id = ? AND mbd_event_id = ?
     `,
       [
@@ -593,7 +643,9 @@ const updateMbdDonorController = async (req, res) => {
         gender || null,
         bagType || null,
         remarks,
+        incrementDonation,
         numDonations,
+        existingDonorUserId,
         donorId,
         eventId,
       ],

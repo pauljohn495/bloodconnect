@@ -126,9 +126,9 @@ async function deliverDueAnnouncementNotifications() {
 }
 
 async function notifyExpiringInventory() {
-  const [items] = await pool.query(`SELECT id, blood_type, available_units, expiration_date, DATEDIFF(DATE(expiration_date), CURDATE()) AS days_left FROM blood_inventory WHERE status = 'available' AND available_units > 0 AND DATEDIFF(DATE(expiration_date), CURDATE()) BETWEEN 0 AND 7`)
+  const [items] = await pool.query(`SELECT id, blood_type, COALESCE(component_type, 'whole_blood') AS component_type, available_units, expiration_date, DATEDIFF(DATE(expiration_date), CURDATE()) AS days_left FROM blood_inventory WHERE status = 'available' AND available_units > 0 AND DATEDIFF(DATE(expiration_date), CURDATE()) BETWEEN 0 AND 7`)
   for (const item of items) {
-    await notifyAdmins('Blood units nearing expiration', `${item.available_units} unit(s) of ${item.blood_type} expire in ${item.days_left} day(s).`, `inventory-expiry:${item.id}`).catch((error) => console.error('[Expiry notifications] Failed:', error.message))
+    await notifyAdmins('Action required: blood inventory nearing expiration', `${item.available_units} unit(s) of ${item.blood_type} (${item.component_type.replace('_', ' ')}) expire in ${item.days_left} day(s). Review the inventory in the admin system.`, `inventory-expiry:${item.id}`).catch((error) => console.error('[Expiry notifications] Failed:', error.message))
   }
 }
 

@@ -5,10 +5,11 @@ import { adminPanel } from '../admin/admin-ui.jsx'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 
 function HospitalBloodRequest() {
-  const [requestItems, setRequestItems] = useState([{ bloodType: '', unitsRequested: '' }])
-  const [componentType, setComponentType] = useState('whole_blood')
-  const [notes, setNotes] = useState('')
-  const [requestPriority, setRequestPriority] = useState('normal')
+  const makeRequestTab = () => ({ id: crypto.randomUUID(), bloodType: '', unitsRequested: '', componentType: 'whole_blood', priority: 'normal', notes: '' })
+  const [requestTabs, setRequestTabs] = useState(() => [makeRequestTab()])
+  const [activeTabId, setActiveTabId] = useState(() => requestTabs[0].id)
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [notification, setNotification] = useState(null)
   const [requests, setRequests] = useState([])
   const [isLoadingRequests, setIsLoadingRequests] = useState(true)
@@ -47,37 +48,61 @@ function HospitalBloodRequest() {
   }, [])
 
   const resetForm = () => {
-    setRequestItems([{ bloodType: '', unitsRequested: '' }])
-    setComponentType('whole_blood')
-    setNotes('')
-    setRequestPriority('normal')
+    const tab = makeRequestTab()
+    setRequestTabs([tab])
+    setActiveTabId(tab.id)
+    setIsReviewOpen(false)
+  }
+
+  const activeTab = requestTabs.find((tab) => tab.id === activeTabId) || requestTabs[0]
+  const updateActiveTab = (changes) => setRequestTabs((tabs) => tabs.map((tab) => tab.id === activeTabId ? { ...tab, ...changes } : tab))
+  const addTab = () => {
+    const tab = makeRequestTab()
+    setRequestTabs((tabs) => [...tabs, tab])
+    setActiveTabId(tab.id)
+  }
+  const removeTab = (id) => {
+    if (requestTabs.length === 1) return
+    const index = requestTabs.findIndex((tab) => tab.id === id)
+    const next = requestTabs.filter((tab) => tab.id !== id)
+    setRequestTabs(next)
+    if (id === activeTabId) setActiveTabId(next[Math.max(0, index - 1)].id)
+  }
+
+  const validateTabs = () => {
+    const seen = new Set()
+    for (const tab of requestTabs) {
+      const units = Number.parseInt(tab.unitsRequested, 10)
+      if (!tab.bloodType || !Number.isInteger(units) || units <= 0) {
+        showNotification('Every request tab needs a blood type and positive whole-unit quantity.', 'destructive')
+        setActiveTabId(tab.id)
+        return false
+      }
+      const key = `${tab.bloodType}:${tab.componentType}:${tab.priority}`
+      if (seen.has(key)) {
+        showNotification('Each blood type/component/priority combination can appear only once.', 'destructive')
+        setActiveTabId(tab.id)
+        return false
+      }
+      seen.add(key)
+    }
+    return true
   }
 
   const handleSubmitRequest = async (e) => {
     e.preventDefault()
 
-    const seen = new Set()
-    const items = requestItems.map((item) => ({
-      bloodType: item.bloodType,
-      unitsRequested: Number.parseInt(item.unitsRequested, 10),
-    }))
-    if (items.some((item) => !item.bloodType || !Number.isInteger(item.unitsRequested) || item.unitsRequested <= 0)) {
-      showNotification('Every blood type needs a positive whole-unit quantity', 'destructive')
-      return
-    }
-    if (items.some((item) => seen.has(item.bloodType) || !seen.add(item.bloodType))) {
-      showNotification('Duplicate blood types are not allowed in one request', 'destructive')
-      return
-    }
+    if (!validateTabs()) return
+    setIsReviewOpen(true)
+  }
 
+  const submitReviewedRequest = async () => {
     try {
+      setIsSubmitting(true)
       await apiRequest('/api/hospital/requests', {
         method: 'POST',
         body: JSON.stringify({
-          items,
-          componentType,
-          notes: notes || null,
-          priority: requestPriority,
+          items: requestTabs.map((tab) => ({ ...tab, unitsRequested: Number.parseInt(tab.unitsRequested, 10) })),
         }),
       })
       showNotification('Blood request submitted successfully!', 'primary')
@@ -86,6 +111,8 @@ function HospitalBloodRequest() {
     } catch (err) {
       console.error('Failed to submit request', err)
       showNotification(err.message || 'Failed to submit blood request', 'destructive')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -228,13 +255,27 @@ function HospitalBloodRequest() {
 
           <div className="px-4 pb-4 sm:px-5 sm:pb-5">
             <form onSubmit={handleSubmitRequest} className="space-y-4 text-xs">
+              <div className="overflow-x-auto border-b border-slate-200">
+                <div className="flex min-w-max items-end gap-1" role="tablist" aria-label="Blood request tabs">
+                  {requestTabs.map((tab, index) => (
+                    <div key={tab.id} className={`flex items-center rounded-t-lg border border-b-0 px-3 py-2 ${tab.id === activeTabId ? 'border-red-200 bg-white text-red-700 shadow-sm' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+                      <button type="button" role="tab" aria-selected={tab.id === activeTabId} onClick={() => setActiveTabId(tab.id)} className="font-semibold focus:outline-none">
+                        Request {index + 1}{tab.bloodType ? ` · ${tab.bloodType}` : ''}
+                      </button>
+                      {requestTabs.length > 1 && <button type="button" onClick={() => removeTab(tab.id)} className="ml-2 rounded p-0.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={`Remove request ${index + 1}`}>×</button>}
+                    </div>
+                  ))}
+                  <button type="button" onClick={addTab} className="mb-1 ml-1 rounded-lg px-2 py-1.5 font-semibold text-red-600 hover:bg-red-50">+ Add request</button>
+                </div>
+              </div>
+              <p className="text-slate-500">Each tab keeps its own details. You can request the same blood type when its component or priority differs.</p>
               <div>
                 <label className="block text-xs font-medium text-slate-700">
                   Component Type <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={componentType}
-                  onChange={(e) => setComponentType(e.target.value)}
+                  value={activeTab.componentType}
+                  onChange={(e) => updateActiveTab({ componentType: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   required
                 >
@@ -249,8 +290,8 @@ function HospitalBloodRequest() {
                   Request Priority <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={requestPriority}
-                  onChange={(e) => setRequestPriority(e.target.value)}
+                  value={activeTab.priority}
+                  onChange={(e) => updateActiveTab({ priority: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   required
                 >
@@ -261,29 +302,23 @@ function HospitalBloodRequest() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-medium text-slate-700">Blood types and quantities <span className="text-red-500">*</span></label>
-                  <button type="button" onClick={() => setRequestItems((items) => [...items, { bloodType: '', unitsRequested: '' }])} className="text-xs font-semibold text-red-600 hover:text-red-700">+ Add blood type</button>
-                </div>
-                <div className="mt-1 space-y-2">
-                  {requestItems.map((item, index) => (
-                    <div key={index} className="flex gap-2">
-                      <select value={item.bloodType} onChange={(e) => setRequestItems((items) => items.map((row, i) => i === index ? { ...row, bloodType: e.target.value } : row))} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" required>
-                        <option value="">Select blood type</option>
-                        {bloodTypes.map((type) => <option key={type} value={type} disabled={requestItems.some((row, i) => i !== index && row.bloodType === type)}>{type}</option>)}
-                      </select>
-                      <input type="number" min="1" value={item.unitsRequested} onChange={(e) => setRequestItems((items) => items.map((row, i) => i === index ? { ...row, unitsRequested: e.target.value } : row))} className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" placeholder="Units" required />
-                      {requestItems.length > 1 && <button type="button" onClick={() => setRequestItems((items) => items.filter((_, i) => i !== index))} className="rounded-lg px-2 text-xs font-semibold text-red-600 hover:bg-red-50" aria-label={`Remove ${item.bloodType || 'blood type'}`}>Remove</button>}
-                    </div>
-                  ))}
-                </div>
+                <label className="block text-xs font-medium text-slate-700">Blood type <span className="text-red-500">*</span></label>
+                <select value={activeTab.bloodType} onChange={(e) => updateActiveTab({ bloodType: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" required>
+                  <option value="">Select blood type</option>
+                  {bloodTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Units requested <span className="text-red-500">*</span></label>
+                <input type="number" min="1" value={activeTab.unitsRequested} onChange={(e) => updateActiveTab({ unitsRequested: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25" placeholder="Units" required />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-700">Notes (Optional)</label>
                 <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  value={activeTab.notes}
+                  onChange={(e) => updateActiveTab({ notes: e.target.value })}
                   rows={3}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/25"
                   placeholder="Add any additional notes or requirements"
@@ -295,7 +330,7 @@ function HospitalBloodRequest() {
                   type="submit"
                   className="inline-flex items-center justify-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
                 >
-                  Submit Request
+                  Review {requestTabs.length} request{requestTabs.length === 1 ? '' : 's'}
                 </button>
               </div>
             </form>
@@ -521,6 +556,27 @@ function HospitalBloodRequest() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="request-review-title">
+            <h3 id="request-review-title" className="text-base font-semibold text-slate-900">Review blood requests</h3>
+            <p className="mt-1 text-sm text-slate-500">The following {requestTabs.length} item{requestTabs.length === 1 ? '' : 's'} will be submitted. You can still return to edit them.</p>
+            <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-100">
+              {requestTabs.map((tab, index) => (
+                <li key={tab.id} className="flex items-center justify-between gap-3 px-4 py-3 text-xs">
+                  <span className="font-semibold text-slate-900">Request {index + 1}: {tab.bloodType} · {tab.unitsRequested} unit{Number(tab.unitsRequested) === 1 ? '' : 's'}</span>
+                  <span className="text-right capitalize text-slate-600">{tab.componentType.replace('_', ' ')} · {tab.priority}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" disabled={isSubmitting} onClick={() => setIsReviewOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Back to edit</button>
+              <button type="button" disabled={isSubmitting} onClick={submitReviewedRequest} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">{isSubmitting ? 'Submitting...' : 'Submit requests'}</button>
             </div>
           </div>
         </div>

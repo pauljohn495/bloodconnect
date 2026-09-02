@@ -41,6 +41,7 @@ const {
   getTransfersController,
   getRequestsController,
   updateRequestStatusController,
+  restoreRequestController,
 } = require('../controllers/adminTransferRequestController')
 const {
   getWastagePredictionsController,
@@ -215,6 +216,7 @@ router.patch('/requests/:id/status', updateRequestStatusController)
 
 // RESTful alias: PATCH /api/admin/requests/:id
 router.patch('/requests/:id', updateRequestStatusController)
+router.patch('/requests/:id/restore', restoreRequestController)
 
 // ===== Analytics & Wastage Reduction =====
 

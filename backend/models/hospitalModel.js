@@ -102,7 +102,7 @@ async function getHospitalDonations(hospitalId) {
 async function createHospitalRequest({ hospitalId, bloodType, items, componentType, unitsRequested, notes, priority }) {
   const component = componentType || 'whole_blood'
   const safePriority = priority || 'normal'
-  const requestItems = items?.length ? items : [{ bloodType, unitsRequested }]
+  const requestItems = items?.length ? items : [{ bloodType, unitsRequested, componentType: component, priority: safePriority, notes }]
   const requestGroupId = requestItems.length > 1 ? require('crypto').randomUUID() : null
   const conn = await pool.getConnection()
 
@@ -113,9 +113,9 @@ async function createHospitalRequest({ hospitalId, bloodType, items, componentTy
       const [result] = await conn.query(
         `INSERT INTO blood_requests (hospital_id, blood_type, component_type, units_requested, notes, priority, request_group_id)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [hospitalId, item.bloodType, component, item.unitsRequested, notes || null, safePriority, requestGroupId],
+        [hospitalId, item.bloodType, item.componentType || component, item.unitsRequested, item.notes ?? notes ?? null, item.priority || safePriority, requestGroupId],
       )
-      created.push({ id: result.insertId, bloodType: item.bloodType, unitsRequested: item.unitsRequested })
+      created.push({ id: result.insertId, bloodType: item.bloodType, unitsRequested: item.unitsRequested, componentType: item.componentType || component, priority: item.priority || safePriority })
     }
     await conn.commit()
     return { id: created[0].id, requestGroupId, hospitalId, items: created, componentType: component, notes: notes || null, priority: safePriority, status: 'pending' }

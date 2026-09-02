@@ -31,7 +31,14 @@ function buildAuthPayload(user) {
     email: user.email,
   }
 
-  const token = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'dev-secret', {
+  const secret = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? 'dev-secret' : null)
+  if (!secret) {
+    const error = new Error('Authentication is not configured')
+    error.statusCode = 503
+    throw error
+  }
+
+  const token = jwt.sign(tokenPayload, secret, {
     expiresIn: '8h',
   })
 

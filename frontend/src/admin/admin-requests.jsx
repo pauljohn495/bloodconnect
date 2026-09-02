@@ -3,6 +3,7 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
+import ConfirmDialog from '../ConfirmDialog.jsx'
 
 function AdminRequests() {
   const [requests, setRequests] = useState([])
@@ -13,6 +14,8 @@ function AdminRequests() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false)
   const [selectedRequestNotes, setSelectedRequestNotes] = useState(null)
+  const [pendingAction, setPendingAction] = useState(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
   const loadRequests = async () => {
     try {
@@ -90,6 +93,7 @@ function AdminRequests() {
 
   const handleUpdateStatus = async (requestId, status, unitsApproved = null, notes = null) => {
     try {
+      setActionLoading(true)
       await apiRequest(`/api/admin/requests/${requestId}`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -103,6 +107,23 @@ function AdminRequests() {
     } catch (err) {
       console.error('Failed to update request status', err)
       showNotification(err.message || 'Failed to update request status', 'destructive')
+    } finally {
+      setActionLoading(false)
+      setPendingAction(null)
+    }
+  }
+
+  const handleRestore = async (requestId) => {
+    try {
+      setActionLoading(true)
+      await apiRequest(`/api/admin/requests/${requestId}/restore`, { method: 'PATCH' })
+      await loadRequests()
+      showNotification('Request restored to pending successfully!', 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Failed to restore request', 'destructive')
+    } finally {
+      setActionLoading(false)
+      setPendingAction(null)
     }
   }
 
@@ -313,15 +334,17 @@ function AdminRequests() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => handleUpdateStatus(request.id, 'approved', request.units_requested)}
-                            className="inline-flex items-center justify-center rounded-full bg-green-600 px-3 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-green-500"
+                            onClick={() => setPendingAction({ type: 'approve', request })}
+                            disabled={actionLoading}
+                            className="inline-flex items-center justify-center rounded-full bg-green-600 px-3 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-green-500 disabled:opacity-60"
                           >
                             Approve
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleUpdateStatus(request.id, 'rejected')}
-                            className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-red-500"
+                            onClick={() => setPendingAction({ type: 'reject', request })}
+                            disabled={actionLoading}
+                            className="inline-flex items-center justify-center rounded-full bg-red-600 px-3 py-1 text-[10px] font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-60"
                           >
                             Reject
                           </button>
@@ -338,7 +361,7 @@ function AdminRequests() {
       {isHistoryOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
           <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-100"
+            className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-100"
             role="dialog"
             aria-modal="true"
             aria-labelledby="requests-history-title"
@@ -350,7 +373,7 @@ function AdminRequests() {
               <p className="mt-1 text-sm text-slate-500">All hospital requests including completed statuses</p>
             </div>
 
-            <div className="max-h-96 overflow-y-auto px-2">
+            <div className="min-h-0 flex-1 overflow-auto px-2">
               <table className="min-w-full divide-y divide-slate-100 text-xs">
                 <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
                   <tr>
@@ -372,12 +395,13 @@ function AdminRequests() {
                     <th className="whitespace-nowrap px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                       Status
                     </th>
+                    <th className="whitespace-nowrap px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {allRequests.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>
+                      <td className="px-3 py-4 text-center text-slate-500" colSpan={7}>
                         No request history available.
                       </td>
                     </tr>
@@ -419,6 +443,11 @@ function AdminRequests() {
                             {request.status || 'pending'}
                           </span>
                         </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right">
+                          {['approved', 'rejected'].includes((request.status || '').toLowerCase()) && (
+                            <button type="button" disabled={actionLoading} onClick={() => setPendingAction({ type: 'restore', request })} className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60">Restore</button>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -438,6 +467,21 @@ function AdminRequests() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingAction)}
+        loading={actionLoading}
+        title={pendingAction?.type === 'restore' ? 'Restore request?' : pendingAction?.type === 'approve' ? 'Approve request?' : 'Reject request?'}
+        message={pendingAction ? `${pendingAction.type === 'restore' ? 'Restore' : pendingAction.type === 'approve' ? 'Approve' : 'Reject'} ${pendingAction.request.blood_type} request from ${pendingAction.request.hospital_name}? ${pendingAction.type === 'restore' ? 'It will return to pending review.' : 'This will change the request status.'}` : ''}
+        confirmLabel={pendingAction?.type === 'restore' ? 'Confirm Restore' : pendingAction?.type === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+        confirmTone={pendingAction?.type === 'approve' ? 'neutral' : 'danger'}
+        onCancel={() => setPendingAction(null)}
+        onConfirm={() => {
+          if (!pendingAction) return
+          if (pendingAction.type === 'restore') return handleRestore(pendingAction.request.id)
+          return handleUpdateStatus(pendingAction.request.id, pendingAction.type === 'approve' ? 'approved' : 'rejected', pendingAction.type === 'approve' ? pendingAction.request.units_requested : null)
+        }}
+      />
 
       {/* Notification Container */}
       {notification && (

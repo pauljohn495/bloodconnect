@@ -10,7 +10,11 @@ function auth(requiredRoles = []) {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret')
+      const secret = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? 'dev-secret' : null)
+      if (!secret) {
+        return res.status(503).json({ message: 'Authentication is not configured' })
+      }
+      const decoded = jwt.verify(token, secret)
       req.user = decoded
 
       if (requiredRoles.length && !requiredRoles.includes(decoded.role)) {
