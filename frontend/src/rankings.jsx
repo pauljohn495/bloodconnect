@@ -48,14 +48,21 @@ function DonorRow({ donor, rank }) {
     }`}>
       <RankBadge rank={rank} />
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        {/* Avatar placeholder */}
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold text-sm ${
           rank === 1 ? 'bg-amber-100 text-amber-700' :
           rank === 2 ? 'bg-slate-200 text-slate-600' :
           rank === 3 ? 'bg-orange-100 text-orange-700' :
           'bg-red-50 text-red-600'
         }`}>
-          {(donor.donorName || '?')[0].toUpperCase()}
+          {donor.profileImageUrl ? (
+            <img
+              src={donor.profileImageUrl}
+              alt={`${donor.donorName || 'Donor'} profile`}
+              className="h-full w-full rounded-full object-cover"
+            />
+          ) : (
+            (donor.donorName || '?')[0].toUpperCase()
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-900">{donor.donorName || 'Anonymous'}</p>

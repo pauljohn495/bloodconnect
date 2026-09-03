@@ -47,11 +47,12 @@ const getDonorDonationRankingController = async (req, res) => {
           u.id as donor_id,
           COALESCE(u.full_name, u.username) as donor_name,
           u.blood_type as blood_type,
+          u.profile_image_url as profile_image_url,
           COALESCE(SUM(d.units_donated), 0) as total_units_donated
         FROM donations d
         JOIN users u ON u.id = d.user_id
         WHERE u.role = 'donor'
-        GROUP BY u.id, u.full_name, u.username, u.blood_type
+        GROUP BY u.id, u.full_name, u.username, u.blood_type, u.profile_image_url
         ORDER BY total_units_donated DESC, donor_name ASC
         LIMIT ?
       `,
@@ -63,6 +64,7 @@ const getDonorDonationRankingController = async (req, res) => {
         donorId: r.donor_id,
         donorName: r.donor_name,
         bloodType: r.blood_type,
+        profileImageUrl: r.profile_image_url || null,
         totalUnitsDonated: Number(r.total_units_donated || 0),
       })),
     )
@@ -76,11 +78,12 @@ const getDonorDonationRankingController = async (req, res) => {
               u.id as donor_id,
               COALESCE(u.full_name, u.username) as donor_name,
               u.blood_type as blood_type,
+              u.profile_image_url as profile_image_url,
               COUNT(*) as total_units_donated
             FROM schedule_requests sr
             JOIN users u ON u.id = sr.user_id
             WHERE u.role = 'donor' AND sr.status = 'completed' AND sr.actual_donation_at IS NOT NULL
-            GROUP BY u.id, u.full_name, u.username, u.blood_type
+            GROUP BY u.id, u.full_name, u.username, u.blood_type, u.profile_image_url
             ORDER BY total_units_donated DESC, donor_name ASC
             LIMIT ?
           `,
@@ -91,6 +94,7 @@ const getDonorDonationRankingController = async (req, res) => {
             donorId: r.donor_id,
             donorName: r.donor_name,
             bloodType: r.blood_type,
+            profileImageUrl: r.profile_image_url || null,
             totalUnitsDonated: Number(r.total_units_donated || 0),
           })),
         )

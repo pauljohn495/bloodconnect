@@ -182,6 +182,10 @@ function AdminDonation() {
       showNotification('Profile update approved.', 'primary')
       setProfileDiffDonor((prev) => (prev && prev.id === donorId ? null : prev))
       await loadDonors()
+      if (selectedDonorDetails?.donor?.id === donorId) {
+        const updatedDetails = await apiRequest(`/api/admin/donors/${donorId}/details`)
+        setSelectedDonorDetails(updatedDetails)
+      }
     } catch (err) {
       alert(err.message || 'Failed to approve profile update')
     } finally {
@@ -3620,9 +3624,7 @@ function AdminDonation() {
 
             <div className="flex justify-center border-b border-slate-200 pb-4">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-red-600 text-2xl font-semibold text-white shadow-md ring-2 ring-slate-100">
-                {selectedDonorDetails.donor.profileImageUrl &&
-                !selectedDonorDetails.donor.isManualDonor &&
-                !donorDetailAvatarFailed ? (
+                {selectedDonorDetails.donor.profileImageUrl && !donorDetailAvatarFailed ? (
                   <img
                     src={selectedDonorDetails.donor.profileImageUrl}
                     alt=""
