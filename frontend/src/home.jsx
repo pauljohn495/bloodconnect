@@ -600,39 +600,53 @@ function Home() {
             <div aria-hidden="true" className="home-hero-grid pointer-events-none absolute inset-x-0 top-0 h-full" />
             <div aria-hidden="true" className="home-hero-orb home-hero-orb-one" />
             <div aria-hidden="true" className="home-hero-orb home-hero-orb-two" />
-            <div className="relative mx-auto max-w-5xl px-4 text-center sm:px-6 lg:px-8">
+            <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 text-center sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12 lg:px-8 lg:text-left">
+              <div className="relative z-10">
+                <h1 className="mx-auto max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl lg:mx-0 lg:text-6.5xl leading-[1.08]">
+                  Empowering communities through{' '}
+                  <span className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 bg-clip-text text-transparent">
+                    Smarter Blood Response
+                  </span>
+                </h1>
 
+                <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg lg:mx-0">
+                  BloodConnect synchronizes donation campaigns, urgent hospital requests, and community volunteers so life-saving actions happen in seconds, not hours.
+                </p>
 
-              <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl lg:text-6.5xl leading-[1.08]">
-                Empowering communities through{' '}
-                <span className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 bg-clip-text text-transparent">
-                  Smarter Blood Response
-                </span>
-              </h1>
-
-              <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
-                BloodConnect synchronizes donation campaigns, urgent hospital requests, and community volunteers so life-saving actions happen in seconds, not hours.
-              </p>
-
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-                <button
-                  type="button"
-                  onClick={() => scrollToSection('login')}
-                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-gradient-to-r from-red-700 via-red-600 to-rose-600 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_-12px_rgba(185,28,28,0.75)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-12px_rgba(185,28,28,0.7)] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
-                >
-                  Sign in to Portal
-                </button>
-                {isFlagEnabled('public', 'public.register') && (
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4 lg:justify-start">
                   <button
                     type="button"
-                    onClick={() => navigate('/register')}
-                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-200 bg-white/90 px-8 py-3 text-sm font-semibold text-slate-700 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                    onClick={() => scrollToSection('login')}
+                    className="inline-flex min-h-12 items-center justify-center rounded-full bg-gradient-to-r from-red-700 via-red-600 to-rose-600 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_-12px_rgba(185,28,28,0.75)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-12px_rgba(185,28,28,0.7)] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
                   >
-                    Become a Donor
+                    Sign in to Portal
                   </button>
-                )}
+                  {isFlagEnabled('public', 'public.register') && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/register')}
+                      className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-200 bg-white/90 px-8 py-3 text-sm font-semibold text-slate-700 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                    >
+                      Become a Donor
+                    </button>
+                  )}
+                </div>
+                <div className="home-hero-rule mx-auto mt-12 max-w-3xl lg:mx-0" aria-hidden="true" />
               </div>
-              <div className="home-hero-rule mx-auto mt-12 max-w-3xl" aria-hidden="true" />
+
+              <div aria-hidden="true" className="home-hero-visual mx-auto hidden w-full max-w-[470px] lg:block">
+                <div className="home-hero-visual-card">
+                  <div className="home-hero-visual-ring home-hero-visual-ring-outer" />
+                  <div className="home-hero-visual-ring home-hero-visual-ring-inner" />
+                  <span className="home-hero-node home-hero-node-top" />
+                  <span className="home-hero-node home-hero-node-right" />
+                  <span className="home-hero-node home-hero-node-bottom" />
+                  <span className="home-hero-node home-hero-node-left" />
+                  <div className="home-hero-logo-wrap">
+                    <BrandLogo tone="light" className="h-20 w-20 rounded-[1.65rem]" roundedClass="rounded-[1.65rem]" />
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 

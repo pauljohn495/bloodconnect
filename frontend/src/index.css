@@ -74,12 +74,102 @@ body {
   background: linear-gradient(90deg, transparent, rgba(248, 113, 113, 0.28), transparent);
 }
 
+.home-hero-visual {
+  perspective: 1000px;
+}
+
+.home-hero-visual-card {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1 / 0.86;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(254, 242, 242, 0.95), rgba(255, 255, 255, 0.84) 47%, rgba(248, 250, 252, 0.72)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.66));
+  box-shadow: 0 28px 60px -34px rgba(127, 29, 29, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: rotate(2deg);
+}
+
+.home-hero-visual-card::before,
+.home-hero-visual-card::after {
+  position: absolute;
+  border-radius: 9999px;
+  content: '';
+}
+
+.home-hero-visual-card::before {
+  width: 15rem;
+  height: 15rem;
+  background: radial-gradient(circle, rgba(254, 202, 202, 0.76), rgba(254, 242, 242, 0));
+  filter: blur(9px);
+}
+
+.home-hero-visual-card::after {
+  inset: 1rem;
+  border: 1px dashed rgba(239, 68, 68, 0.18);
+}
+
+.home-hero-visual-ring {
+  position: absolute;
+  border: 1px solid rgba(239, 68, 68, 0.17);
+  border-radius: 9999px;
+}
+
+.home-hero-visual-ring-outer {
+  width: 72%;
+  aspect-ratio: 1;
+}
+
+.home-hero-visual-ring-inner {
+  width: 48%;
+  aspect-ratio: 1;
+  border-color: rgba(251, 113, 133, 0.28);
+}
+
+.home-hero-logo-wrap {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 7.25rem;
+  height: 7.25rem;
+  place-items: center;
+  border: 1px solid rgba(254, 202, 202, 0.8);
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 20px 38px -20px rgba(185, 28, 28, 0.35);
+}
+
+.home-hero-node {
+  position: absolute;
+  z-index: 1;
+  width: 0.82rem;
+  height: 0.82rem;
+  border: 3px solid #fff;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #ef4444, #be123c);
+  box-shadow: 0 5px 12px -5px rgba(185, 28, 28, 0.75);
+}
+
+.home-hero-node-top { top: 16%; left: 50%; transform: translateX(-50%); }
+.home-hero-node-right { top: 50%; right: 14%; transform: translateY(-50%); }
+.home-hero-node-bottom { bottom: 16%; left: 50%; transform: translateX(-50%); }
+.home-hero-node-left { top: 50%; left: 14%; transform: translateY(-50%); }
+
 .home-surface {
   box-shadow: 0 14px 34px -30px rgba(15, 23, 42, 0.38);
 }
 
 .home-login-section {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.38), rgba(255, 255, 255, 0.9));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-visual-card {
+    transform: none;
+  }
 }
 
 /* Safe areas for notched phones (nav bars use pb-safe where needed) */
