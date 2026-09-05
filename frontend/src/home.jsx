@@ -594,22 +594,22 @@ function Home() {
           )}
         </header>
 
-        <main className="pt-16">
+        <main className="home-main pt-16">
           {/* Hero Section */}
-          <section className="home-hero relative isolate overflow-hidden pt-14 pb-18 sm:pt-20 lg:pt-28 lg:pb-28">
-            <div aria-hidden="true" className="home-hero-grid pointer-events-none absolute inset-x-0 top-0 h-full" />
+          <section className="home-hero relative isolate overflow-hidden py-16 sm:py-20 lg:py-28">
+            <div aria-hidden="true" className="home-hero-grid pointer-events-none absolute inset-0" />
             <div aria-hidden="true" className="home-hero-orb home-hero-orb-one" />
             <div aria-hidden="true" className="home-hero-orb home-hero-orb-two" />
-            <div className="relative mx-auto grid max-w-7xl items-center gap-10 px-4 text-center sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:gap-12 lg:px-8 lg:text-left">
-              <div className="relative z-10">
-                <h1 className="mx-auto max-w-4xl text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl lg:mx-0 lg:text-6.5xl leading-[1.08]">
+            <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:px-8">
+              <div className="relative z-10 text-center lg:text-left">
+                <h1 className="mx-auto max-w-4xl text-5xl font-extrabold tracking-[-0.06em] text-white sm:text-6xl lg:mx-0 lg:text-7xl leading-[0.98]">
                   Empowering communities through{' '}
                   <span className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 bg-clip-text text-transparent">
                     Smarter Blood Response
                   </span>
                 </h1>
 
-                <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg lg:mx-0">
+                <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-rose-50/80 sm:text-lg lg:mx-0">
                   BloodConnect synchronizes donation campaigns, urgent hospital requests, and community volunteers so life-saving actions happen in seconds, not hours.
                 </p>
 
@@ -617,7 +617,7 @@ function Home() {
                   <button
                     type="button"
                     onClick={() => scrollToSection('login')}
-                    className="inline-flex min-h-12 items-center justify-center rounded-full bg-gradient-to-r from-red-700 via-red-600 to-rose-600 px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_-12px_rgba(185,28,28,0.75)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_32px_-12px_rgba(185,28,28,0.7)] focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2"
+                    className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-8 py-3 text-sm font-semibold text-red-700 shadow-[0_16px_32px_-14px_rgba(0,0,0,0.55)] transition duration-300 hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-[0_22px_36px_-14px_rgba(0,0,0,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-red-950"
                   >
                     Sign in to Portal
                   </button>
@@ -625,7 +625,7 @@ function Home() {
                     <button
                       type="button"
                       onClick={() => navigate('/register')}
-                      className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-200 bg-white/90 px-8 py-3 text-sm font-semibold text-slate-700 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                      className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 bg-white/10 px-8 py-3 text-sm font-semibold text-white backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-red-950"
                     >
                       Become a Donor
                     </button>
@@ -652,8 +652,8 @@ function Home() {
 
           {/* Blood Donation Schedule — Full Width */}
           {showMbdPublic && (
-            <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
-              <div className="home-surface overflow-hidden rounded-3xl border border-slate-200/70 bg-white/90 backdrop-blur-sm">
+            <section className="home-schedule-shell mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+              <div className="home-schedule-panel home-surface overflow-hidden rounded-3xl border border-slate-200/70 bg-white/90 backdrop-blur-sm">
                 {/* Section Header */}
                 <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -867,8 +867,8 @@ function Home() {
           )}
 
           {/* Latest Posts Section — up to 6 image-cover cards */}
-          <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
-              <div className="mb-7 text-center">
+          <section className="home-posts-shell mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+              <div className="home-section-heading mb-9 text-center">
                 <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-red-600 ring-1 ring-red-100">
                   Latest Updates
                 </span>
@@ -891,7 +891,7 @@ function Home() {
                       key={post.id}
                       type="button"
                       onClick={() => setSelectedPost(post)}
-                      className="group relative flex aspect-[4/3] w-full overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-900 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.55)] transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/80"
+                    className="home-post-card group relative flex aspect-[4/3] w-full overflow-hidden rounded-3xl border border-slate-200/80 bg-slate-900 shadow-[0_12px_28px_-18px_rgba(15,23,42,0.55)] transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/80"
                       aria-label={`Read post: ${post.title}`}
                     >
                       {/* Background image */}
@@ -946,7 +946,7 @@ function Home() {
                 {Array.from({ length: Math.max(0, 6 - homePosts.slice(0, 6).length) }).map((_, idx) => (
                   <div
                     key={`placeholder-${idx}`}
-                    className="flex aspect-[4/3] items-center justify-center rounded-3xl border-2 border-dashed border-slate-200/70 bg-slate-50/80"
+                    className="home-post-placeholder flex aspect-[4/3] items-center justify-center rounded-3xl border-2 border-dashed border-slate-200/70 bg-slate-50/80"
                     aria-hidden="true"
                   >
                     <div className="flex flex-col items-center gap-2 text-slate-300">
@@ -961,7 +961,7 @@ function Home() {
             </section>
 
           {/* Blood Donation Benefits & Knowledge Cards */}
-          <section className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+          <section className="home-benefits-shell mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
             <div className="mb-8 text-center">
               <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-red-600 ring-1 ring-red-100">
                 Why Donate?
@@ -1008,7 +1008,7 @@ function Home() {
                   body: 'Most healthy adults aged 17–65 weighing at least 50kg can donate. You must not have donated in the last 3 months and be free of illness on donation day.',
                 },
               ].map((card, idx) => (
-                <div key={idx} className="home-surface group rounded-3xl border border-slate-200/70 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-red-100 hover:shadow-lg">
+                <div key={idx} className="home-benefit-card home-surface group rounded-3xl border border-slate-200/70 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-red-100 hover:shadow-lg">
                   <div className="flex items-start justify-between gap-3 mb-4">
                     <div className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${card.color} text-white shadow-[0_4px_12px_rgba(220,38,38,0.25)]`}>
                       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1024,7 +1024,7 @@ function Home() {
           </section>
 
           {/* Login Portal Section */}
-          <section id="login" className="home-login-section scroll-mt-24 border-y border-slate-200/60 py-16 sm:py-20">
+          <section id="login" className="home-login-section scroll-mt-24 py-16 sm:py-24">
             <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 px-4 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
               {/* Left explanatory portal card */}
               <div className="relative overflow-hidden rounded-3xl border border-red-300/30 bg-gradient-to-br from-red-700 via-red-600 to-rose-700 p-8 flex flex-col justify-between shadow-[0_20px_48px_-22px_rgba(185,28,28,0.7)]">
@@ -1216,7 +1216,7 @@ function Home() {
 
           {/* Donate Call-To-Action Banner */}
           {isFlagEnabled('public', 'public.section_donate') && (
-            <section id="donate" className="scroll-mt-24 py-16 sm:py-20">
+            <section id="donate" className="home-donate-section scroll-mt-24 py-16 sm:py-20">
               <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
                 <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-700 via-red-600 to-rose-600 p-8 text-center shadow-[0_20px_48px_-24px_rgba(185,28,28,0.7)] sm:p-14">
                   {/* Subtle grid pattern background */}
@@ -1251,7 +1251,7 @@ function Home() {
 
           {/* About & Mission Sections */}
           {isFlagEnabled('public', 'public.section_about') && (
-            <section id="about" className="scroll-mt-24 border-t border-slate-200/50 bg-slate-50/65 py-16 sm:py-20">
+            <section id="about" className="home-about-section scroll-mt-24 py-16 sm:py-20">
               <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                   <div className="home-surface rounded-3xl border border-slate-200/70 bg-white p-8 lg:col-span-7 flex flex-col justify-center">
@@ -1307,7 +1307,7 @@ function Home() {
           )}
 
           {/* Slogan Banner */}
-          <section className="relative overflow-hidden bg-slate-950 py-16 sm:py-20 text-center">
+          <section className="home-mission-section relative overflow-hidden py-20 text-center sm:py-28">
             {/* Ambient light effects inside the dark banner */}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(220,38,38,0.25)_0%,rgba(15,23,42,0)_60%)]" />
             <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
@@ -1321,7 +1321,7 @@ function Home() {
           </section>
 
           {/* Footer */}
-          <footer className="border-t border-slate-200 bg-white py-12 text-slate-700">
+          <footer className="home-footer py-12 text-slate-700">
             <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 px-4 sm:px-6 lg:grid-cols-[1.5fr_1fr] lg:px-8">
               <div className="space-y-3">
                 <p className="text-base font-extrabold tracking-tight text-slate-950">
