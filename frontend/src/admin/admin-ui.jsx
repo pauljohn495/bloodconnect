@@ -4,7 +4,7 @@
  */
 
 const shell =
-  'overflow-hidden rounded-3xl border border-slate-200/85 bg-white shadow-[0_14px_35px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80 max-w-full min-w-0'
+  'bc-portal-panel overflow-hidden rounded-3xl border border-slate-200/85 bg-white shadow-[0_14px_35px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-100/80 max-w-full min-w-0'
 
 /** Horizontal scroll for data tables — touch-friendly on iOS */
 const tableScrollBase =
@@ -74,7 +74,7 @@ export const adminPanel = {
 }
 
 const reportShell =
-  'rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm shadow-slate-200/20 ring-1 ring-slate-100/80 sm:p-5 max-w-full min-w-0'
+  'bc-portal-panel rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm shadow-slate-200/20 ring-1 ring-slate-100/80 sm:p-5 max-w-full min-w-0'
 
 /** Use for tables outside adminPanel (e.g. reports) */
 export const responsiveTableContainer = tableScrollBase

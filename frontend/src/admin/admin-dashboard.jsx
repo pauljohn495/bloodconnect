@@ -195,7 +195,7 @@ function AdminDashboard() {
               className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
               aria-label="Dashboard summary statistics"
             >
-              <article className="group rounded-2xl border border-sky-300/40 bg-linear-to-br from-sky-400 via-sky-500 to-cyan-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(2,132,199,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(2,132,199,0.8)]">
+              <article className="bc-portal-stat group rounded-2xl border border-sky-300/40 bg-linear-to-br from-sky-400 via-sky-500 to-cyan-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(2,132,199,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(2,132,199,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-sky-50/95">
@@ -214,7 +214,7 @@ function AdminDashboard() {
                 </div>
               </article>
 
-              <article className="group rounded-2xl border border-orange-300/45 bg-linear-to-br from-orange-400 via-orange-500 to-amber-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(234,88,12,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(234,88,12,0.8)]">
+              <article className="bc-portal-stat group rounded-2xl border border-orange-300/45 bg-linear-to-br from-orange-400 via-orange-500 to-amber-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(234,88,12,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(234,88,12,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-orange-50/95">
@@ -233,7 +233,7 @@ function AdminDashboard() {
                 </div>
               </article>
 
-              <article className="group rounded-2xl border border-violet-300/40 bg-linear-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(124,58,237,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(124,58,237,0.8)]">
+              <article className="bc-portal-stat group rounded-2xl border border-violet-300/40 bg-linear-to-br from-violet-500 via-purple-500 to-fuchsia-500 p-5 text-white shadow-[0_18px_36px_-24px_rgba(124,58,237,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(124,58,237,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-50/95">
@@ -252,7 +252,7 @@ function AdminDashboard() {
                 </div>
               </article>
 
-              <article className="group rounded-2xl border border-rose-300/40 bg-linear-to-br from-rose-500 via-red-500 to-red-600 p-5 text-white shadow-[0_18px_36px_-24px_rgba(225,29,72,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(225,29,72,0.8)]">
+              <article className="bc-portal-stat group rounded-2xl border border-rose-300/40 bg-linear-to-br from-rose-500 via-red-500 to-red-600 p-5 text-white shadow-[0_18px_36px_-24px_rgba(225,29,72,0.75)] ring-1 ring-white/25 transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-24px_rgba(225,29,72,0.8)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-50/95">

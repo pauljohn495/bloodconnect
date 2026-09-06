@@ -1,0 +1,39 @@
+/* Companion pages use the landing page's reference palette. */
+.bc-public-page {
+  --bc-brand-gradient: linear-gradient(135deg, #a52f49 0%, #82203e 45%, #59102f 100%);
+  color: #383838;
+  font-family: 'DM Sans', var(--font-sans);
+}
+.bc-public-page button { cursor: pointer; }
+.bc-public-page button:disabled { cursor: default; }
+.bc-public-page :is(button, a, input, select):focus-visible {
+  outline: 2px solid #a52f49;
+  outline-offset: 4px;
+}
+.bc-public-page ::selection { color: #59102f; background: #ebd5e0; }
+.bc-register-intro, .bc-ranking-intro {
+  background: var(--bc-brand-gradient);
+  border-radius: 24px;
+  padding: 44px 32px;
+  box-shadow: 0 18px 44px -28px #59102f55;
+}
+.bc-register-intro { padding-block: 64px; }
+.bc-ranking-tabs button[aria-pressed='true'] {
+  background: #080808;
+  color: white;
+  box-shadow: 0 3px 9px #00000012;
+  --tw-ring-color: transparent;
+}
+.bc-public-page input, .bc-public-page select { min-height: 44px; }
+@media (max-width: 640px) {
+  .bc-register-intro, .bc-ranking-intro { padding: 32px 22px; border-radius: 18px; }
+  .bc-ranking-tabs { width: 100%; flex-wrap: wrap; }
+  .bc-ranking-tabs button { flex: 1 1 140px; justify-content: center; min-height: 44px; }
+  .bc-public-page input, .bc-public-page select { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bc-public-page *, .bc-public-page *::before, .bc-public-page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,3 +1,4 @@
+import '../portal-theme.css'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
@@ -507,7 +508,7 @@ function UserDashboard() {
     })
 
   return (
-    <div className="min-h-screen">
+    <div className="bc-portal bc-donor-portal min-h-screen">
       {/* Top Header */}
       <header className="z-30 border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3 lg:px-8">
@@ -641,6 +642,14 @@ function UserDashboard() {
           </p>
         )}
         <div className="mx-auto w-full max-w-4xl space-y-8 px-3 sm:px-6 lg:px-8">
+        <section className="bc-donor-welcome" aria-labelledby="donor-welcome-title">
+          <div>
+            <p className="bc-portal-eyebrow">YOUR BLOODCONNECT COMMUNITY</p>
+            <h2 id="donor-welcome-title">A little of you.<br /><em>A difference that lasts.</em></h2>
+            <p>Welcome{userData.name ? `, ${userData.name}` : ''}. Keep track of your donations, stay connected, and find your next opportunity to give.</p>
+          </div>
+          <svg viewBox="0 0 120 140" fill="none" aria-hidden="true"><path d="M60 8S20 57 20 88a40 40 0 0 0 80 0C100 57 60 8 60 8Z" stroke="currentColor" strokeWidth="2" /><path d="M27 88h17l8-15 11 31 11-24 7 8h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </section>
         {/* Hero Section - Statistic Cards */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Blood Type Card */}

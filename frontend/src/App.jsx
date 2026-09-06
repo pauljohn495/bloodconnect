@@ -48,11 +48,13 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/rankings" element={<Rankings />} />
+            <Route path="/ranking" element={<Navigate to="/rankings" replace />} />
             <Route path="/superadmin/login" element={<SuperadminLogin />} />
             <Route path="/register" element={<DonorRegistration />} />
             <Route path="/complete-google-donor-profile" element={<GoogleDonorProfileSetup />} />
             <Route path="/module-unavailable" element={<ModuleUnavailable />} />
             <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/donors" element={<Navigate to="/dashboard" replace />} />
             <Route path="/profile" element={<ProfileSettings />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/requests" element={<AdminRequests />} />

@@ -1,3 +1,4 @@
+import '../portal-theme.css'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
@@ -36,7 +37,7 @@ function GoogleDonorProfileSetup() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-red-100 via-white to-red-200">
+    <div className="bc-portal min-h-screen">
       <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md rounded-2xl bg-white/95 p-6 shadow-xl shadow-red-100 ring-1 ring-red-100 backdrop-blur-sm sm:p-8">
           <h1 className="text-xl font-semibold text-slate-900">Complete your donor profile</h1>

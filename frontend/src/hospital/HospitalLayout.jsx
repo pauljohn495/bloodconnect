@@ -1,3 +1,4 @@
+import '../portal-theme.css'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../BrandLogo.jsx'
@@ -67,7 +68,7 @@ function NavLinks({ onNavigate, isExpanded, items }) {
         return (
           <Link
             key={item.path}
-            to={item.path}
+            to={item.path} aria-current={isActive ? 'page' : undefined}
             onClick={onNavigate}
             title={!isExpanded ? item.name : undefined}
             className={`group flex min-h-[44px] w-full items-center rounded-xl px-3 py-3 text-left transition md:min-h-0 md:py-2.5 ${
@@ -145,7 +146,7 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
   }
 
   return (
-    <div className="min-h-screen text-slate-900 antialiased">
+    <div className="bc-portal min-h-screen text-slate-900 antialiased">
       <a
         href="#hospital-main"
         className="fixed left-4 top-4 z-100 -translate-y-16 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
@@ -155,7 +156,7 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
 
       <div className="flex min-h-screen">
         <aside
-          className={`hidden shrink-0 flex-col border-r border-slate-900/20 bg-[#151821] transition-[width] duration-200 md:flex ${
+          className={`hidden shrink-0 flex-col border-r border-slate-900/20 bc-portal-sidebar transition-[width] duration-200 md:flex ${
             desktopSidebarExpanded ? 'w-64' : 'w-20'
           }`}
           onMouseEnter={handleSidebarMouseEnter}
@@ -200,10 +201,10 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
 
         <aside
           id="mobile-hospital-nav"
-          className={`fixed inset-y-0 left-0 z-50 flex w-[min(100%,280px)] flex-col border-r border-slate-900/20 bg-[#151821] shadow-xl transition-transform duration-200 ease-out md:hidden ${
+          className={`fixed inset-y-0 left-0 z-50 flex w-[min(100%,280px)] flex-col border-r border-slate-900/20 bc-portal-sidebar shadow-xl transition-transform duration-200 ease-out md:hidden ${
             mobileOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
-          aria-hidden={!mobileOpen}
+          aria-hidden={!mobileOpen} inert={!mobileOpen}
         >
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
             <div className="flex items-center gap-2">
@@ -227,7 +228,7 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
 
         </aside>
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="bc-portal-workspace flex min-h-screen min-w-0 flex-1 flex-col">
           <div className="flex justify-end px-3 pt-2 sm:px-6 lg:px-8">
             <button
               onClick={handleLogout}
@@ -241,7 +242,7 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
               Log out
             </button>
           </div>
-          <header className="z-30 mx-3 mt-2 flex min-h-13 items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_8px_25px_-20px_rgba(15,23,42,0.45)] sm:mx-6 sm:mt-3 sm:gap-4 sm:px-6 sm:py-3 lg:mx-8">
+          <header className="bc-portal-heading z-30 mx-3 mt-2 flex min-h-13 items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_8px_25px_-20px_rgba(15,23,42,0.45)] sm:mx-6 sm:mt-3 sm:gap-4 sm:px-6 sm:py-3 lg:mx-8">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <button
                 type="button"
