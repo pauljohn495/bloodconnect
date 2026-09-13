@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { ensureBloodRequestTransferAllocations } = require('../utils/requestStatusSchema')
 
 async function getDashboardSummary() {
   const [[bloodStockRows], [donorSummaryRows], [pendingRequestsRows], [countsRows]] =
@@ -33,6 +34,7 @@ async function getDashboardSummary() {
 }
 
 async function getHospitalsWithRequests() {
+  await ensureBloodRequestTransferAllocations()
   const [rows] = await pool.query(
     `
     SELECT
@@ -78,14 +80,13 @@ async function getHospitalsWithRequests() {
       br.units_requested,
       br.units_approved,
       br.status,
+      br.priority,
       br.request_date,
       COALESCE(
         (
-          SELECT SUM(bt.units_transferred)
-          FROM blood_transfers bt
-          WHERE bt.hospital_id = br.hospital_id
-            AND bt.blood_type COLLATE utf8mb4_unicode_ci = br.blood_type COLLATE utf8mb4_unicode_ci
-            AND bt.transfer_date >= br.request_date
+          SELECT SUM(rta.units_allocated)
+          FROM blood_request_transfer_allocations rta
+          WHERE rta.request_id = br.id
         ),
         0
       ) as units_fulfilled
@@ -96,8 +97,8 @@ async function getHospitalsWithRequests() {
   )
 
   const requestsWithFulfillment = approvedRequests.map((req) => {
-    const unitsFulfilled = req.units_fulfilled || 0
-    const unitsRequested = req.units_requested || 0
+    const unitsFulfilled = Number(req.units_fulfilled || 0)
+    const unitsRequested = Number(req.units_approved || req.units_requested || 0)
     const remainingBalance = Math.max(0, unitsRequested - unitsFulfilled)
     const isFullyFulfilled = remainingBalance === 0
     const isPartiallyFulfilled = unitsFulfilled > 0 && remainingBalance > 0
@@ -123,6 +124,7 @@ async function getHospitalsWithRequests() {
       unitsRequested: req.units_requested,
       unitsFulfilled: req.unitsFulfilled,
       remainingBalance: req.remainingBalance,
+      priority: req.priority || 'normal',
       status: req.isFullyFulfilled
         ? 'fulfilled'
         : req.isPartiallyFulfilled

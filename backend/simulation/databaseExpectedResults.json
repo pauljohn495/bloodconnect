@@ -1,0 +1,49 @@
+{
+  "dataset": {
+    "donors": 200,
+    "donations": 600,
+    "minimumDeliveredRequests": 500,
+    "pendingRequests": 5,
+    "historyDays": 183
+  },
+  "predictive": {
+    "O+|whole_blood": {
+      "previous30DayDemand": 30,
+      "current30DayDemand": 60,
+      "predicted7DayDemand": 14,
+      "trend": "increasing",
+      "demandRisk": "high",
+      "usableStock": 12,
+      "estimatedDaysRemaining": "6",
+      "supplyStatus": "critical"
+    },
+    "A+|whole_blood": {
+      "previous30DayDemand": 30,
+      "current30DayDemand": 30,
+      "trend": "stable"
+    },
+    "AB+|whole_blood": {
+      "previous30DayDemand": 30,
+      "current30DayDemand": 10,
+      "trend": "decreasing",
+      "unusualChange": "drop"
+    },
+    "B+|platelets": {
+      "supplyStatus": "near_expiry_only"
+    },
+    "O-|whole_blood": {
+      "supplyStatus": "critical_out"
+    },
+    "B-|all_components": {
+      "aggregateStock": 4,
+      "expectedBehavior": "Critical component shortages and up to five eligible B- donor suggestions"
+    }
+  },
+  "prescriptive": [
+    { "requestId": 929901, "priority": "critical", "source": null, "units": 0, "recommendation": "Contact donors / coordinate external supply" },
+    { "requestId": 929902, "priority": "urgent", "source": "central", "units": 13, "recommendation": "Dispatch from Central Inventory" },
+    { "requestId": 929903, "priority": "urgent", "source": "h:900102", "units": 20, "recommendation": "Transfer from another hospital" },
+    { "requestId": 929904, "priority": "normal", "source": "central", "units": 10, "recommendation": "Dispatch from Central Inventory" },
+    { "requestId": 929905, "priority": "normal", "source": null, "units": 0, "recommendation": "Already covered by current on-hand stock" }
+  ]
+}

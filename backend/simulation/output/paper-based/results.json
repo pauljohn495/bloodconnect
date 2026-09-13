@@ -1,0 +1,736 @@
+{
+  "title": "Published-aggregate-based controlled validation; NOT real-world predictive accuracy",
+  "engineSha256": "48ead14722b2a419fcdc06b7ad84f32dfb876abe8ff41744d60772203fe7e1d7",
+  "referenceTime": "2026-01-01T12:00:00.000Z",
+  "provenance": {
+    "india": {
+      "file": "C:/Users/JEPOY/Downloads/12288_2023_Article_1631.pdf",
+      "doi": "10.1007/s12288-023-01631-8",
+      "table": "Table 1, printed page 657 (PDF page 3)",
+      "period": "2019-10-01 through 2021-12-31; seven unequal phases",
+      "product": "Combined PRBC and whole blood; no ABO/Rh breakdown"
+    },
+    "korea": {
+      "file": "C:/Users/JEPOY/Downloads/alm-44-3-262.pdf",
+      "doi": "10.3343/alm.2023.0242",
+      "table": "Table 1, Total (N=194) column, printed page 266 (PDF page 5)",
+      "period": "2019-2020",
+      "product": "RBC products; ABO only; daily usage includes transfused AND wasted units"
+    }
+  },
+  "publishedAggregates": {
+    "india": [
+      {
+        "phase": "A",
+        "weeklyCollection": 42,
+        "weeklyIssued": 39,
+        "averageStock": 76,
+        "safetyStock": 51
+      },
+      {
+        "phase": "B",
+        "weeklyCollection": 30,
+        "weeklyIssued": 25,
+        "averageStock": 52,
+        "safetyStock": 40
+      },
+      {
+        "phase": "C",
+        "weeklyCollection": 51,
+        "weeklyIssued": 51,
+        "averageStock": 92,
+        "safetyStock": 66
+      },
+      {
+        "phase": "D",
+        "weeklyCollection": 36,
+        "weeklyIssued": 34,
+        "averageStock": 74,
+        "safetyStock": 43
+      },
+      {
+        "phase": "E",
+        "weeklyCollection": 30,
+        "weeklyIssued": 25,
+        "averageStock": 73,
+        "safetyStock": 32
+      },
+      {
+        "phase": "F",
+        "weeklyCollection": 43,
+        "weeklyIssued": 38,
+        "averageStock": 75,
+        "safetyStock": 39
+      },
+      {
+        "phase": "G",
+        "weeklyCollection": 47,
+        "weeklyIssued": 49,
+        "averageStock": 90,
+        "safetyStock": 59
+      }
+    ],
+    "korea": [
+      {
+        "abo": "O",
+        "averageDailyUsage": 6.1,
+        "averageStockIndexDays": 5.4
+      },
+      {
+        "abo": "A",
+        "averageDailyUsage": 7.4,
+        "averageStockIndexDays": 4.7
+      },
+      {
+        "abo": "B",
+        "averageDailyUsage": 5.8,
+        "averageStockIndexDays": 5.6
+      },
+      {
+        "abo": "AB",
+        "averageDailyUsage": 2.4,
+        "averageStockIndexDays": 5.8
+      }
+    ]
+  },
+  "assumptions": [
+    "Daily rates are spread uniformly across two artificial 30-day windows using fractional units.",
+    "India phase means are mapped to equal windows solely for arithmetic checks; actual phase durations differ.",
+    "India phase A has an artificial identical prior window; other phases use the preceding phase mean.",
+    "Korean prior and current rates are artificially identical; no actual temporal trend can be inferred.",
+    "India average stock is used as a hypothetical snapshot; Korean stock is a constructed five-day supply.",
+    "Whole-blood is a deliberate numerical surrogate only; original red-cell records cannot be imported unchanged.",
+    "No Rh signs are invented. ALL_UNSPECIFIED is a test-only label, not a real blood group.",
+    "Transfers, hospital identities, priorities and expiration scenarios are constructed, not reported events.",
+    "No underlying hospital/day ground truth, expert recommendations or operational outcomes are available."
+  ],
+  "metrics": {
+    "realWorldForecastMAE": null,
+    "realWorldForecastMAPE": null,
+    "shortageAccuracy": null,
+    "prescriptiveEffectiveness": null,
+    "reason": "Original dated observations and independent outcomes are not present in the PDFs."
+  },
+  "summary": {
+    "usage_arithmetic": {
+      "passed": 11,
+      "total": 11
+    },
+    "shortage_arithmetic": {
+      "passed": 11,
+      "total": 11
+    },
+    "prescriptive_scenario": {
+      "passed": 6,
+      "total": 6
+    },
+    "product_compatibility": {
+      "passed": 2,
+      "total": 2
+    }
+  },
+  "checks": [
+    {
+      "category": "usage_arithmetic",
+      "name": "India phase A",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "India phase A",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "India phase B",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "India phase B",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "India phase C",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "India phase C",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "India phase D",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "India phase D",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "India phase E",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "India phase E",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "India phase F",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "India phase F",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "India phase G",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "India phase G",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "Korea ABO O",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "Korea ABO O",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "Korea ABO A",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "Korea ABO A",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "Korea ABO B",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "Korea ABO B",
+      "passed": true
+    },
+    {
+      "category": "usage_arithmetic",
+      "name": "Korea ABO AB",
+      "passed": true
+    },
+    {
+      "category": "shortage_arithmetic",
+      "name": "Korea ABO AB",
+      "passed": true
+    },
+    {
+      "category": "prescriptive_scenario",
+      "name": "Hospital transfer respects the 20-unit reserve for one request",
+      "passed": true
+    },
+    {
+      "category": "prescriptive_scenario",
+      "name": "Central dispatch for constructed Korean-scale request",
+      "passed": true
+    },
+    {
+      "category": "prescriptive_scenario",
+      "name": "No source triggers external-supply recommendation",
+      "passed": true
+    },
+    {
+      "category": "prescriptive_scenario",
+      "name": "Already-covered request should suggest zero transfer units",
+      "passed": true
+    },
+    {
+      "category": "prescriptive_scenario",
+      "name": "Concurrent recommendations must not collectively overcommit source stock",
+      "passed": true
+    },
+    {
+      "category": "prescriptive_scenario",
+      "name": "Past-expiration stock with stale available status must not be suggested",
+      "passed": true
+    },
+    {
+      "category": "product_compatibility",
+      "name": "Preserve or explicitly reject packed_red_blood_cells",
+      "passed": true
+    },
+    {
+      "category": "product_compatibility",
+      "name": "Preserve or explicitly reject red_blood_cells",
+      "passed": true
+    }
+  ],
+  "trendResults": [
+    {
+      "name": "India phase A",
+      "constructedCurrentDailyRate": 5.571428571428571,
+      "constructedPreviousDailyRate": 5.571428571428571,
+      "forecast7Days": 39.000000000000014,
+      "trend": "stable"
+    },
+    {
+      "name": "India phase B",
+      "constructedCurrentDailyRate": 3.5714285714285716,
+      "constructedPreviousDailyRate": 5.571428571428571,
+      "forecast7Days": 24.999999999999993,
+      "trend": "decreasing"
+    },
+    {
+      "name": "India phase C",
+      "constructedCurrentDailyRate": 7.285714285714286,
+      "constructedPreviousDailyRate": 3.5714285714285716,
+      "forecast7Days": 50.999999999999986,
+      "trend": "increasing"
+    },
+    {
+      "name": "India phase D",
+      "constructedCurrentDailyRate": 4.857142857142857,
+      "constructedPreviousDailyRate": 7.285714285714286,
+      "forecast7Days": 34.00000000000001,
+      "trend": "decreasing"
+    },
+    {
+      "name": "India phase E",
+      "constructedCurrentDailyRate": 3.5714285714285716,
+      "constructedPreviousDailyRate": 4.857142857142857,
+      "forecast7Days": 24.999999999999993,
+      "trend": "decreasing"
+    },
+    {
+      "name": "India phase F",
+      "constructedCurrentDailyRate": 5.428571428571429,
+      "constructedPreviousDailyRate": 3.5714285714285716,
+      "forecast7Days": 37.999999999999986,
+      "trend": "increasing"
+    },
+    {
+      "name": "India phase G",
+      "constructedCurrentDailyRate": 7,
+      "constructedPreviousDailyRate": 5.428571428571429,
+      "forecast7Days": 49,
+      "trend": "increasing"
+    },
+    {
+      "name": "Korea ABO O",
+      "constructedCurrentDailyRate": 6.1,
+      "constructedPreviousDailyRate": 6.1,
+      "forecast7Days": 42.69999999999998,
+      "trend": "stable"
+    },
+    {
+      "name": "Korea ABO A",
+      "constructedCurrentDailyRate": 7.4,
+      "constructedPreviousDailyRate": 7.4,
+      "forecast7Days": 51.800000000000026,
+      "trend": "stable"
+    },
+    {
+      "name": "Korea ABO B",
+      "constructedCurrentDailyRate": 5.8,
+      "constructedPreviousDailyRate": 5.8,
+      "forecast7Days": 40.60000000000001,
+      "trend": "stable"
+    },
+    {
+      "name": "Korea ABO AB",
+      "constructedCurrentDailyRate": 2.4,
+      "constructedPreviousDailyRate": 2.4,
+      "forecast7Days": 16.8,
+      "trend": "stable"
+    }
+  ],
+  "shortageResults": [
+    {
+      "name": "India phase A",
+      "constructedSnapshotStock": 76,
+      "daysRemaining": 13.641025641025637,
+      "status": "low",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "India phase B",
+      "constructedSnapshotStock": 52,
+      "daysRemaining": 14.560000000000004,
+      "status": "sufficient",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "India phase C",
+      "constructedSnapshotStock": 92,
+      "daysRemaining": 12.62745098039216,
+      "status": "low",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "India phase D",
+      "constructedSnapshotStock": 74,
+      "daysRemaining": 15.235294117647054,
+      "status": "sufficient",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "India phase E",
+      "constructedSnapshotStock": 73,
+      "daysRemaining": 20.440000000000005,
+      "status": "sufficient",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "India phase F",
+      "constructedSnapshotStock": 75,
+      "daysRemaining": 13.815789473684214,
+      "status": "low",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "India phase G",
+      "constructedSnapshotStock": 90,
+      "daysRemaining": 12.857142857142858,
+      "status": "low",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "Korea ABO O",
+      "constructedSnapshotStock": 30.5,
+      "daysRemaining": 5.000000000000003,
+      "status": "critical",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "Korea ABO A",
+      "constructedSnapshotStock": 37,
+      "daysRemaining": 4.999999999999997,
+      "status": "critical",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "Korea ABO B",
+      "constructedSnapshotStock": 29,
+      "daysRemaining": 4.999999999999999,
+      "status": "critical",
+      "assumesNoExpiryOrReplenishment": true
+    },
+    {
+      "name": "Korea ABO AB",
+      "constructedSnapshotStock": 12,
+      "daysRemaining": 5,
+      "status": "critical",
+      "assumesNoExpiryOrReplenishment": true
+    }
+  ],
+  "prescriptionResults": [
+    {
+      "name": "Hospital transfer respects the 20-unit reserve for one request",
+      "constructedInventory": [
+        {
+          "available_units": 76,
+          "hospital_id": 1,
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "available"
+        }
+      ],
+      "constructedRequests": [
+        {
+          "id": 1,
+          "hospital_id": 2,
+          "hospital_name": "Constructed destination A",
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "pending",
+          "units_requested": 39,
+          "priority": "normal",
+          "created_at": "2026-01-01T12:00:00.000Z"
+        }
+      ],
+      "result": [
+        {
+          "requestId": 1,
+          "requestedAt": "2026-01-01T12:00:00.000Z",
+          "bloodType": "ALL_UNSPECIFIED",
+          "componentType": "whole_blood",
+          "priority": "normal",
+          "priorityScore": 1,
+          "destinationHospitalId": 2,
+          "destinationHospitalName": "Constructed destination A",
+          "destinationOnHand": 0,
+          "destinationUnitsApplied": 0,
+          "unitsRequested": 39,
+          "unitsNeeded": 39,
+          "sourceLocationKey": "h:1",
+          "suggestedUnits": 39,
+          "recommendation": "Transfer from another hospital"
+        }
+      ]
+    },
+    {
+      "name": "Central dispatch for constructed Korean-scale request",
+      "constructedInventory": [
+        {
+          "available_units": 76,
+          "hospital_id": null,
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "available"
+        }
+      ],
+      "constructedRequests": [
+        {
+          "id": 2,
+          "hospital_id": 2,
+          "hospital_name": "Constructed destination A",
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "pending",
+          "units_requested": 43,
+          "priority": "normal",
+          "created_at": "2026-01-01T12:00:00.000Z"
+        }
+      ],
+      "result": [
+        {
+          "requestId": 2,
+          "requestedAt": "2026-01-01T12:00:00.000Z",
+          "bloodType": "ALL_UNSPECIFIED",
+          "componentType": "whole_blood",
+          "priority": "normal",
+          "priorityScore": 1,
+          "destinationHospitalId": 2,
+          "destinationHospitalName": "Constructed destination A",
+          "destinationOnHand": 0,
+          "destinationUnitsApplied": 0,
+          "unitsRequested": 43,
+          "unitsNeeded": 43,
+          "sourceLocationKey": "central",
+          "suggestedUnits": 43,
+          "recommendation": "Dispatch from Central Inventory"
+        }
+      ]
+    },
+    {
+      "name": "No source triggers external-supply recommendation",
+      "constructedInventory": [],
+      "constructedRequests": [
+        {
+          "id": 3,
+          "hospital_id": 2,
+          "hospital_name": "Constructed destination A",
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "pending",
+          "units_requested": 39,
+          "priority": "normal",
+          "created_at": "2026-01-01T12:00:00.000Z"
+        }
+      ],
+      "result": [
+        {
+          "requestId": 3,
+          "requestedAt": "2026-01-01T12:00:00.000Z",
+          "bloodType": "ALL_UNSPECIFIED",
+          "componentType": "whole_blood",
+          "priority": "normal",
+          "priorityScore": 1,
+          "destinationHospitalId": 2,
+          "destinationHospitalName": "Constructed destination A",
+          "destinationOnHand": 0,
+          "destinationUnitsApplied": 0,
+          "unitsRequested": 39,
+          "unitsNeeded": 39,
+          "sourceLocationKey": null,
+          "suggestedUnits": 0,
+          "recommendation": "Contact donors / coordinate external supply"
+        }
+      ]
+    },
+    {
+      "name": "Already-covered request should suggest zero transfer units",
+      "constructedInventory": [
+        {
+          "available_units": 76,
+          "hospital_id": 1,
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "available"
+        },
+        {
+          "available_units": 52,
+          "hospital_id": 2,
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "available"
+        }
+      ],
+      "constructedRequests": [
+        {
+          "id": 4,
+          "hospital_id": 2,
+          "hospital_name": "Constructed destination A",
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "pending",
+          "units_requested": 39,
+          "priority": "normal",
+          "created_at": "2026-01-01T12:00:00.000Z"
+        }
+      ],
+      "result": [
+        {
+          "requestId": 4,
+          "requestedAt": "2026-01-01T12:00:00.000Z",
+          "bloodType": "ALL_UNSPECIFIED",
+          "componentType": "whole_blood",
+          "priority": "normal",
+          "priorityScore": 1,
+          "destinationHospitalId": 2,
+          "destinationHospitalName": "Constructed destination A",
+          "destinationOnHand": 52,
+          "destinationUnitsApplied": 39,
+          "unitsRequested": 39,
+          "unitsNeeded": 0,
+          "sourceLocationKey": null,
+          "suggestedUnits": 0,
+          "recommendation": "Already covered by current on-hand stock"
+        }
+      ]
+    },
+    {
+      "name": "Concurrent recommendations must not collectively overcommit source stock",
+      "constructedInventory": [
+        {
+          "available_units": 76,
+          "hospital_id": 1,
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "available"
+        }
+      ],
+      "constructedRequests": [
+        {
+          "id": 5,
+          "hospital_id": 2,
+          "hospital_name": "Constructed destination A",
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "pending",
+          "units_requested": 39,
+          "priority": "critical",
+          "created_at": "2026-01-01T12:00:00.000Z"
+        },
+        {
+          "id": 6,
+          "hospital_id": 3,
+          "hospital_name": "Constructed destination B",
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "pending",
+          "units_requested": 39,
+          "priority": "normal",
+          "created_at": "2026-01-01T12:00:00.000Z"
+        }
+      ],
+      "result": [
+        {
+          "requestId": 5,
+          "requestedAt": "2026-01-01T12:00:00.000Z",
+          "bloodType": "ALL_UNSPECIFIED",
+          "componentType": "whole_blood",
+          "priority": "critical",
+          "priorityScore": 3,
+          "destinationHospitalId": 2,
+          "destinationHospitalName": "Constructed destination A",
+          "destinationOnHand": 0,
+          "destinationUnitsApplied": 0,
+          "unitsRequested": 39,
+          "unitsNeeded": 39,
+          "sourceLocationKey": "h:1",
+          "suggestedUnits": 39,
+          "recommendation": "Transfer from another hospital"
+        },
+        {
+          "requestId": 6,
+          "requestedAt": "2026-01-01T12:00:00.000Z",
+          "bloodType": "ALL_UNSPECIFIED",
+          "componentType": "whole_blood",
+          "priority": "normal",
+          "priorityScore": 1,
+          "destinationHospitalId": 3,
+          "destinationHospitalName": "Constructed destination B",
+          "destinationOnHand": 0,
+          "destinationUnitsApplied": 0,
+          "unitsRequested": 39,
+          "unitsNeeded": 39,
+          "sourceLocationKey": "h:1",
+          "suggestedUnits": 17,
+          "recommendation": "Transfer from another hospital"
+        }
+      ]
+    },
+    {
+      "name": "Past-expiration stock with stale available status must not be suggested",
+      "constructedInventory": [
+        {
+          "available_units": 76,
+          "hospital_id": 1,
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "available",
+          "expiration_date": "2000-01-01"
+        }
+      ],
+      "constructedRequests": [
+        {
+          "id": 7,
+          "hospital_id": 2,
+          "hospital_name": "Constructed destination A",
+          "blood_type": "ALL_UNSPECIFIED",
+          "component_type": "whole_blood",
+          "status": "pending",
+          "units_requested": 39,
+          "priority": "normal",
+          "created_at": "2026-01-01T12:00:00.000Z"
+        }
+      ],
+      "result": [
+        {
+          "requestId": 7,
+          "requestedAt": "2026-01-01T12:00:00.000Z",
+          "bloodType": "ALL_UNSPECIFIED",
+          "componentType": "whole_blood",
+          "priority": "normal",
+          "priorityScore": 1,
+          "destinationHospitalId": 2,
+          "destinationHospitalName": "Constructed destination A",
+          "destinationOnHand": 0,
+          "destinationUnitsApplied": 0,
+          "unitsRequested": 39,
+          "unitsNeeded": 39,
+          "sourceLocationKey": null,
+          "suggestedUnits": 0,
+          "recommendation": "Contact donors / coordinate external supply"
+        }
+      ]
+    }
+  ]
+}

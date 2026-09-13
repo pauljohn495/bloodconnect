@@ -3,14 +3,14 @@ const { logExpiredInventoryIfMissing } = require('../models/expiredUnitModel')
 
 const getInventoryController = async (req, res) => {
   try {
-    const { hospitalId } = req.query
+    const { hospitalId, scope } = req.query
 
     let query = 'SELECT * FROM blood_inventory'
     const params = []
     if (hospitalId) {
       query += ' WHERE hospital_id = ?'
       params.push(hospitalId)
-    } else {
+    } else if (scope !== 'all') {
       query += ' WHERE hospital_id IS NULL'
     }
     query += ' ORDER BY created_at DESC'

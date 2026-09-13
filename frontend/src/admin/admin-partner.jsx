@@ -115,9 +115,21 @@ function AdminPartner() {
 
   const selectedRequests = useMemo(() => hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId)), [hospitalApprovedRequests, selectedRequestIds])
 
-  const selectedBloodTypes = useMemo(() => [...new Set(selectedRequests.map((req) => req.bloodType))], [selectedRequests])
+  const selectedBloodProducts = useMemo(
+    () => new Set(selectedRequests.map((req) => `${req.bloodType}|${req.componentType || 'whole_blood'}`)),
+    [selectedRequests],
+  )
 
-  const filteredInventory = useMemo(() => selectedBloodTypes.length > 0 ? availableInventory.filter((item) => selectedBloodTypes.includes(item.blood_type || item.bloodType)) : availableInventory, [selectedBloodTypes, availableInventory])
+  const filteredInventory = useMemo(
+    () => selectedBloodProducts.size > 0
+      ? availableInventory.filter((item) =>
+          selectedBloodProducts.has(
+            `${item.blood_type || item.bloodType}|${item.component_type || item.componentType || 'whole_blood'}`,
+          ),
+        )
+      : availableInventory,
+    [selectedBloodProducts, availableInventory],
+  )
 
   const loadHospitals = async () => {
     try {
@@ -406,18 +418,28 @@ function AdminPartner() {
       inventoryId: parseInt(inventoryId),
       units: parseInt(units),
     }))
-    const selectedRequestsForDelivery = hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId))
-    const requestFulfillments = selectedRequestsForDelivery.map((req) => {
-      const deliveredUnits = transfers
-        .filter((t) => {
-          const item = availableInventory.find((inv) => inv.id === t.inventoryId)
-          return item && (item.blood_type || item.bloodType) === req.bloodType
-        })
-        .reduce((sum, t) => sum + Number(t.units || 0), 0)
-      return {
-        requestId: req.requestId,
-        unitsTransferred: deliveredUnits > 0 ? deliveredUnits : req.unitsRequested,
-      }
+    const transferBudgets = new Map()
+    transfers.forEach((transfer) => {
+      const item = availableInventory.find((inventory) => Number(inventory.id) === transfer.inventoryId)
+      if (!item) return
+      const key = `${item.blood_type || item.bloodType}|${item.component_type || item.componentType || 'whole_blood'}`
+      transferBudgets.set(key, (transferBudgets.get(key) || 0) + transfer.units)
+    })
+    const priorityRank = { critical: 0, urgent: 1, normal: 2 }
+    const selectedRequestsForDelivery = hospitalApprovedRequests
+      .filter((req) => selectedRequestIds.has(req.requestId))
+      .sort((a, b) => {
+        const priorityDifference = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2)
+        if (priorityDifference !== 0) return priorityDifference
+        return new Date(a.requestDate || 0).getTime() - new Date(b.requestDate || 0).getTime()
+      })
+    const requestFulfillments = selectedRequestsForDelivery.flatMap((req) => {
+      const key = `${req.bloodType}|${req.componentType || 'whole_blood'}`
+      const availableForRequest = transferBudgets.get(key) || 0
+      const remainingDemand = Number(req.remainingBalance ?? req.unitsRequested ?? 0)
+      const unitsTransferred = Math.min(availableForRequest, remainingDemand)
+      transferBudgets.set(key, Math.max(0, availableForRequest - unitsTransferred))
+      return unitsTransferred > 0 ? [{ requestId: req.requestId, unitsTransferred }] : []
     })
 
     try {
@@ -454,7 +476,7 @@ function AdminPartner() {
       setSelectedStocks({})
       setSelectedRequestIds(new Set())
       
-      showNotification('Blood transferred and request marked as delivered.', 'primary')
+      showNotification('Blood transferred and matching requests updated.', 'primary')
       
       // Refresh hospital list to update totals (this will show the transferred blood in the hospital table)
       await loadHospitals()
@@ -1069,7 +1091,7 @@ function AdminPartner() {
                                     </span>
                                   )}
                                   <span className="ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-700">
-                                    Will become Delivered after transfer
+                                    Will be updated from matching transferred units
                                   </span>
                                 </div>
                               </div>
@@ -1099,11 +1121,15 @@ function AdminPartner() {
                       const selectedRequests = hospitalApprovedRequests.filter((req) =>
                         selectedRequestIds.has(req.requestId)
                       )
-                      const selectedBloodTypes = [...new Set(selectedRequests.map((req) => req.bloodType))]
+                      const selectedBloodProducts = new Set(
+                        selectedRequests.map((req) => `${req.bloodType}|${req.componentType || 'whole_blood'}`),
+                      )
                       const filteredInventory =
-                        selectedBloodTypes.length > 0
+                        selectedBloodProducts.size > 0
                           ? availableInventory.filter((item) =>
-                              selectedBloodTypes.includes(item.blood_type || item.bloodType)
+                              selectedBloodProducts.has(
+                                `${item.blood_type || item.bloodType}|${item.component_type || item.componentType || 'whole_blood'}`,
+                              )
                             )
                           : availableInventory
 

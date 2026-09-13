@@ -1,0 +1,708 @@
+
+--- PAGE 1 ---
+ISSN 2234-3806   •   eISSN 2234-3814 
+262   www.annlabmed.org   https://doi.org/10.3343/alm.2023.0242 
+Ann Lab Med   2024;44:262- 270 
+https://doi.org/10.3343/alm. 2023.0242 
+Original Article 
+Transfusion and Cell Therapy 
+INTRODUCTION 
+Adequate blood daily issuable stock (IS) levels should be main - 
+tained for hospitals to be able to provide blood transfusion ser - 
+vices to patients in need within the required time frame. On the 
+one hand, when inventories are insufficient, patients may not be 
+able to receive timely transfusions. On the other hand, when the 
+ISs of hospitals exceed the target IS, the risk of blood product 
+wastage increases, which may negatively affect blood inventory 
+levels in hospitals, particularly during nationwide blood short - 
+ages [1]. Therefore, establishing a target IS according to the 
+ABO blood groups is important for efficient blood management 
+in hospitals and reliable blood management on a national level. 
+It is recommended that the IS be established for each hospi - 
+tal separately, as conditions vary among hospitals. However, 
+most hospitals in Korea arbitrarily apply a uniform 5-day IS (5IS) 
+Optimizing the Hospital Blood Bank Stock in Korea: 
+A Comparative Analysis of the Uniform 5-Day Stock 
+Index and a Novel Blood Stock Index 
+Seo-Jin Park   , M.D., Ph.D. 1 , Young Ae Lim   , M.D., Ph.D. 1 , and Kyung-Hee Kim   , M.D. 2 
+1 Department of Laboratory Medicine, Ajou University School of Medicine, Suwon, Korea;   2 LabGenomics Clinical Laboratories, Seongnam, Korea 
+Background:   Maintaining optimal blood inventory levels in hospitals is important to pre - 
+vent blood shortage and wastage. We aimed to provide an efficient blood inventory man - 
+agement strategy for hospital blood banks nation-wide by comparing the current use of 
+5-day issuable stock (IS) with Lim’s IS as a novel target IS. 
+Methods:   The average and CV of daily usage (DU) were calculated from information en - 
+tered into Korea’s Blood Management System by 194 participating hospitals in 2019 and 
+2020. Using these data, Lim’s IS was calculated by determining the simulated annual av - 
+erage blood shortage day nearest to 1 for each blood group in each hospital. The 5-day IS 
+(5IS) was estimated by multiplying the average DU in 2018 by five to count the shortage 
+days in 2019. 
+Results:   The average DU (0.3–231.3 units) and corresponding CV (0.33–7.14) in the par - 
+ticipating hospitals were inversely proportional (r = –0.699 to –0.695). The hypothetical av - 
+erages of 5IS and Lim’s IS were 27.0 ± 41.2 and 24.7 ± 20.8, respectively ( 
+P   = 0.006). The 
+shortage days for 5IS and Lim’s IS were 8.9 ± 22.7 and 1.0 ± 1.9, respectively ( 
+P   < 0.001). 
+Conclusions:   While 5IS was unacceptable for universal application, Lim’s IS remained 
+near one shortage day and is considered more efficient than 5IS. Hospitals should imple - 
+ment indicators that consider DU and its variations. This is the first study to introduce 
+Lim’s IS as an indicator of optimal blood inventory, and the data are expected to provide 
+guidance for effective blood inventory management nationwide, particularly during blood 
+shortages. 
+Key Words:   Blood bank, Blood inventory management, Blood shortage day, Issuable stock 
+Received:   June 14, 2023 
+Revision received:   September 4, 2023 
+Accepted:   December 1, 2023 
+Published online :   December 15, 2023 
+Corresponding author: 
+Young Ae Lim, M.D., Ph.D. 
+Department of Laboratory Medicine, Ajou 
+University School of Medicine, 
+164 Worldcup-ro, Yeongtong-gu, 
+Suwon 16499, Korea 
+E-mail:   limyoung@ajou.ac.kr 
+© Korean Society for Laboratory Medicine 
+This is an Open Access article distributed under 
+the terms of the Creative Commons Attribution 
+Non-Commercial License (https://creativecom - 
+mons.org/licenses/by-nc/4.0) which permits 
+unrestricted non-commercial use, distribution, 
+and reproduction in any medium, provided the 
+original work is properly cited. 
+
+--- PAGE 2 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+https://doi.org/10.3343/alm.2023.0242   www.annlabmed.org   263 
+based on the average IS index (ISI) of a subset of hospitals [2, 
+3]. The ISI is calculated by dividing the IS by the average daily 
+usage (DU) and is used to determine the daily blood demand [4]. 
+The ISI can also be used to indicate the number of days of avail - 
+able blood stock in a blood bank inventory [1]. 
+Unfortunately, hospitals occasionally have had difficulties in 
+maintaining the existing target uniform 5IS, as documented in 
+the monthly reports on blood supply and demand issued by the 
+National Institute of Organ, Tissue and Blood Management 
+(NIOTBM) of the Ministry of Health and Welfare. In addition to 
+the rapidly declining fertility rate and aging population in Korea, 
+the coronavirus disease (COVID-19) outbreak that struck in 
+2020 has been problematic for the national blood supply [5, 6]. 
+Crisis levels according to the actual ISI during blood shortages in 
+Korea are defined as follows: blue phase, < 5 days; yellow 
+phase, < 3 days; orange phase, < 2 days; and red phase, < 1 
+day [7]. These crisis level definitions reflect blood inventory lev - 
+els in blood supply centers at a national level; however, their ap - 
+plication in the hospital setting and their impact on the actual 
+inventory levels have not yet been investigated. Moreover, 
+whether the use of 5IS is acceptable as the target IS in hospitals 
+has not been properly investigated. 
+To resolve these issues, we established a novel IS (termed 
+Lim’s IS) using daily input data from participating hospitals in 
+the Blood Management System (BMS), which monitors the 
+blood supply and demand in Korea, and compared it with the 
+currently used 5IS. Lim’s IS and ISI were analyzed to establish a 
+target IS for red blood cell (RBC) products in each hospital na - 
+tionwide. 
+MATERIALS AND METHODS 
+Materials and data collection 
+The BMS was founded in 2008 as a pilot project in 28 hospitals 
+in Korea and is equivalent to the national blood supply monitor - 
+ing system in Korea governed by the NIOTBM of the Ministry of 
+Health and Welfare. Prior to the enactment of new provisions of 
+the Blood Management Act in December 2019, BMS participa - 
+tion was voluntary. Participation has since become mandatory 
+depending on each hospital’s previous year’s blood supply, and 
+the number of participating hospitals has soared to 1,174 as of 
+October 31, 2023. In the BMS, blood product information (e.g., 
+product type, serial number, blood group, and expiration date) of 
+the previous day is entered or uploaded as a CSV file once a day 
+by the participating hospitals [8]. 
+Data on all RBC products from hospitals that participated in 
+the BMS between January 2019 and December 2020 were pro - 
+vided by the NIOTBM in Excel worksheet format (Microsoft 2019; 
+Microsoft, Redmond, WA, USA). Only hospitals that participated 
+in the BMS prior to 2018 were selected. The rhesus (RhD) blood 
+type was not specified since hospitals most likely do not keep 
+RhD-negative blood products in their inventory because of the 
+very low frequency of the RhD-negative blood type in Koreans 
+(0.1%–0.24%) [9]. The data received included DU and inventory 
+levels for each ABO blood group in 2019 and 2020, and the av - 
+erage DU in 2018 (calculated as annual blood usage/365, un - 
+conditionally rounded up) for each hospital, but excluded the 
+hospital names. Data on transfused and wasted blood products 
+were both included in the daily DU data from each hospital. The 
+data were organized and analyzed using Microsoft Excel (Micro - 
+soft 2019; Microsoft, Redmond, WA, USA). 
+Hospitals were arbitrarily divided into seven groups according 
+to their summed average DU of all blood groups, as follows: 1) 
+≥ 70 DU, 2) 30–69.9 DU, 3) 20–29.9 DU, 4) 10–19.9 DU, 5) 
+4–9.9 DU, 6) 2–3.9 DU, and 7) 1–1.9 DU. The data in the ≥ 70 
+DU group were further divided to analyze differences in blood 
+consumption between weekdays and weekends (Saturday and 
+Sunday). 
+Analysis of daily IS and ISI in 2019 and 2020 
+For each hospital, the IS and ISI (ISI = IS/DU) for 2019 and 2020 
+were calculated for each blood type from the acquired BMS data 
+(N = 730 days). In addition, the average, SD, and CV (CV = SD/av - 
+erage DU) of DU for 2019 and 2020 were calculated. The 3SD 
+IS, defined as the unconditionally rounded up sum of average 
+DU and 3SD of DU (indicative of 99.7% of DU), was determined 
+for each hospital. Lim’s IS was calculated by multiplying the 3SD 
+IS by the optimal multiplying factor (described in detail in the fol - 
+lowing section). 3SD ISI and Lim’s ISI were calculated by dividing 
+the 3SD IS or Lim’s IS by the average DU of the corresponding 
+hospital. 
+Simulation of 5IS and Lim’s IS for 2019 
+The 5IS was calculated by multiplying the average DU of 2018 
+for each hospital by five. As the novel target IS, Lim’s IS was esti - 
+mated by multiplying the 3SD IS for 2018 by the optimal multi - 
+plying factor. The 3SD IS for 2018 was estimated by calculating 
+the SD ( = 2018 average DU   ×   CV), assuming that the CV of DU in 
+2018 was identical to that in the period 2019–2020. The value 
+of the optimal factor was determined as the value that lowered 
+blood shortage days to around 1 day/yr for each of the seven 
+groups in this study. To find the most optimal point of 3SD IS at 
+
+--- PAGE 3 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+264   www.annlabmed.org   https://doi.org/10.3343/alm.2023.0242 
+which the number of shortage days in 2019 was nearest to 1, 
+the 3SD IS was multiplied by one-tenth intervals between 1- and 
+2-fold levels and whole-number intervals from 2- to 7-fold levels 
+for all blood groups at each hospital. For example, a 1.2-fold 
+3SD IS was selected for blood group O in the ≥ 70 DU group be - 
+cause the calculated annual average blood shortage days was 
+1.4 days for a 1.1-fold 3SD IS and 0.9 days for a 1.2-fold 3SD IS. 
+However, Lim’s ISI could not be calculated for some hospitals 
+because the received DU data for 2018 were rounded to the 
+nearest whole number, and therefore, included DU values of 0. 
+If more than half of the hospitals had a 2018 DU value of 0 in 
+the corresponding consumption level-based group, Lim’s ISI 
+data were excluded because they were not calculable (reported 
+as “not available” [“NA”]). 
+Analysis of simulated annual average blood shortage days 
+in 2019 
+The annual average blood shortage days were simulated using 
+only the 2019 data because blood consumption was presumed 
+to have decreased in 2020 due to COVID-19, which was ex - 
+pected to show a different pattern from 2018. The 2019 short - 
+age days were defined and counted when the simulated IS was 
+lower than the actual DU of each hospital in 2019. The IS and 
+shortage days were calculated not only for 5IS and Lim’s IS, but 
+also for 3-day IS, 2-day IS, and 1-day IS, which were calculated 
+by multiplying the average 2018 DU for each hospital with 3, 2, 
+and 1, respectively, which corresponds to the yellow, orange, 
+and red blood shortage crisis phases. 
+The shortage days per blood group for each hospital were 
+counted using the CountIF function in Microsoft Excel. To elimi - 
+nate hospitals with deviations in annual blood usage caused by 
+factors unrelated to blood usage (e.g., hospital expansions), 
+hospitals that met both of the following exclusion criteria were 
+excluded: ≥ 10% difference in average DU for 2018 versus 
+2019–2020 in two or more ABO blood groups, and average DU 
+≥ 4 units. 
+Statistical analysis 
+A paired 
+t -test was used to compare the average DU between 
+2019–2020 and 2018 (unconditional rounding up used for all 
+data). Pearson’s correlation coefficients (r) were calculated to 
+analyze the relationship between the average DU and CV of DU 
+of participating hospitals by ABO blood type. To evaluate Lim’s 
+ISI, the simulated average IS and shortage days were calculated 
+based on 5IS and Lim’s IS and compared using a paired 
+t -test 
+for each blood group. Statistical analysis was performed using 
+Microsoft Excel, and 
+P   < 0.05 was considered statistically signifi - 
+cant. 
+RESULTS 
+Characteristics of participating hospitals 
+In total, 194 hospitals were included in the study. During the 
+2-yr period (2019–2020), these hospitals used 3,049,811 units 
+of RBC blood products, accounting for 82.4% of the total 
+3,703,178 units supplied. The daily parameters of the RBC 
+products varied depending on the hospital and ABO blood group. 
+The average DU was 0.3–231.3 units (mean ± SD, 21.5 ± 28.8 
+units), average IS was 0.1–1,215.7 units (mean ± SD, 105.6   ± 
+140.8 units), and ISI was 0.0–35.3 days (mean ± SD, 5.4 ± 2.7 
+days). When comparing the 2-yr (2019–2020) and 2018 aver - 
+age DU data for each ABO blood group, the average DU was sig - 
+nificantly lower in the former group, which included the CO - 
+VID-19 outbreak period ( 
+P   < 0.001 for blood groups B, O, AB, 
+and 
+P   = 0.018 for blood group A). 
+The average DU and corresponding CV per ABO blood type in 
+2019–2020 were inversely proportional, with r = –0.696 for 
+blood groups O and A, r = –0.699 for B, and r = –0.697 for AB. 
+After excluding three hospitals with an average DU < 1 unit but 
+markedly increased CVs (2.43–7.14), the 2-yr CV for DU of the 
+remaining 191 hospitals ranged from 0.33 to 3.97 ( Fig. 1 ). In 
+nine hospitals with a total DU   ≥ 70 units, the average DU ac - 
+counted for 25.8% (1,080.3 out of 4,177.8 units) of the average 
+DU of the participating hospitals. The proportion of weekend DU 
+compared to weekday DU ranged from 52.9% to 69.2%, with 
+similar percentages among blood groups within each hospital. 
+Daily inventory levels and inventory indices in 2019 and 
+2020 
+The average DU was the highest for blood group A, followed by 
+blood groups O, B, and AB. However, the ISI was the lowest in 
+blood group A. During 2019–2020, the actual ISI of the partici - 
+pating hospitals was maintained at 5.4 days (3.8–11.9), without 
+significant differences according to their DU. In contrast, the 
+3SD ISI (2.2–22.3) and Lim’s ISI (2.4–10.0 excluding NA data) 
+showed more diversity, with an inversely proportional relation - 
+ship to average DU, as it was calculated by factoring in for varia - 
+tions in the DU of each hospital ( Table 1 ). 
+Simulations of average daily IS and annual average blood 
+shortage days in 2019 
+The simulated average IS and shortage days were calculated for 
+
+--- PAGE 4 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+https://doi.org/10.3343/alm.2023.0242   www.annlabmed.org   265 
+170 hospitals, after eliminating 21 hospitals that met the exclu - 
+sion criteria and three hospitals with an average DU < 1 ( Table 
+2 ). Overall, the simulated average IS was significantly lower 
+when Lim’s IS was applied than when 5IS was used in hospitals 
+with an average DU of ≥ 20 units, whereas opposite findings 
+were observed for hospitals with an average DU of < 10 units. 
+Similarly, the simulated average IS by blood groups revealed sig - 
+nificantly lower levels of Lim’s IS for group O and A in hospitals 
+with DU ≥ 20 units. In contrast, group AB had significantly lower 
+5IS in all groups, except the DU ≥ 70 group (Table 2). There was 
+no significant difference in the simulated average IS when 5IS 
+or Lim’s IS was applied to hospitals in the 10–19.9 DU group, 
+except for blood group AB. 
+The total shortage days were significantly shorter for all blood 
+groups when Lim’s IS was applied ( Table 3 ). The various ISIs cor - 
+respond to the blood shortage crisis levels and are reported as 
+3-day IS, 2-day IS, and 1-day IS. The number of shortage days in - 
+creased with decreasing IS, particularly in hospitals with a low 
+average DU, except for 1-day IS (Table 3). Among the seven DU 
+groups, hospitals with an average DU of ≥ 70 units showed the 
+lowest impact on inventories until 2-day IS (orange phase) but 
+had the worst impact on their inventories at the 1-day IS (red 
+phase). 
+DISCUSSION 
+Our results indicate that a different standard may need to be im - 
+plemented to set the target ISI according to the average DU of 
+each hospital to maintain an efficient and adequate blood sup - 
+ply at the national level. In Korea, the average ISI was reported 
+for 5 days in most hospitals and for 4.2 days in four hospitals 
+with a DU of > 30 units [2, 3, 8, 10]. In the UK, the National 
+Health Service recommends 3–4 days of stock, but hospitals re - 
+portedly hold an average of 5.9 days of stock [11]. A question - 
+naire review regarding inventory management showed that the 
+target ISI varies among countries: 7 days in Austria, 5–12 days 
+in Belgium, 5–8 days in Canada, 3–5 days in Germany, < 5 days 
+in Hong Kong, 3–5 days in Israel, 6–12 days in the Netherlands, 
+10–14 days in Norway, 4 days in Portugal, 7 days in South Af - 
+rica, 3–7 days in Spain, 2.5–3 days in the US (Wisconsin), and 
+3.0
+2.6
+2.2
+1.8
+1.4
+1.0
+0.6
+0.2
+CV of DU (%)
+0   20
+Average DU (units)
+5   10   15 
+A 
+3.4
+2.6
+2.2
+1.8
+1.4
+1.0
+0.6
+0.2
+CV of DU (%)
+0   16
+Average DU (units) 
+C 
+2   4   6   8   10   12   14
+3.0
+r=   0.696
+r=   0.699
+2.6
+2.2
+1.8
+1.4
+1.0
+0.6
+0.2
+CV of DU (%)
+0   25
+Average DU (units)
+5   10   15 
+B 
+20
+4.4
+4.0
+3.6
+3.2
+2.8
+2.4
+2.0
+1.6
+1.2
+0.8
+0.4
+CV of DU (%)
+0   8
+Average DU (units) 
+D 
+1   2   3   4   5   6   7
+r=   0.696
+r=   0.697 
+Fig. 1.   Correlation between the average and CV of daily DU for blood groups: (A) O, (B) A, (C) B, (D) AB over a 2-yr period (2019–2020). The 
+average DUs of nine hospitals with the highest DUs are shown as one-tenth of their original values (black circles). 
+Abbreviation:   DU, daily usage. 
+
+--- PAGE 5 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+266   www.annlabmed.org   https://doi.org/10.3343/alm.2023.0242 
+7–10 days in Venezuela [12]. Our results suggest that hospitals 
+with low blood consumption levels ( < 10 units/day) would need 
+a higher ISI and to increase their blood supply compared to hos - 
+pitals with higher blood consumption ( > 20 units/day) to reduce 
+their shortage days to approximately 1 day. In addition, 25.8% of 
+the national blood supply was used by the nine hospitals with 
+the highest blood consumption rate ( ≥ 70 DU group), which ac - 
+counted for only 4.6% of hospitals participating in the BMS. This 
+suggests that the amount of blood stocked in the inventories of 
+these hospitals greatly impacts the national blood supply. If 
+these hospitals were to apply the proposed Lim’s IS to their 
+blood inventory and maintain their shortage days close to 1 day, 
+the IS would be reduced and most hospitals would be able to ef - 
+ficiently manage their blood supply, which would greatly help 
+with the supply of RBC products in Korea. 
+Fig. 2   shows a flow chart of the procedure used to establish 
+Lim’s IS (and ISI) for each hospital according to each ABO blood 
+group. Lim’s IS (or ISI) can be applied when the blood usage 
+amount and variation of the current year are expected to be 
+similar to those of the previous year. Lim’s IS was obtained by 
+determining the most optimal multiplying factor in which the 
+shortage days became nearest to 1 for each blood group, which 
+may prevent blood shortages on a national level. The target 
+blood shortage days can be used in a flexible manner and ap - 
+plied differently according to a hospital’s specific situation; for 
+example, 0–1 day for ideal IS or normal blood supply status, and 
+1–2 days for minimal IS or blood shortages on a national level. 
+If the blood supply is sufficient on a national level, the shortage 
+day to determine the target IS does not need to be maintained 
+as high as 1. 
+Lim’s ISI was calculated by dividing Lim’s IS by the DU of the 
+corresponding hospital, which enabled comparison among daily 
+Table 1.   DU (units) and associated ISI (days) of 194 participants in the BMS in Korea for 2 yrs (2019 and 2020) 
+Variable   Blood 
+group 
+Groups by total DU (N hospitals)   Total 
+(N = 194) ≥ 70 
+(N = 9) 
+30–69.9 
+(N = 39) 
+20–29.9 
+(N = 20) 
+10–19.9 
+(N = 31) 
+4–9.9 
+(N = 49) 
+2–3.9 
+(N = 28) 
+1–1.9 
+(N = 15) 
+< 1 
+(N = 3) 
+DU   O   34.9 ± 15.5   12.2 ± 2.5   7.0 ± 0.6   4.1 ± 0.8   1.9 ± 0.5   1.1 ± 1.7   0.4 ± 0.1   0.1 ± 0.1   6.1 ± 8.4 
+A   40.3 ± 17.3   14.9 ± 3.2   8.4 ± 0.8   5.2 ± 0.9   2.3 ± 0.6   1.5 ± 2.1   0.5 ± 0.1   0.2 ± 0.1   7.4 ± 9.7 
+B   31.6 ± 13.5   11.4 ± 2.0   6.9 ± 0.7   4.0 ± 0.9   1.8 ± 0.4   1.1 ± 1.8   0.4 ± 0.1   0.2 ± 0.1   5.8 ± 7.6 
+AB   13.1 ± 5.5   4.8 ± 1.0   2.8 ± 0.4   1.7 ± 0.3   0.8 ± 0.2   0.5 ± 0.7   0.2 ± 0.0   0.1 ± 0.0   2.4 ± 3.1 
+All   30.0 ± 16.7   10.8 ± 4.4   6.3 ± 2.2   3.7 ± 1.5   1.7 ± 0.7   1.0 ± 1.7   0.4 ± 0.1   0.1 ± 0.1   21.5 ± 28.8 
+ISI   O   4.3 ± 0.8   4.9 ± 1.7   5.0 ± 1.4   5.4 ± 1.9   5.8 ± 2.0   6.0 ± 2.6   6.3 ± 3.3   11.9 ± 20.3   5.4 ± 2.2 
+A   3.8 ± 0.8   4.2 ± 1.5   4.4 ± 1.0   4.4 ± 1.4   4.8 ± 1.7   5.2 ± 2.1   6.2 ± 2.7   6.8 ± 9.2   4.7 ± 1.8 
+B   4.7 ± 0.9   5.2 ± 1.8   5.1 ± 1.2   5.6 ± 1.8   5.8 ± 2.1   5.9 ± 2.5   5.9 ± 3.6   6.3 ± 9.9   5.6 ± 2.3 
+AB   6.3 ± 0.8   6.1 ± 1.5   5.6 ± 1.4   6.3 ± 2.5   5.4 ± 2.0   5.2 ± 2.7   5.7 ± 5.6   11.0 ± 18.9   5.8 ± 3.2 
+All   4.8 ± 1.2   5.1 ± 1.8   5.0 ± 1.3   5.4 ± 2.0   5.5 ± 2.0   5.6 ± 2.5   6.0 ± 3.8   9.0 ± 13.4   5.4 ± 2.7 
+3SD ISI   O   2.3 ± 0.2   2.8 ± 0.3   3.0 ± 0.2   3.6 ± 0.4   4.4 ± 0.4   5.6 ± 0.5   7.6 ± 1.0   15.4 ± 8.3   4.3 ± 2.2 
+A   2.2 ± 0.2   2.6 ± 0.3   2.9 ± 0.2   3.4 ± 0.4   4.2 ± 0.4   5.2 ± 0.6   7.0 ± 0.7   10.3 ± 3.5   4.0 ± 1.6 
+B   2.3 ± 0.2   2.8 ± 0.3   3.1 ± 0.2   3.6 ± 0.5   4.5 ± 0.4   5.8 ± 0.6   7.9 ± 1.1   11.2 ± 5.2   4.3 ± 1.9 
+AB   2.8 ± 0.4   3.6 ± 0.4   4.1 ± 0.4   4.9 ± 0.7   6.1 ± 0.7   8.3 ± 1.2   10.9 ± 1.4   22.3 ± 7.6   6.0 ± 3.2 
+All   2.4 ± 0.4   2.9 ± 0.5   3.3 ± 0.5   3.9 ± 0.8   4.8 ± 0.9   6.2 ± 1.5   8.4 ± 1.8   14.8 ± 7.4   4.7 ± 2.4 
+Lim’s ISI (optimal multiplying factor)   O   2.7 (1.2)   3.5 (1.3)   4.3 (1.4)   5.3 (1.4)   6.6 (1.4)   7.2 (1.2)   NA (4.0)   -   NA (2.0) 
+A   2.4 (1.1)   3.4 (1.3)   3.9 (1.3)   4.8 (1.4)   6.2 (1.4)   7.1 (1.3)   NA (3.0)   -   NA (2.0) 
+B   2.8 (1.2)   3.5 (1.3)   4.5 (1.4)   5.2 (1.4)   8.3 (1.7)   NA (2.0)   NA (4.0)   -   NA (2.0) 
+AB   4.9 (1.7)   5.4 (1.5)   6.5 (1.5)   10.0 (1.9)   NA (3.0)   NA (4.0)   NA (3.0)   -   NA (3.0) 
+All   2.9 (1.3)   3.9 (1.4)   4.5 (1.4)   6.0 (1.6)   NA (2.0)   NA (3.0)   NA (4.0)   -   NA (2.0) 
+Data are expressed as mean ± SD. 
+The ISI was calculated by dividing daily IS by the DU. The 3SD IS was determined as the unconditionally rounded up sum of average DU and 3SD of DU. Lim’s 
+IS was calculated by multiplying the 3SD ISI by the optimal factor. 
+Abbreviations: DU, daily usage; ISI, issuable stock index; BMS, Blood Management System; SD, standard deviation; NA, not available. 
+
+--- PAGE 6 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+https://doi.org/10.3343/alm.2023.0242   www.annlabmed.org   267 
+average consumption levels (Table 1). Theoretically, 3SD ISI 
+should include 99.7% of DU, but was not considered a suitable 
+variable for calculating the shortage days for every hospital be - 
+cause of its wide variation (2.2–22.3 days, Table 1); therefore, a 
+multiplying factor was needed. 
+Lim’s IS implemented in this study was calculated assuming 
+that the requested amount of blood products could be supplied 
+at least once a day, considering the geographical characteristics 
+of Korea. This is because during blood shortage periods, it 
+would be preferable that hospitals received blood products ev - 
+ery day instead of storing several days’ worth of blood. However, 
+it would be much more effective and realistic to maintain RBC 
+inventory levels at the IS while receiving blood products once ev - 
+ery few days or extend the calculated shortage day in hospitals 
+with low blood consumption levels, such as the 1–1.9 DU group 
+in Table 2. However, it is unclear whether 1 day as the shortage 
+day for Lim’s IS is suitable for hospitals with low blood consump - 
+tion levels, because the IS can be overestimated, which may in - 
+crease blood wastage. To clarify this limitation, further studies 
+are required to determine the appropriate shortage day for ap - 
+plying Lim’s IS to hospitals with low blood consumption levels. 
+In all ABO blood groups, the average and CV of DU showed an 
+inverse correlation. In addition, the prediction of the average DU 
+in hospitals with low blood consumption was particularly difficult 
+because of the high CV values. As such, variation factors have 
+been used along with other factors in algorithms of blood inven - 
+tor models for minimizing blood shortage and outdating, such 
+as the XGBoost and stochastic inventory models [13, 14]. The 
+Australian Red Cross Blood Service developed an RBC safety 
+stock calculation method using the Z score, average of lead 
+time, variance of demand, variance of lead time, and average of 
+demand in each period [15]. It is considered necessary to reflect 
+the unique characteristics of each country when calculating the 
+target ISI. 
+As our study included only hospitals participating in the BMS, 
+which accounts for 82.4% of the RBC blood products supplied in 
+Korea, it is not clear whether Lim’s IS will in fact reduce the av - 
+erage IS and annual blood shortage days at the national level. 
+Furthermore, based on the 2018 annual data on RBC products, 
+as most hospitals not included in the BMS use < 5,000 units/yr 
+(average DU < 13.7), the IS is expected to increase when using 
+Lim’s IS instead of the 5IS [10]. Therefore, additional studies in - 
+cluding all hospitals offering transfusion services are required. 
+In addition, in future, it would be helpful for hospitals if the 
+NIOTBM provided the CV or SD in addition to the average DU of 
+the previous year and used decimal numbers instead of integers 
+when reporting the average DU. 
+In summary, Lim’s IS, a novel IS, was calculated by multiplying 
+the 3SD IS by the optimal factor at which the annual average 
+blood shortage day was 1, reflecting the variation in blood con - 
+sumption among hospitals. Additionally, Lim’s ISI was found to 
+be an effective index that not only lowered the average IS of the 
+Table 2.   Five-day IS and Lim’s IS according to total blood usage and ABO blood groups 
+Blood group   IS 
+Groups by total DU (N hospitals)   Total 
+(N = 170) ≥ 70 
+(N = 9) 
+30–69.9 
+(N = 28) 
+20–29.9 
+(N = 17) 
+10–19.9 
+(N = 26) 
+4–9.9 
+(N = 47) 
+2–3.9 
+(N = 28) 
+1–1.9 
+(N = 15) 
+O   5-day   180.6 ± 71.5   62.9 ± 11.2   34.4 ± 3.5   20.2 ± 4.8 ‡   10.0 ± 3.3   6.8 ± 8.5 †   2.0 ± 2.5   30.5 ± 44.2 
+Lim’s   95.5 ± 30.5   44.1 ± 7.3   29.8 ± 3.3   20.9 ± 4.2   12.9 ± 3.8   8.6 ± 5.4   15.7 ± 14.9   24.9 ± 22.5 
+A   5-day   205.6 ± 85.3   77.9 ± 15.8   42.4 ± 5.0   25.8 ± 5.8 ‡   12.6 ± 4.2   8.4 ± 10.4*   4.0 ± 2.1   37.1 ± 51.2 
+Lim’s   97.7 ± 34.8   51.8 ± 9.3   33.1 ± 3.2   24.8 ± 5.7   15.3 ± 5.0   10.4 ± 6.8   18.8 ± 8.4   28.4 ± 23.6 
+B   5-day   162.8 ± 75.0   57.7 ± 9.1   34.1 ± 4.4   21.2 ± 4.8 ‡   9.5 ± 4.1   6.4 ± 8.7   3.0 ± 2.5   28.7 ± 40.7 ‡ 
+Lim’s   88.3 ± 36.7   40.8 ± 6.5   30.4 ± 4.1   21.6 ± 3.7   15.1 ± 5.9   13.9 ± 9.1   22.7 ± 16.1   26.2 ± 20.6 
+AB   5-day   62.8 ± 24.6 ‡   25.5 ± 4.6   14.7 ± 2.1   8.5 ± 2.4   4.6 ± 1.8   1.8 ± 4.1   NA   11.9 ± 15.9 
+Lim’s   59.9 ± 18.9   27.2 ± 4.6   17.9 ± 3.0   16.7 ± 4.7   18.4 ± 6.1   11.7 ± 14.7   NA   19.3 ± 14.2 
+All   5-day   152.9 ± 85.3   56.0 ± 22.0   31.4 ± 11.0   18.9 ± 7.9   9.1 ± 4.5   5.8 ± 8.5   3.0 ± 2.5   27.0 ± 41.2 † 
+Lim’s   85.3 ± 33.4   41.0 ± 11.4   27.8 ± 6.8   21.0 ± 5.4   15.4 ± 5.6   11.1 ± 9.7   19.1 ± 13.6   24.7 ± 20.8 
+Data are expressed as mean ± SD (in units). 
+NA was due to the exclusion of more than half of the hospitals with a 2018 DU value of 0 in their corresponding consumption level-based group. 
+The 5-day IS was determined by multiplying the DU by five. Lim’s IS was calculated by multiplying the 3SD ISI with the optimal factor. 
+All data show a significant difference between 5-day IS and Lim’s IS ( 
+P   < 0.001; * 
+P   < 0.05,   † 
+P   < 0.01), except data indicated by   ‡ (not significant). 
+Abbreviations: DU, daily usage; IS, issuable stock; NA, not available. 
+
+--- PAGE 7 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+268   www.annlabmed.org   https://doi.org/10.3343/alm.2023.0242 
+hospitals participating in the BMS but also reduced the annual 
+average blood shortage days when compared to the 5ISI. Fur - 
+thermore, shortage days were proposed for all blood crisis 
+phases for guidance during periods of blood shortage. To the 
+best of our knowledge, this study was the first in Korea to report 
+optimal blood inventory levels on a national level and blood 
+shortage days according to various indices and to show the im - 
+pact of blood inventories in hospitals on the national level ac - 
+Table 3.   Simulated blood shortage days according to various IS levels, blood usage, and ABO blood groups in 2019 
+Blood group   IS 
+Groups by total daily usages (N hospitals)   Total 
+(N = 170) ≥ 70 
+(N = 9) 
+30–69.9 
+(N = 28) 
+20–29.9 
+(N = 17) 
+10–19.9 
+(N = 26) 
+4–9.9 
+(N = 47) 
+2–3.9 
+(N = 28) 
+1–1.9 
+(N = 15) 
+O   5-day   0.1   0.1   0.5   1.7   4.3   3.4   56.5   7.1 
+Lim’s   0.9 †   1.0 ‡   1.0*   1.2   1.0 ‡   0.7 ‡   0.9 ‡   1.0 ‡ 
+3 SD   4.1   7.9   7.6   8.4   8.9   2.2   57.5   11.5 
+3-day   0.7   2.4   4.2   11.6   21.3   18.5   58.9   16.7 
+2-day   6.4   17.4   25.2   43.1   48.9   37.3   63.3   37.6 
+1-day   155.4   155.9   150.1   144.8   120.5   97.1   79.9   127.4 
+A   5-day   0.1   0.2   0.4   0.9   2.5   4.1   20.3   3.4 
+Lim’s   1.2   1.1 ‡   1.1 ‡   1.3*   0.9 †   1.1 ‡   1.3*   1.1 ‡ 
+3 SD   4.6   7.1   6.9   7.6   7.4   4.5   21.6   8.0 
+3-day   0.6   2.0   3.8   8.2   16.9   20.3   26.7   12.3 
+2-day   4.9   14.5   23.0   34.8   46.4   42.4   36.5   33.3 
+1-day   166.2   161.4   148.6   151.8   125.2   105.8   75.5   132.2 
+B   5-day   0.1   0.1   0.1   1.0   6.4   9.5   34.1   6.5 
+Lim’s   1.1   1.0 ‡   0.8*   0.9   1.0 ‡   1.1   0.5 †   0.9 ‡ 
+3 SD   6.3   8.0   7.9   6.7   13.1   9.9   37.8   12.1 
+3-day   1.0   2.1   5.1   9.1   25.2   23.0   38.5   16.4 
+2-day   7.3   18.0   27.3   36.4   53.0   39.7   43.9   36.7 
+1-day   160.4   154.0   143.4   133.4   125.4   95.4   67.9   125.0 
+AB   5-day   1.0   1.3   2.2   7.2   14.6   54.1   45.2   18.5 
+Lim’s   1.0   1.0   1.2/0.8 ‡   1.0 ‡   1.0 †   0.8 ‡   0.9 ‡   1.0 ‡ 
+3 SD   10.3   8.2   8.9   10.6   16.4   46.1   34.6   19.6 
+3-day   6.2   7.8   12.6   26.5   27.7   55.4   45.2   27.7 
+2-day   23.8   30.9   36.0   52.6   43.9   58.6   45.2   43.8 
+1-day   157.2   132.5   117.6   118.6   91.4   71.8   45.2   101.1 
+All   5-day   0.3   0.5   0.8   2.7   7.0   17.8   39.0   8.9 
+Lim’s   1.1 †   1.0 ‡   1.0   1.1 ‡   1.0 ‡   1.0 ‡   0.9 ‡   1.0 ‡ 
+3 SD   6.3   7.8   7.8   8.3   11.5   15.7   37.9   12.8 
+3-day   2.1   3.6   6.4   13.8   22.8   29.3   42.3   18.3 
+2-day   10.6   20.2   27.9   41.7   48.0   44.5   47.2   37.8 
+1-day   159.8   151.0   139.9   137.2   115.6   92.5   67.1   121.4 
+Data are expressed as average simulated blood shortage days. 
+Statistical significance between 5-day and Lim’s IS: * 
+P   < 0.05,   † 
+P   < 0.01,   ‡ 
+P   < 0.001. 
+The 5-day IS was determined by multiplying the daily usage by five. Lim’s IS was calculated by multiplying the 3SD ISI with the optimal factor. 3-day, 2-day, and 
+1-day ISs correspond to the yellow, orange, and red blood shortage crisis phases, respectively, and were calculated by multiplying the daily usage by 3, 2, and 
+1, respectively. 
+Abbreviation: IS, issuable stock. 
+
+--- PAGE 8 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+https://doi.org/10.3343/alm.2023.0242   www.annlabmed.org   269 
+cording to the crisis level during blood shortages. Our results are 
+expected to provide guidance for efficient blood management 
+on a national level and deepen our understanding of various 
+scenarios that hospitals encounter in response to blood short - 
+age crises. 
+ACKNOWLEDGEMENTS 
+We thank the Division of Human Blood Safety Surveillance, Na - 
+tional Institute of Organ, Tissue and Blood Management for pro - 
+viding inventory data for RBC products. 
+AUTHOR CONTRIBUTIONS 
+Lim YA designed and supervised the study. Lim YA and Park SJ 
+wrote and revised the manuscript. Lim YA, Park SJ, and Kim KH 
+contributed to data analysis and interpretation. All authors have 
+read and approved the final manuscript. 
+CONFLICTS OF INTEREST 
+None declared. 
+RESEARCH FUNDING 
+This study was carried out as a part of the study for Blood Man - 
+agement Governance Development Plans to strengthen national 
+responsibility in 2021 ( 202103174D1-00 ), which was financially 
+supported by the Ministry of Health and Welfare. 
+REFERENCES 
+1.   National Blood Authority Australia. Managing blood and blood product 
+inventory - Guidelines for Australian health providers.   https://www. 
+blood.gov.au/inv-mgt-guideline   (Updated on July 2023). 
+2.   Oh JA, Shin JY, Lee KY, Jeong KE, Seo CR, Choi YS, et al. The status of 
+the Korea blood inventory monitoring system, 2009~2012. Korean J 
+Blood Transfus 2013;24:33-40. 
+3.   Chang WR and Lim YA. The inventory levels of red blood cells from senti - 
+nel hospitals in Korea according to the blood type. Korean J Blood 
+Transfus 2008;19:155-64. 
+4.   Chapman JF and Cook R. The Blood Stocks Management Scheme, a 
+partnership venture between the National Blood Service of England and 
+North Wales and participating hospitals for maximizing blood supply 
+chain management. Vox Sang 2002;83:239-46. 
+5.   Park KU, Kwon SY, Kim SW, Lim YA. Long term prospects for the blood 
+supply and demand. Korean J Blood Transfus 2006;17:1-10. 
+6.   Kim HO. Current state of blood management services in Korea. Ann Lab 
+Med 2022;42:306-13. 
+7.   Ministry of Health and Welfare. Manual for blood supply and manage - 
+ment in blood shortage crisis. Social Disaster Document-22.   https:// 
+www.kha.or.kr/board/dept/list?siteGb=HOME&siteCd=HOME&rMnuGb 
+=ASW&brdMstIdx=61&menuIdx=921   (Updated on Nov 2023). 
+8.   Lim YA, Kim HH, Joung US, Kim CY, Shin YH, Lee SW, et al. The develop - 
+ment of a national surveillance system for monitoring blood use and in - 
+ventory levels at sentinel hospitals in South Korea. Transfus Med 
+2010;20:104-12. 
+9.   The Korean Society of Blood Transfusion. Transfusion Medicine. 5th ed. 
+Seoul: Korea Medical Book Publishing Company, 2023:284. 
+Step 1
+Step 2
+Step 3
+Step 4
+Step 5
+Calculate the average daily blood usage (DU) and its standard deviation (SD) of the
+previous year for each hospital according to ABO blood groups
+Calculate 3SD daily issuable stock level [3SD IS=average DU+(3   SD),
+rounded up] unconditionally
+Multiply the 3SD IS by one-tenth intervals between 1- and 2-fold levels in most
+hospitals, and whole number intervals from 2- to 7-fold levels for hospitals with
+DU <10 units
+Compare each DU of the previous year with the multiplied 3SD IS obtained from
+step 3 and then count the annual blood shortage days of the previous year
+Find the optimal multiplying factor that is closest to the target annual blood shortage
+days (e g. 1 day) and calculate Lim s IS (=3SD IS   optimal factor) and
+Lim s ISI (Lim s IS/DU)
+. 
+Fig. 2.   Flow chart of the procedure 
+used to obtain Lim’s daily IS level and 
+the ISI for each hospital according to 
+the ABO blood group. 
+Abbreviations:   IS, issuable stock; ISI, IS in - 
+dex. 
+
+--- PAGE 9 ---
+Park SJ, et al. 
+An optimal-target issuable stock index 
+270   www.annlabmed.org   https://doi.org/10.3343/alm.2023.0242 
+10.   Jeong KE, Oh JA, Kim JN, Lim YA. Research for improvement of the Kore - 
+an blood supply and demand monitoring. Public Health Weekly Report 
+2020;13:1717-27. 
+11.   National Health Service Blood and Transplant United Kingdom. Annual 
+reports: information about the blood supply chain in England, Wales 
+and Northern Ireland.   https://www.bloodstocks.co.uk/resources/annu - 
+al-reports/   (Updated on July 2023). 
+12.   Devine DV, Sher GD, Reesink HW, Panzer S, Hetzel PA, Wong JK, et al. 
+Inventory management. Vox Sang 2010;98:e295-363. 
+13.   Sun X, Xu Z, Feng Y, Yang Q, Xie Y, Wang D, et al. RBC inventory-manage - 
+ment system based on XGBoost model. Indian J Hematol Blood Transfus 
+2021;37:126-33. 
+14.   Shih H and Rajendran S. Stochastic inventory model for minimizing 
+blood shortage and outdating in a blood supply chain under supply and 
+demand uncertainty. J Healthc Eng 2020;2020:8881751. 
+15.   King PL. Understanding safety stock and mastering its equations. APICS 
+magazine.   https://web.mit.edu/2.810/www/files/readings/King_Safet - 
+yStock.pdf   (Updated on Aug 2011). 

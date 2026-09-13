@@ -1,4 +1,5 @@
 const { pool } = require('../db')
+const { allocateNearExpiryInventory, toFiniteNonNegative } = require('../services/adminAnalyticsLogic')
 
 const getWastagePredictionsController = async (req, res) => {
   try {
@@ -68,18 +69,21 @@ const getWastagePredictionsController = async (req, res) => {
     const wastageRates = {}
     historicalWastage.forEach((item) => {
       const key = `${item.blood_type}_${item.component_type || 'whole_blood'}`
-      wastageRates[key] = { wastedUnits: item.wasted_units || 0, wastedCount: item.wasted_count || 0 }
+      wastageRates[key] = {
+        wastedUnits: toFiniteNonNegative(item.wasted_units),
+        wastedCount: toFiniteNonNegative(item.wasted_count),
+      }
     })
 
     const demandFactors = {}
-    const totalDemand = demandData.reduce((sum, item) => sum + (item.total_demand || 0), 0)
+    const totalDemand = demandData.reduce((sum, item) => sum + toFiniteNonNegative(item.total_demand), 0)
     demandData.forEach((item) => {
       const key = `${item.blood_type}_${item.component_type || 'whole_blood'}`
-      demandFactors[key] = totalDemand > 0 ? (item.total_demand || 0) / totalDemand : 0
+      demandFactors[key] = totalDemand > 0 ? toFiniteNonNegative(item.total_demand) / totalDemand : 0
     })
 
     const inventoryWithRisk = atRiskInventory.map((item) => {
-      const daysUntilExpiry = item.days_until_expiry || 0
+      const daysUntilExpiry = Number(item.days_until_expiry) || 0
       const bloodType = item.blood_type
       const componentType = item.component_type || 'whole_blood'
       const key = `${bloodType}_${componentType}`
@@ -100,7 +104,7 @@ const getWastagePredictionsController = async (req, res) => {
       const inventorySummaryItem = inventorySummary.find(
         (inv) => inv.blood_type === bloodType && (inv.component_type || 'whole_blood') === componentType,
       )
-      const totalAvailable = inventorySummaryItem?.total_available || 0
+      const totalAvailable = toFiniteNonNegative(inventorySummaryItem?.total_available)
       const inventoryFactor = totalAvailable > 50 ? 10 : totalAvailable > 20 ? 5 : 0
       const riskScore = Math.min(
         100,
@@ -109,6 +113,7 @@ const getWastagePredictionsController = async (req, res) => {
 
       return {
         ...item,
+        available_units: toFiniteNonNegative(item.available_units),
         riskScore,
         expiryFactor,
         wastageFactor: Math.round(wastageFactor),
@@ -186,7 +191,7 @@ const getWastagePredictionsController = async (req, res) => {
 
 const getWastagePrescriptionsController = async (req, res) => {
   try {
-    const [highRiskInventory] = await pool.query(
+    const [highRiskInventoryRows] = await pool.query(
       `
       SELECT 
         bi.id,
@@ -237,19 +242,13 @@ const getWastagePrescriptionsController = async (req, res) => {
           cleanNotes = match[2] || null
         }
       }
-      return { ...row, priority, notes: cleanNotes }
+      return {
+        ...row,
+        units_requested: toFiniteNonNegative(row.units_requested),
+        priority: ['critical', 'urgent', 'normal'].includes(priority) ? priority : 'normal',
+        notes: cleanNotes,
+      }
     })
-
-    await pool.query(
-      `
-      SELECT hospital_id, blood_type, SUM(available_units) as total_available
-      FROM blood_inventory
-      WHERE hospital_id IS NOT NULL
-        AND status = 'available'
-        AND expiration_date > CURDATE()
-      GROUP BY hospital_id, blood_type
-    `,
-    )
 
     const [centralInventory] = await pool.query(
       `
@@ -269,52 +268,12 @@ const getWastagePrescriptionsController = async (req, res) => {
     const centralInventoryMap = {}
     centralInventory.forEach((row) => {
       const key = `${row.blood_type}_${row.component_type}`
-      centralInventoryMap[key] = row.total_available || 0
+      centralInventoryMap[key] = toFiniteNonNegative(row.total_available)
     })
 
-    const transferRecommendations = []
-    const processedRequests = new Set()
-
-    highRiskInventory.forEach((inventory) => {
-      const matchingRequests = pendingRequests.filter(
-        (req) =>
-          req.blood_type === inventory.blood_type &&
-          (req.component_type || 'whole_blood') === (inventory.component_type || 'whole_blood') &&
-          req.units_requested > 0 &&
-          !processedRequests.has(req.id),
-      )
-
-      if (matchingRequests.length > 0) {
-        matchingRequests.sort((a, b) => new Date(a.request_date) - new Date(b.request_date))
-        matchingRequests.forEach((request) => {
-          const unitsToTransfer = Math.min(inventory.available_units, request.units_requested)
-          if (unitsToTransfer > 0) {
-            transferRecommendations.push({
-              type: 'transfer',
-              priority:
-                inventory.days_until_expiry <= 3
-                  ? 'high'
-                  : inventory.days_until_expiry <= 7
-                    ? 'medium'
-                    : 'low',
-              requestPriority: request.priority,
-              inventoryId: inventory.id,
-              bloodType: inventory.blood_type,
-              componentType: inventory.component_type || 'whole_blood',
-              units: unitsToTransfer,
-              daysUntilExpiry: inventory.days_until_expiry,
-              targetHospitalId: request.hospital_id,
-              targetHospitalName: request.hospital_name,
-              requestId: request.id,
-              impact: `Prevent ${unitsToTransfer} units from expiring`,
-              reason: `Match expiring inventory with pending request from ${request.hospital_name}`,
-            })
-            processedRequests.add(request.id)
-            inventory.available_units -= unitsToTransfer
-          }
-        })
-      }
-    })
+    const allocation = allocateNearExpiryInventory(highRiskInventoryRows, pendingRequests)
+    const highRiskInventory = allocation.inventory
+    const transferRecommendations = allocation.transferRecommendations
 
     const priorityActions = []
     const expiring3Days = highRiskInventory.filter(
@@ -337,22 +296,24 @@ const getWastagePrescriptionsController = async (req, res) => {
 
     const [lowDemandBloodTypes] = await pool.query(
       `
-      SELECT 
-        bi.blood_type,
-        COALESCE(bi.component_type, 'whole_blood') as component_type,
-        SUM(bi.available_units) as total_inventory,
-        COALESCE(SUM(br.units_requested), 0) as total_demand
-      FROM blood_inventory bi
-      LEFT JOIN blood_requests br ON bi.blood_type = br.blood_type 
-        AND COALESCE(bi.component_type, 'whole_blood') = COALESCE(br.component_type, 'whole_blood')
-        AND br.status = 'pending'
-        AND br.request_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-      WHERE bi.status = 'available'
-        AND bi.expiration_date > CURDATE()
-        AND bi.available_units > 0
-        AND (bi.hospital_id IS NULL OR bi.hospital_id = 0)
-      GROUP BY bi.blood_type, bi.component_type
-      HAVING total_inventory > 30 AND total_demand < 5
+      SELECT inv.blood_type, inv.component_type, inv.total_inventory,
+        COALESCE(demand.total_demand, 0) AS total_demand
+      FROM (
+        SELECT blood_type, COALESCE(component_type, 'whole_blood') AS component_type,
+          SUM(available_units) AS total_inventory
+        FROM blood_inventory
+        WHERE status = 'available' AND expiration_date > CURDATE() AND available_units > 0
+          AND (hospital_id IS NULL OR hospital_id = 0)
+        GROUP BY blood_type, COALESCE(component_type, 'whole_blood')
+      ) inv
+      LEFT JOIN (
+        SELECT blood_type, COALESCE(component_type, 'whole_blood') AS component_type,
+          SUM(units_requested) AS total_demand
+        FROM blood_requests
+        WHERE status = 'pending' AND request_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        GROUP BY blood_type, COALESCE(component_type, 'whole_blood')
+      ) demand ON demand.blood_type = inv.blood_type AND demand.component_type = inv.component_type
+      WHERE inv.total_inventory > 30 AND COALESCE(demand.total_demand, 0) < 5
     `,
     )
 
@@ -378,7 +339,6 @@ const getWastagePrescriptionsController = async (req, res) => {
       (item) =>
         item.days_until_expiry > 3 &&
         item.days_until_expiry <= 7 &&
-        !transferRecommendations.some((rec) => rec.inventoryId === item.id) &&
         item.available_units > 0,
     )
 
@@ -396,11 +356,6 @@ const getWastagePrescriptionsController = async (req, res) => {
         action: 'Contact hospitals to check if they need these blood types',
       })
     }
-
-    transferRecommendations.sort((a, b) => {
-      const priorityOrder = { high: 3, medium: 2, low: 1 }
-      return priorityOrder[b.priority] - priorityOrder[a.priority]
-    })
 
     const priorityRequests = pendingRequests
       .filter(

@@ -1,0 +1,18 @@
+{
+  "referenceDate": "2026-09-01T12:00:00.000Z",
+  "predictive": {
+    "O+|whole_blood": { "currentStock": 20, "expiringSoonUnits": 8, "usableStock": 20, "usage30Days": 60, "estimatedDaysRemaining": "10", "supplyStatusKey": "sufficient", "previousUnits": 30, "currentUnits": 60, "percentChange": 100, "predictedDemand7Days": 14, "trendKey": "increasing", "demandRiskKey": "high", "unusualKey": "spike" },
+    "A+|whole_blood": { "currentStock": 60, "expiringSoonUnits": 0, "usableStock": 60, "usage30Days": 30, "estimatedDaysRemaining": "60", "supplyStatusKey": "sufficient", "previousUnits": 30, "currentUnits": 30, "percentChange": 0, "predictedDemand7Days": 7, "trendKey": "stable", "demandRiskKey": "moderate", "unusualKey": "normal" },
+    "AB+|whole_blood": { "currentStock": 80, "expiringSoonUnits": 0, "usableStock": 80, "usage30Days": 10, "estimatedDaysRemaining": "240", "supplyStatusKey": "sufficient", "previousUnits": 30, "currentUnits": 10, "percentChange": -66.6666666667, "predictedDemand7Days": 2.3333333333, "trendKey": "decreasing", "demandRiskKey": "low", "unusualKey": "drop" },
+    "O-|whole_blood": { "currentStock": 0, "expiringSoonUnits": 0, "usableStock": 0, "usage30Days": 5, "estimatedDaysRemaining": "0", "supplyStatusKey": "critical_out", "previousUnits": 5, "currentUnits": 5, "percentChange": 0, "predictedDemand7Days": 1.1666666667, "trendKey": "stable", "demandRiskKey": "low", "unusualKey": "normal" },
+    "B+|platelets": { "currentStock": 12, "expiringSoonUnits": 12, "usableStock": 0, "usage30Days": 0, "estimatedDaysRemaining": "—", "supplyStatusKey": "sufficient_no_usage" },
+    "AB-|whole_blood": { "currentStock": 25, "expiringSoonUnits": 0, "usableStock": 25, "usage30Days": 0, "estimatedDaysRemaining": "—", "supplyStatusKey": "sufficient_no_usage" }
+  },
+  "prescriptive": [
+    { "requestId": 1301, "priority": "critical", "unitsNeeded": 8, "sourceLocationKey": null, "suggestedUnits": 0, "recommendation": "Contact donors / coordinate external supply" },
+    { "requestId": 1302, "priority": "urgent", "unitsNeeded": 13, "sourceLocationKey": "central", "suggestedUnits": 13, "recommendation": "Dispatch from Central Inventory" },
+    { "requestId": 1303, "priority": "urgent", "unitsNeeded": 20, "sourceLocationKey": "h:902", "suggestedUnits": 20, "recommendation": "Transfer from another hospital" },
+    { "requestId": 1304, "priority": "normal", "unitsNeeded": 10, "sourceLocationKey": "central", "suggestedUnits": 10, "recommendation": "Dispatch from Central Inventory" },
+    { "requestId": 1305, "priority": "normal", "unitsNeeded": 0, "sourceLocationKey": null, "suggestedUnits": 0, "recommendation": "Already covered by current on-hand stock" }
+  ]
+}

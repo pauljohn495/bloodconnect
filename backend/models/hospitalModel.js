@@ -1,5 +1,8 @@
 const { pool } = require('../db')
-const { ensureBloodRequestStatusSupportsDelivery } = require('../utils/requestStatusSchema')
+const {
+  ensureBloodRequestStatusSupportsDelivery,
+  ensureBloodRequestTransferAllocations,
+} = require('../utils/requestStatusSchema')
 
 async function getHospitalIdForUser(userId) {
   const [rows] = await pool.query('SELECT id FROM hospitals WHERE user_id = ?', [userId])
@@ -206,24 +209,11 @@ async function getHospitalRequests(hospitalId) {
 
 async function confirmHospitalRequestReceived({ hospitalId, requestId, receivedByUserId }) {
   await ensureBloodRequestStatusSupportsDelivery()
+  await ensureBloodRequestTransferAllocations()
 
   const conn = await pool.getConnection()
   try {
     await conn.beginTransaction()
-
-    await conn.query(
-      `
-      CREATE TABLE IF NOT EXISTS hospital_request_transfer_receipts (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
-        request_id BIGINT NOT NULL,
-        transfer_id BIGINT NOT NULL UNIQUE,
-        received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        received_by BIGINT NULL,
-        INDEX idx_receipt_request (request_id),
-        INDEX idx_receipt_transfer (transfer_id)
-      )
-    `,
-    )
 
     const [requestRows] = await conn.query(
       `
@@ -257,21 +247,22 @@ async function confirmHospitalRequestReceived({ hospitalId, requestId, receivedB
     const [transferRows] = await conn.query(
       `
       SELECT
+        rta.id AS allocation_id,
         bt.id AS transfer_id,
         bt.blood_type,
-        bt.units_transferred,
+        rta.units_allocated,
         bi.expiration_date,
         COALESCE(bi.component_type, 'whole_blood') AS component_type
-      FROM blood_transfers bt
+      FROM blood_request_transfer_allocations rta
+      JOIN blood_transfers bt ON bt.id = rta.transfer_id
       LEFT JOIN blood_inventory bi ON bi.id = bt.source_inventory_id
-      LEFT JOIN hospital_request_transfer_receipts rr ON rr.transfer_id = bt.id
-      WHERE bt.hospital_id = ?
-        AND bt.blood_type COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
-        AND bt.transfer_date >= ?
-        AND rr.transfer_id IS NULL
+      WHERE rta.request_id = ?
+        AND bt.hospital_id = ?
+        AND rta.received_at IS NULL
       ORDER BY bt.transfer_date ASC
+      FOR UPDATE
     `,
-      [hospitalId, request.blood_type, request.request_date],
+      [requestId, hospitalId],
     )
 
     if (transferRows.length === 0) {
@@ -282,17 +273,18 @@ async function confirmHospitalRequestReceived({ hospitalId, requestId, receivedB
 
     let totalReceivedUnits = 0
     for (const row of transferRows) {
-      const units = Number(row.units_transferred || 0)
+      const units = Number(row.units_allocated || 0)
       totalReceivedUnits += units
     }
 
     for (const row of transferRows) {
       await conn.query(
         `
-        INSERT INTO hospital_request_transfer_receipts (request_id, transfer_id, received_by)
-        VALUES (?, ?, ?)
+        UPDATE blood_request_transfer_allocations
+        SET received_at = NOW(), received_by = ?
+        WHERE id = ? AND received_at IS NULL
       `,
-        [requestId, row.transfer_id, receivedByUserId || null],
+        [receivedByUserId || null, row.allocation_id],
       )
     }
 

@@ -187,7 +187,7 @@ router.get('/donation-rankings/municipalities', getMunicipalityDonationRankingCo
 
 // ===== Blood Inventory =====
 
-// GET /api/admin/inventory
+// GET /api/admin/inventory (use ?scope=all for central + hospital inventory)
 router.get('/inventory', getInventoryController)
 
 // POST /api/admin/inventory

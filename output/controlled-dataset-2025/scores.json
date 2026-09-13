@@ -1,0 +1,2307 @@
+{
+  "dataset": {
+    "directory": "C:\\Users\\JEPOY\\Downloads\\BloodConnect_1Year_Controlled_Dataset_2025",
+    "hashes": {
+      "blood_units.csv": "a04a6b7863f7418c9ef355697c29255dda8d45f5e89c94d5cf1b70027300b8fc",
+      "blood_usage_history.csv": "7d6d657d37bcafa36d4a333dc9b3b2b1e9ab92fa4c9453ab99542864cf710f6c",
+      "donations_supply.csv": "eef0affc3bbb9425bd684858782b89363864c9e9138429fe63e159752ecdba9a",
+      "expected_test_scenarios.csv": "af3ec9f9d2e45ebc308ca7ec8b0d731f1cf9955885eb1eabc67d9778aa4da677",
+      "hospital_requests.csv": "88d04210249bb83ef2966bd0249f332c2c1841abb1ca9c141ff79f35760ed91b",
+      "inventory_history.csv": "6802afdb64b69f338b9605bb2ae53337565e6c1f5431f38408b58d1fc5463b19"
+    },
+    "counts": {
+      "blood_units.csv": 49190,
+      "blood_usage_history.csv": 52560,
+      "donations_supply.csv": 52560,
+      "expected_test_scenarios.csv": 15,
+      "hospital_requests.csv": 33017,
+      "inventory_history.csv": 52560
+    }
+  },
+  "integrity": {
+    "passed": 18,
+    "total": 18,
+    "checks": [
+      {
+        "name": "inventory row count",
+        "passed": true,
+        "detail": "52560/52,560"
+      },
+      {
+        "name": "usage row count",
+        "passed": true,
+        "detail": "52560/52,560"
+      },
+      {
+        "name": "supply row count",
+        "passed": true,
+        "detail": "52560/52,560"
+      },
+      {
+        "name": "request IDs unique",
+        "passed": true,
+        "detail": "33017 requests"
+      },
+      {
+        "name": "blood-unit IDs unique",
+        "passed": true,
+        "detail": "49190 units"
+      },
+      {
+        "name": "daily inventory keys unique",
+        "passed": true,
+        "detail": "52560 daily keys"
+      },
+      {
+        "name": "daily usage keys unique",
+        "passed": true,
+        "detail": "52560 daily keys"
+      },
+      {
+        "name": "daily supply keys unique",
+        "passed": true,
+        "detail": "52560 daily keys"
+      },
+      {
+        "name": "inventory arithmetic",
+        "passed": true,
+        "detail": "opening + received - fulfilled - expired = closing"
+      },
+      {
+        "name": "nonnegative inventory",
+        "passed": true,
+        "detail": "all inventory measures >= 0"
+      },
+      {
+        "name": "usage quantity constraints",
+        "passed": true,
+        "detail": "transfused <= fulfilled <= requested"
+      },
+      {
+        "name": "request quantity constraints",
+        "passed": true,
+        "detail": "fulfilled <= requested"
+      },
+      {
+        "name": "day-to-day inventory continuity",
+        "passed": true,
+        "detail": "0 mismatches"
+      },
+      {
+        "name": "request totals reconcile to usage",
+        "passed": true,
+        "detail": "daily requested and fulfilled totals"
+      },
+      {
+        "name": "supply reconciles to inventory receipts",
+        "passed": true,
+        "detail": "daily units received"
+      },
+      {
+        "name": "blood-unit chronology",
+        "passed": true,
+        "detail": "0 invalid date sequences"
+      },
+      {
+        "name": "unit usage reconciles to inventory",
+        "passed": true,
+        "detail": "unit used dates vs fulfilled units"
+      },
+      {
+        "name": "unit expirations reconcile to inventory",
+        "passed": true,
+        "detail": "unit expired dates vs expired units"
+      }
+    ]
+  },
+  "protocol": {
+    "forecastHorizonDays": 7,
+    "historyDays": 30,
+    "originStepDays": 7,
+    "forecastCases": 6768,
+    "note": "Per-hospital/product chronological rolling-origin evaluation; no future rows are supplied to the engine."
+  },
+  "demand": {
+    "n": 6768,
+    "MAE": 0.9313682033096985,
+    "RMSE": 1.3275316423199237,
+    "bias": -0.02508372734436594,
+    "WAPE_percent": 16.36295200269979,
+    "MAPE_nonzero_percent": 26.721178018573514,
+    "MAPE_included": 5620,
+    "MAPE_excluded_zero_actual": 1148,
+    "within20PercentCount": 3519,
+    "within20PercentScore": 51.99468085106383
+  },
+  "baseline": {
+    "n": 6768,
+    "MAE": 1.069001182033097,
+    "RMSE": 1.5543255437587995,
+    "bias": -0.01787825059101655,
+    "WAPE_percent": 18.78098798120603,
+    "MAPE_nonzero_percent": 34.971089759493246,
+    "MAPE_included": 5620,
+    "MAPE_excluded_zero_actual": 1148,
+    "within20PercentCount": 3849,
+    "within20PercentScore": 56.87056737588653
+  },
+  "prescriptive": {
+    "runs": 47,
+    "feasibleRuns": 47,
+    "requests": 5969,
+    "totalDemand": 40817,
+    "initiallyCovered": 35851,
+    "fulfilled": 36198,
+    "feasiblePlanPercent": 100,
+    "noTransferCoveragePercent": 87.83350074723766,
+    "recommendationCoveragePercent": 88.68363671999411
+  },
+  "shortage": {
+    "n": 6768,
+    "TP": 553,
+    "TN": 4739,
+    "FP": 534,
+    "FN": 942,
+    "accuracyPercent": 78.19148936170212,
+    "precisionPercent": 50.873965041398336,
+    "recallPercent": 36.98996655518395,
+    "specificityPercent": 89.87293760667552,
+    "F1Percent": 42.835011618900076,
+    "balancedAccuracyPercent": 63.43145208092973,
+    "prevalencePercent": 22.089243498817968,
+    "majorityClassBaselineAccuracyPercent": 77.91075650118204,
+    "groundTruth": "At least one requested unit was unfulfilled during the next seven days."
+  },
+  "legacyShortage": {
+    "n": 6768,
+    "TP": 884,
+    "TN": 3571,
+    "FP": 1702,
+    "FN": 611,
+    "accuracyPercent": 65.82446808510637,
+    "precisionPercent": 34.18406805877803,
+    "recallPercent": 59.130434782608695,
+    "specificityPercent": 67.72235918831785,
+    "F1Percent": 43.32271502082823,
+    "balancedAccuracyPercent": 63.42639698546327,
+    "prevalencePercent": 22.089243498817968,
+    "majorityClassBaselineAccuracyPercent": 77.91075650118204
+  },
+  "expectedScenarioDetection": {
+    "matched": 10,
+    "supported": 14,
+    "percent": 71.42857142857143,
+    "excludedUnsupported": 1
+  },
+  "expectedScenarioForecasts": {
+    "matched": 14,
+    "total": 15,
+    "percent": 93.33333333333333,
+    "toleranceUnits": 0.011
+  },
+  "scenarioResults": [
+    {
+      "scenarioId": "S001",
+      "name": "Stable Normal Demand",
+      "condition": "Normal Supply",
+      "supported": true,
+      "detected": false,
+      "expectedForecast": 16.8,
+      "engineForecast": 2.8000000000000003,
+      "forecastMatchesExpected": false,
+      "expectedAction": "Maintain inventory",
+      "signals": [
+        {
+          "date": "2025-01-06",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 22,
+          "expiring": 0,
+          "usage30": 12
+        },
+        {
+          "date": "2025-01-07",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 25,
+          "expiring": 0,
+          "usage30": 12
+        },
+        {
+          "date": "2025-01-08",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 25,
+          "expiring": 0,
+          "usage30": 15
+        },
+        {
+          "date": "2025-01-09",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 26,
+          "expiring": 0,
+          "usage30": 17
+        },
+        {
+          "date": "2025-01-10",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 26,
+          "expiring": 0,
+          "usage30": 20
+        },
+        {
+          "date": "2025-01-11",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 27,
+          "expiring": 0,
+          "usage30": 22
+        },
+        {
+          "date": "2025-01-12",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 28,
+          "expiring": 0,
+          "usage30": 24
+        },
+        {
+          "date": "2025-01-13",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 29,
+          "expiring": 0,
+          "usage30": 26
+        },
+        {
+          "date": "2025-01-14",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 29,
+          "expiring": 0,
+          "usage30": 29
+        },
+        {
+          "date": "2025-01-15",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 29,
+          "expiring": 0,
+          "usage30": 32
+        },
+        {
+          "date": "2025-01-16",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 30,
+          "expiring": 0,
+          "usage30": 34
+        },
+        {
+          "date": "2025-01-17",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 30,
+          "expiring": 0,
+          "usage30": 37
+        },
+        {
+          "date": "2025-01-18",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 31,
+          "expiring": 0,
+          "usage30": 39
+        },
+        {
+          "date": "2025-01-19",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 32,
+          "expiring": 0,
+          "usage30": 41
+        }
+      ]
+    },
+    {
+      "scenarioId": "S002",
+      "name": "Gradually Increasing O+ Demand",
+      "condition": "Increasing Demand",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 24.73,
+      "engineForecast": 24.733333333333334,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Increase stock and monitor trend",
+      "signals": [
+        {
+          "date": "2025-03-01",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 62,
+          "expiring": 0,
+          "usage30": 106
+        },
+        {
+          "date": "2025-03-02",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 63,
+          "expiring": 0,
+          "usage30": 105
+        },
+        {
+          "date": "2025-03-03",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 63,
+          "expiring": 0,
+          "usage30": 105
+        },
+        {
+          "date": "2025-03-04",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 63,
+          "expiring": 0,
+          "usage30": 106
+        },
+        {
+          "date": "2025-03-05",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 64,
+          "expiring": 0,
+          "usage30": 107
+        },
+        {
+          "date": "2025-03-06",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 66,
+          "expiring": 0,
+          "usage30": 106
+        },
+        {
+          "date": "2025-03-07",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 65,
+          "expiring": 0,
+          "usage30": 107
+        },
+        {
+          "date": "2025-03-08",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 65,
+          "expiring": 0,
+          "usage30": 107
+        },
+        {
+          "date": "2025-03-09",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 64,
+          "expiring": 0,
+          "usage30": 109
+        },
+        {
+          "date": "2025-03-10",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 64,
+          "expiring": 0,
+          "usage30": 110
+        },
+        {
+          "date": "2025-03-11",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 63,
+          "expiring": 0,
+          "usage30": 113
+        },
+        {
+          "date": "2025-03-12",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 61,
+          "expiring": 0,
+          "usage30": 117
+        },
+        {
+          "date": "2025-03-13",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 60,
+          "expiring": 0,
+          "usage30": 121
+        },
+        {
+          "date": "2025-03-14",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 62,
+          "expiring": 0,
+          "usage30": 119
+        },
+        {
+          "date": "2025-03-15",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 66,
+          "expiring": 0,
+          "usage30": 116
+        },
+        {
+          "date": "2025-03-16",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 66,
+          "expiring": 0,
+          "usage30": 115
+        },
+        {
+          "date": "2025-03-17",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 66,
+          "expiring": 0,
+          "usage30": 116
+        },
+        {
+          "date": "2025-03-18",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 65,
+          "expiring": 0,
+          "usage30": 117
+        },
+        {
+          "date": "2025-03-19",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 63,
+          "expiring": 0,
+          "usage30": 120
+        },
+        {
+          "date": "2025-03-20",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 62,
+          "expiring": 0,
+          "usage30": 121
+        },
+        {
+          "date": "2025-03-21",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 61,
+          "expiring": 0,
+          "usage30": 123
+        },
+        {
+          "date": "2025-03-22",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 58,
+          "expiring": 0,
+          "usage30": 127
+        },
+        {
+          "date": "2025-03-23",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 58,
+          "expiring": 0,
+          "usage30": 128
+        },
+        {
+          "date": "2025-03-24",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 58,
+          "expiring": 0,
+          "usage30": 130
+        },
+        {
+          "date": "2025-03-25",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 54,
+          "expiring": 0,
+          "usage30": 135
+        },
+        {
+          "date": "2025-03-26",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 51,
+          "expiring": 0,
+          "usage30": 139
+        },
+        {
+          "date": "2025-03-27",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 48,
+          "expiring": 0,
+          "usage30": 142
+        },
+        {
+          "date": "2025-03-28",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 47,
+          "expiring": 0,
+          "usage30": 146
+        }
+      ]
+    },
+    {
+      "scenarioId": "S003",
+      "name": "B+ Whole Blood Demand Spike",
+      "condition": "Demand Spike",
+      "supported": true,
+      "detected": false,
+      "expectedForecast": 14.7,
+      "engineForecast": 14.700000000000001,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Prioritize urgent/critical requests and increase stock",
+      "signals": [
+        {
+          "date": "2025-05-10",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 39,
+          "expiring": 0,
+          "usage30": 63
+        },
+        {
+          "date": "2025-05-11",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 36,
+          "expiring": 0,
+          "usage30": 66
+        },
+        {
+          "date": "2025-05-12",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 34,
+          "expiring": 0,
+          "usage30": 68
+        }
+      ]
+    },
+    {
+      "scenarioId": "S004",
+      "name": "A+ Platelet Shortage",
+      "condition": "Shortage",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 7,
+      "engineForecast": 7,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Transfer from another hospital and increase stock",
+      "signals": [
+        {
+          "date": "2025-04-05",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 4,
+          "expiring": 4,
+          "usage30": 30
+        },
+        {
+          "date": "2025-04-06",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 2,
+          "expiring": 2,
+          "usage30": 31
+        },
+        {
+          "date": "2025-04-07",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 32
+        },
+        {
+          "date": "2025-04-08",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 31
+        },
+        {
+          "date": "2025-04-09",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 30
+        },
+        {
+          "date": "2025-04-10",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 29
+        },
+        {
+          "date": "2025-04-11",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 28
+        },
+        {
+          "date": "2025-04-12",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 27
+        },
+        {
+          "date": "2025-04-13",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 26
+        },
+        {
+          "date": "2025-04-14",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 26
+        }
+      ]
+    },
+    {
+      "scenarioId": "S005",
+      "name": "O+ Whole Blood Shortage",
+      "condition": "Shortage",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 21.47,
+      "engineForecast": 21.46666666666667,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Transfer from another hospital and increase stock",
+      "signals": [
+        {
+          "date": "2025-07-01",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 79,
+          "expiring": 0,
+          "usage30": 92
+        },
+        {
+          "date": "2025-07-02",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 73,
+          "expiring": 0,
+          "usage30": 96
+        },
+        {
+          "date": "2025-07-03",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 67,
+          "expiring": 0,
+          "usage30": 99
+        },
+        {
+          "date": "2025-07-04",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 62,
+          "expiring": 0,
+          "usage30": 101
+        },
+        {
+          "date": "2025-07-05",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 56,
+          "expiring": 0,
+          "usage30": 104
+        },
+        {
+          "date": "2025-07-06",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 52,
+          "expiring": 0,
+          "usage30": 106
+        },
+        {
+          "date": "2025-07-07",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 49,
+          "expiring": 0,
+          "usage30": 107
+        },
+        {
+          "date": "2025-07-08",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 44,
+          "expiring": 0,
+          "usage30": 111
+        },
+        {
+          "date": "2025-07-09",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 38,
+          "expiring": 0,
+          "usage30": 115
+        },
+        {
+          "date": "2025-07-10",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 33,
+          "expiring": 0,
+          "usage30": 117
+        },
+        {
+          "date": "2025-07-11",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 29,
+          "expiring": 0,
+          "usage30": 121
+        },
+        {
+          "date": "2025-07-12",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 23,
+          "expiring": 0,
+          "usage30": 125
+        },
+        {
+          "date": "2025-07-13",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 19,
+          "expiring": 0,
+          "usage30": 127
+        },
+        {
+          "date": "2025-07-14",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 15,
+          "expiring": 0,
+          "usage30": 129
+        }
+      ]
+    },
+    {
+      "scenarioId": "S006",
+      "name": "O- Whole Blood Out of Stock",
+      "condition": "Out of Stock",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 8.17,
+      "engineForecast": 8.166666666666668,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Transfer from another hospital and recall matching donors",
+      "signals": [
+        {
+          "date": "2025-08-10",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 35
+        },
+        {
+          "date": "2025-08-11",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 34
+        },
+        {
+          "date": "2025-08-12",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 33
+        },
+        {
+          "date": "2025-08-13",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 32
+        },
+        {
+          "date": "2025-08-14",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 32
+        },
+        {
+          "date": "2025-08-15",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 31
+        },
+        {
+          "date": "2025-08-16",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 30
+        },
+        {
+          "date": "2025-08-17",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 29
+        },
+        {
+          "date": "2025-08-18",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 28
+        },
+        {
+          "date": "2025-08-19",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 27
+        },
+        {
+          "date": "2025-08-20",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 26
+        }
+      ]
+    },
+    {
+      "scenarioId": "S007",
+      "name": "O+ Plasma Overstock",
+      "condition": "Overstock",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 12.13,
+      "engineForecast": 12.133333333333333,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Monitor inventory and avoid unnecessary replenishment",
+      "signals": [
+        {
+          "date": "2025-02-01",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 37,
+          "expiring": 0,
+          "usage30": 52
+        },
+        {
+          "date": "2025-02-02",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 42,
+          "expiring": 0,
+          "usage30": 50
+        },
+        {
+          "date": "2025-02-03",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 47,
+          "expiring": 0,
+          "usage30": 49
+        },
+        {
+          "date": "2025-02-04",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 50,
+          "expiring": 0,
+          "usage30": 48
+        },
+        {
+          "date": "2025-02-05",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 54,
+          "expiring": 0,
+          "usage30": 47
+        },
+        {
+          "date": "2025-02-06",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 58,
+          "expiring": 0,
+          "usage30": 46
+        },
+        {
+          "date": "2025-02-07",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 64,
+          "expiring": 0,
+          "usage30": 44
+        },
+        {
+          "date": "2025-02-08",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 69,
+          "expiring": 0,
+          "usage30": 42
+        },
+        {
+          "date": "2025-02-09",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 74,
+          "expiring": 0,
+          "usage30": 41
+        },
+        {
+          "date": "2025-02-10",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 78,
+          "expiring": 0,
+          "usage30": 39
+        },
+        {
+          "date": "2025-02-11",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 82,
+          "expiring": 0,
+          "usage30": 38
+        },
+        {
+          "date": "2025-02-12",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 87,
+          "expiring": 0,
+          "usage30": 37
+        },
+        {
+          "date": "2025-02-13",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "sufficient",
+          "stock": 91,
+          "expiring": 0,
+          "usage30": 36
+        },
+        {
+          "date": "2025-02-14",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 95,
+          "expiring": 0,
+          "usage30": 35
+        },
+        {
+          "date": "2025-02-15",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 100,
+          "expiring": 0,
+          "usage30": 35
+        },
+        {
+          "date": "2025-02-16",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 104,
+          "expiring": 0,
+          "usage30": 34
+        },
+        {
+          "date": "2025-02-17",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 108,
+          "expiring": 0,
+          "usage30": 32
+        },
+        {
+          "date": "2025-02-18",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 112,
+          "expiring": 0,
+          "usage30": 32
+        },
+        {
+          "date": "2025-02-19",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 116,
+          "expiring": 0,
+          "usage30": 31
+        },
+        {
+          "date": "2025-02-20",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 120,
+          "expiring": 0,
+          "usage30": 30
+        },
+        {
+          "date": "2025-02-21",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 125,
+          "expiring": 0,
+          "usage30": 28
+        }
+      ]
+    },
+    {
+      "scenarioId": "S008",
+      "name": "O+ Platelet Near-Expiry Source",
+      "condition": "Near Expiry",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 11.2,
+      "engineForecast": 11.200000000000001,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Prioritize near-expiry stock and transfer to AMCV",
+      "signals": [
+        {
+          "date": "2025-10-01",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 36,
+          "expiring": 36,
+          "usage30": 48
+        },
+        {
+          "date": "2025-10-02",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 31,
+          "expiring": 31,
+          "usage30": 46
+        },
+        {
+          "date": "2025-10-03",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 22,
+          "expiring": 22,
+          "usage30": 44
+        },
+        {
+          "date": "2025-10-04",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 16,
+          "expiring": 16,
+          "usage30": 42
+        },
+        {
+          "date": "2025-10-05",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 9,
+          "expiring": 9,
+          "usage30": 40
+        }
+      ]
+    },
+    {
+      "scenarioId": "S009",
+      "name": "O+ Platelet Transfer Destination",
+      "condition": "Transfer Opportunity",
+      "supported": true,
+      "detected": false,
+      "expectedForecast": 7,
+      "engineForecast": 7,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Receive near-expiry O+ platelets from St. JUDE",
+      "signals": [
+        {
+          "date": "2025-10-01",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 9,
+          "expiring": 9,
+          "usage30": 30
+        },
+        {
+          "date": "2025-10-02",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 4,
+          "expiring": 4,
+          "usage30": 31
+        },
+        {
+          "date": "2025-10-03",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 4,
+          "expiring": 4,
+          "usage30": 30
+        },
+        {
+          "date": "2025-10-04",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 32
+        },
+        {
+          "date": "2025-10-05",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 31
+        },
+        {
+          "date": "2025-10-06",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 30
+        },
+        {
+          "date": "2025-10-07",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 29
+        }
+      ]
+    },
+    {
+      "scenarioId": "S010",
+      "name": "A+ Whole Blood Transfer Source",
+      "condition": "Transfer Opportunity",
+      "supported": true,
+      "detected": false,
+      "expectedForecast": 12.83,
+      "engineForecast": 12.833333333333332,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Transfer excess/near-expiry stock to MPGHI",
+      "signals": [
+        {
+          "date": "2025-06-10",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 107,
+          "expiring": 12,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-11",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 106,
+          "expiring": 16,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-12",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 105,
+          "expiring": 20,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-13",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 104,
+          "expiring": 19,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-14",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 103,
+          "expiring": 23,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-15",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 102,
+          "expiring": 28,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-16",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 99,
+          "expiring": 32,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-17",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 95,
+          "expiring": 35,
+          "usage30": 55
+        },
+        {
+          "date": "2025-06-18",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 90,
+          "expiring": 39,
+          "usage30": 55
+        }
+      ]
+    },
+    {
+      "scenarioId": "S011",
+      "name": "A+ Whole Blood Transfer Destination",
+      "condition": "Shortage",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 14.23,
+      "engineForecast": 14.233333333333333,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Receive stock from VPGHI",
+      "signals": [
+        {
+          "date": "2025-06-10",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 37,
+          "expiring": 0,
+          "usage30": 61
+        },
+        {
+          "date": "2025-06-11",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 32,
+          "expiring": 0,
+          "usage30": 64
+        },
+        {
+          "date": "2025-06-12",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 28,
+          "expiring": 0,
+          "usage30": 66
+        },
+        {
+          "date": "2025-06-13",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 25,
+          "expiring": 0,
+          "usage30": 67
+        },
+        {
+          "date": "2025-06-14",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 21,
+          "expiring": 0,
+          "usage30": 69
+        },
+        {
+          "date": "2025-06-15",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 17,
+          "expiring": 0,
+          "usage30": 71
+        },
+        {
+          "date": "2025-06-16",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 14,
+          "expiring": 0,
+          "usage30": 72
+        },
+        {
+          "date": "2025-06-17",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 10,
+          "expiring": 0,
+          "usage30": 74
+        },
+        {
+          "date": "2025-06-18",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "low",
+          "stock": 6,
+          "expiring": 0,
+          "usage30": 76
+        }
+      ]
+    },
+    {
+      "scenarioId": "S012",
+      "name": "AB+ Platelet Wastage Cluster",
+      "condition": "Wastage Risk",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 0.7,
+      "engineForecast": 0.7000000000000001,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Prioritize near-expiry stock and reduce replenishment",
+      "signals": [
+        {
+          "date": "2025-11-06",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "low",
+          "stock": 5,
+          "expiring": 5,
+          "usage30": 3
+        },
+        {
+          "date": "2025-11-07",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "low",
+          "stock": 5,
+          "expiring": 5,
+          "usage30": 3
+        },
+        {
+          "date": "2025-11-08",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical",
+          "stock": 4,
+          "expiring": 4,
+          "usage30": 2
+        },
+        {
+          "date": "2025-11-09",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical",
+          "stock": 4,
+          "expiring": 4,
+          "usage30": 2
+        },
+        {
+          "date": "2025-11-10",
+          "trend": "stable",
+          "unusual": "normal",
+          "status": "critical",
+          "stock": 3,
+          "expiring": 3,
+          "usage30": 2
+        },
+        {
+          "date": "2025-11-11",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-11-12",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical",
+          "stock": 1,
+          "expiring": 1,
+          "usage30": 0
+        },
+        {
+          "date": "2025-11-13",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical",
+          "stock": 1,
+          "expiring": 1,
+          "usage30": 0
+        },
+        {
+          "date": "2025-11-14",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical",
+          "stock": 1,
+          "expiring": 1,
+          "usage30": 0
+        }
+      ]
+    },
+    {
+      "scenarioId": "S013",
+      "name": "AB- Plasma No Recent Usage",
+      "condition": "No Recent Usage",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 0.7,
+      "engineForecast": 0.7000000000000001,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Maintain inventory; sufficient with no recent usage",
+      "signals": [
+        {
+          "date": "2025-06-01",
+          "trend": "decreasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 3
+        },
+        {
+          "date": "2025-06-02",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-06-03",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-06-04",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-06-05",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-06-06",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-06-07",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-06-08",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-06-09",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-06-10",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-06-11",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-06-12",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-06-13",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-14",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-15",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-16",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-17",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-18",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-19",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-20",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-21",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-22",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-23",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-24",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-25",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-26",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-27",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-28",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-29",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-06-30",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "sufficient_no_usage",
+          "stock": 11,
+          "expiring": 0,
+          "usage30": 0
+        }
+      ]
+    },
+    {
+      "scenarioId": "S014",
+      "name": "AB- Platelet Zero Inventory and Usage",
+      "condition": "Unknown / At Risk",
+      "supported": true,
+      "detected": true,
+      "expectedForecast": 0.47,
+      "engineForecast": 0.4666666666666667,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Monitor inventory; no recent usage and zero stock",
+      "signals": [
+        {
+          "date": "2025-09-01",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-09-02",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-09-03",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-09-04",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-09-05",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-09-06",
+          "trend": "increasing",
+          "unusual": "spike",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 2
+        },
+        {
+          "date": "2025-09-07",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-09-08",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-09-09",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-09-10",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-09-11",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 1
+        },
+        {
+          "date": "2025-09-12",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-13",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-14",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-15",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-16",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-17",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-18",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-19",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-20",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-21",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-22",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-23",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "critical_out",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-24",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "at_risk",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-25",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "at_risk",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-26",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "at_risk",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-27",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "at_risk",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-28",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "at_risk",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-29",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "at_risk",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        },
+        {
+          "date": "2025-09-30",
+          "trend": "decreasing",
+          "unusual": "drop",
+          "status": "at_risk",
+          "stock": 0,
+          "expiring": 0,
+          "usage30": 0
+        }
+      ]
+    },
+    {
+      "scenarioId": "S015",
+      "name": "Holiday Supply Reduction",
+      "condition": "Reduced Supply",
+      "supported": false,
+      "detected": false,
+      "expectedForecast": 24.03,
+      "engineForecast": 24.03333333333333,
+      "forecastMatchesExpected": true,
+      "expectedAction": "Increase monitoring and prepare replenishment/transfer",
+      "signals": [
+        {
+          "date": "2025-12-20",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 108,
+          "expiring": 14,
+          "usage30": 103
+        },
+        {
+          "date": "2025-12-21",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 106,
+          "expiring": 14,
+          "usage30": 103
+        },
+        {
+          "date": "2025-12-22",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 105,
+          "expiring": 13,
+          "usage30": 102
+        },
+        {
+          "date": "2025-12-23",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 102,
+          "expiring": 12,
+          "usage30": 104
+        },
+        {
+          "date": "2025-12-24",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 101,
+          "expiring": 12,
+          "usage30": 105
+        },
+        {
+          "date": "2025-12-25",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 101,
+          "expiring": 13,
+          "usage30": 103
+        },
+        {
+          "date": "2025-12-26",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 99,
+          "expiring": 11,
+          "usage30": 104
+        },
+        {
+          "date": "2025-12-27",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 97,
+          "expiring": 10,
+          "usage30": 104
+        },
+        {
+          "date": "2025-12-28",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 95,
+          "expiring": 11,
+          "usage30": 104
+        },
+        {
+          "date": "2025-12-29",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 94,
+          "expiring": 12,
+          "usage30": 104
+        },
+        {
+          "date": "2025-12-30",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 92,
+          "expiring": 12,
+          "usage30": 104
+        },
+        {
+          "date": "2025-12-31",
+          "trend": "increasing",
+          "unusual": "normal",
+          "status": "sufficient",
+          "stock": 90,
+          "expiring": 11,
+          "usage30": 105
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,15 @@ import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { adminReportLoading, adminReportSection, responsiveTableContainer } from './admin-ui.jsx'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
+import {
+  calculateShortageForecast,
+  calculateTransferRecommendations,
+  calculateUsageTrends,
+} from './analyticsEngine.js'
+import analyticsSimulationData from './analyticsSimulationData.js'
+
+const ANALYTICS_SIMULATION_ENABLED =
+  (import.meta.env.VITE_ANALYTICS_SIMULATION || '').toString().toLowerCase() === 'true'
 
 function StatusTooltipBadge({ className, tooltip, children }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -61,8 +70,15 @@ function AdminReports() {
       try {
         setIsLoading(true)
         setError('')
+        if (ANALYTICS_SIMULATION_ENABLED) {
+          setInventory(analyticsSimulationData.inventory)
+          setRequests(analyticsSimulationData.requests)
+          setDonors(analyticsSimulationData.donors)
+          setHospitals(analyticsSimulationData.hospitals)
+          return
+        }
         const [inventoryData, requestsData, donorsData, hospitalsData] = await Promise.all([
-          apiRequest('/api/admin/inventory'),
+          apiRequest('/api/admin/inventory?scope=all'),
           apiRequest('/api/admin/requests'),
           apiRequest('/api/admin/donors'),
           apiRequest('/api/admin/hospitals'),
@@ -82,7 +98,9 @@ function AdminReports() {
     loadData()
   }, [])
 
-  const now = new Date()
+  const now = ANALYTICS_SIMULATION_ENABLED
+    ? new Date(analyticsSimulationData.referenceDate)
+    : new Date()
   const msPerDay = 1000 * 60 * 60 * 24
 
   const diffInDays = (dateA, dateB) => {
@@ -175,138 +193,14 @@ function AdminReports() {
 
   // Blood Shortage Forecast
   const usageWindowDays = 30
-  const windowStart = new Date(now.getTime() - usageWindowDays * msPerDay)
-
-  const usageRequestsInWindow = requests.filter((req) => {
-    const status = (req.status || '').toString().toLowerCase()
-    if (!(status === 'delivered' || status === 'received')) return false
-    const usageDate = req.request_date || req.requestDate || req.created_at || req.createdAt
-    if (!usageDate) return false
-    const d = new Date(usageDate)
-    if (Number.isNaN(d.getTime())) return false
-    const ct = normalizeComponentType(req.component_type || req.componentType)
-    if (componentFilter !== 'all' && ct !== componentFilter) return false
-    return d >= windowStart && d <= now
+  const shortageForecastResult = calculateShortageForecast({
+    inventory,
+    requests,
+    now,
+    componentFilter,
+    usageWindowDays,
   })
-  const fulfilledRequestsInWindow = usageRequestsInWindow
-
-  const usageByBloodType = usageRequestsInWindow.reduce((acc, req) => {
-    const bt = req.blood_type || req.bloodType
-    if (!bt) return acc
-    const ct = normalizeComponentType(req.component_type || req.componentType)
-    const key = `${bt}|${ct}`
-    const units = req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0
-    acc[key] = (acc[key] || 0) + Number(units || 0)
-    return acc
-  }, {})
-
-  const stockByBloodType = inventory
-    .filter((item) => item.status !== 'expired')
-    .reduce((acc, item) => {
-      const bt = item.blood_type || item.bloodType
-      if (!bt) return acc
-      const ct = normalizeComponentType(item.component_type || item.componentType)
-      if (componentFilter !== 'all' && ct !== componentFilter) return acc
-      const key = `${bt}|${ct}`
-      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
-      acc[key] = (acc[key] || 0) + Number(units || 0)
-      return acc
-    }, {})
-
-  // Units that will expire within 7 days (per blood type + component),
-  // treated as non-usable for shortage horizon calculations.
-  const expiringSoonByBloodType = inventory
-    .filter((item) => item.status !== 'expired')
-    .reduce((acc, item) => {
-      const bt = item.blood_type || item.bloodType
-      if (!bt) return acc
-      const ct = normalizeComponentType(item.component_type || item.componentType)
-      if (componentFilter !== 'all' && ct !== componentFilter) return acc
-      const expDate = item.expiration_date || item.expirationDate
-      if (!expDate) return acc
-      const daysLeft = diffInDays(expDate, now)
-      if (daysLeft > 7) return acc
-      const key = `${bt}|${ct}`
-      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
-      acc[key] = (acc[key] || 0) + Number(units || 0)
-      return acc
-    }, {})
-
-  // Expired units are excluded above, so a type that only exists as expired inventory
-  // would otherwise disappear from the forecast and Donor Contact Suggestions.
-  inventory.forEach((item) => {
-    if (item.status !== 'expired') return
-    const bt = item.blood_type || item.bloodType
-    if (!bt) return
-    const ct = normalizeComponentType(item.component_type || item.componentType)
-    if (componentFilter !== 'all' && ct !== componentFilter) return
-    const key = `${bt}|${ct}`
-    if (stockByBloodType[key] === undefined) stockByBloodType[key] = 0
-  })
-
-  const bloodShortageForecast = Object.entries(stockByBloodType).map(([key, currentStockRaw]) => {
-    const [bloodType, componentType] = key.split('|')
-    const currentStock = Number(currentStockRaw) || 0
-    const expiringSoonUnits = Number(expiringSoonByBloodType[key] || 0)
-    const usableStock = Math.max(0, currentStock - expiringSoonUnits)
-    const usage = usageByBloodType[key] || 0
-
-    let supplyStatusKey = 'sufficient'
-    let statusLabel = 'Sufficient'
-    let estimatedDaysRemaining = '—'
-    let numericDaysRemaining = Infinity
-
-    if (usableStock === 0) {
-      if (currentStock > 0 && expiringSoonUnits >= currentStock) {
-        supplyStatusKey = 'near_expiry_only'
-        statusLabel = 'Critical – Near-Expiry Stock'
-        estimatedDaysRemaining = '0'
-        numericDaysRemaining = 0
-      } else if (usage > 0) {
-        supplyStatusKey = 'critical_out'
-        statusLabel = 'Critical – Out of Stock'
-        estimatedDaysRemaining = '0'
-        numericDaysRemaining = 0
-      } else {
-        supplyStatusKey = 'at_risk'
-        statusLabel = 'At Risk'
-        estimatedDaysRemaining = '—'
-        numericDaysRemaining = 0
-      }
-    } else if (usage === 0) {
-      supplyStatusKey = 'sufficient_no_usage'
-      statusLabel = 'Sufficient (No recent usage)'
-      estimatedDaysRemaining = '—'
-      numericDaysRemaining = Infinity
-    } else {
-      const averageDailyUsage = usage / usageWindowDays
-      const daysRemaining = usableStock / averageDailyUsage
-      numericDaysRemaining = daysRemaining
-      estimatedDaysRemaining = String(Math.round(daysRemaining))
-      if (daysRemaining < 7) {
-        supplyStatusKey = 'critical'
-        statusLabel = 'Critical'
-      } else if (daysRemaining < 14) {
-        supplyStatusKey = 'low'
-        statusLabel = 'Low'
-      } else {
-        supplyStatusKey = 'sufficient'
-        statusLabel = 'Sufficient'
-      }
-    }
-
-    return {
-      bloodType,
-      componentType,
-      currentStock,
-      estimatedDaysRemaining,
-      numericDaysRemaining,
-      supplyStatusKey,
-      statusLabel,
-    }
-  })
-
-  bloodShortageForecast.sort((a, b) => a.numericDaysRemaining - b.numericDaysRemaining)
+  const bloodShortageForecast = shortageForecastResult.rows
 
   const getSupplyStatusClasses = (supplyStatusKey) => {
     if (supplyStatusKey === 'critical_out' || supplyStatusKey === 'critical') {
@@ -358,7 +252,7 @@ function AdminReports() {
     ...Object.keys(trendUsagePreviousByKey),
   ])
 
-  const bloodUsageTrendRows = Array.from(trendKeys)
+  const legacyBloodUsageTrendRows = Array.from(trendKeys)
     .map((key) => {
       const [bloodType, componentType] = key.split('|')
       const currentUnits = Number(trendUsageCurrentByKey[key] || 0)
@@ -411,6 +305,13 @@ function AdminReports() {
       }
     })
     .sort((a, b) => b.currentUnits - a.currentUnits)
+  void legacyBloodUsageTrendRows
+  const bloodUsageTrendRows = calculateUsageTrends({
+    requests,
+    now,
+    periodDays: usageTrendPeriodDays,
+    componentFilter,
+  })
 
   const trendByBloodType = bloodUsageTrendRows.reduce((acc, row) => {
     if (!acc[row.bloodType]) {
@@ -493,10 +394,10 @@ function AdminReports() {
 
   const getSupplyStatusTooltip = (supplyStatusKey) => {
     if (supplyStatusKey === 'critical_out') return 'Critical: no usable stock remains and there has been recent usage.'
-    if (supplyStatusKey === 'near_expiry_only') return 'Critical: all remaining stock expires within 7 days and is treated as unavailable.'
-    if (supplyStatusKey === 'critical') return 'Critical: usable stock is expected to last fewer than 7 days.'
-    if (supplyStatusKey === 'at_risk') return 'At risk: no usable stock remains, but there is no recent usage to calculate a shortage timeline.'
-    if (supplyStatusKey === 'low') return 'Low: usable stock is expected to last from 7 up to 14 days.'
+    if (supplyStatusKey === 'near_expiry_only') return 'Critical: remaining stock is expected to expire before it can cover forecast usage.'
+    if (supplyStatusKey === 'critical') return 'Critical: usable stock covers at most 20% of forecast seven-day demand, or at least two recent requests left 65% or more of demand unfulfilled.'
+    if (supplyStatusKey === 'at_risk') return 'Uncertain: there is no stock and no recent usage evidence. Monitor this item; it is not counted as a confirmed shortage alert.'
+    if (supplyStatusKey === 'low') return 'Low: usable stock does not cover the full seven-day forecast, or recent under-fulfillment is at least 55%. Monitor before escalating.'
     if (supplyStatusKey === 'sufficient_no_usage') return 'Sufficient: stock is available, but no fulfilled requests were recorded in the last 30 days.'
     return 'Sufficient: usable stock is expected to last at least 14 days at the recent usage rate.'
   }
@@ -719,7 +620,7 @@ function AdminReports() {
     return locationKey
   }
 
-  const requestTransferRecommendations = activeHospitalRequests
+  const legacyRequestTransferRecommendations = activeHospitalRequests
     .map((req) => {
       const bloodType = req.blood_type || req.bloodType
       const componentType = normalizeComponentType(req.component_type || req.componentType)
@@ -791,42 +692,20 @@ function AdminReports() {
       const db = b.requestedAt ? new Date(b.requestedAt) : new Date(0)
       return da - db
     })
-
-  // Donor Contact Suggestions (aggregate by blood type, not per component row)
-  // This avoids suggesting the same blood type donor when overall stock is sufficient.
-  const usageByBloodTypeAggregate = fulfilledRequestsInWindow.reduce((acc, req) => {
-    const bt = req.blood_type || req.bloodType
-    if (!bt) return acc
-    const units = req.units_approved ?? req.unitsApproved ?? req.units_requested ?? 0
-    acc[bt] = (acc[bt] || 0) + Number(units || 0)
-    return acc
-  }, {})
-
-  const stockByBloodTypeAggregate = inventory
-    .filter((item) => item.status !== 'expired')
-    .reduce((acc, item) => {
-      const bt = item.blood_type || item.bloodType
-      if (!bt) return acc
-      const ct = normalizeComponentType(item.component_type || item.componentType)
-      if (componentFilter !== 'all' && ct !== componentFilter) return acc
-      const units = item.available_units ?? item.availableUnits ?? item.units ?? 0
-      acc[bt] = (acc[bt] || 0) + Number(units || 0)
-      return acc
-    }, {})
-
-  const shortageByBloodType = Object.keys({
-    ...stockByBloodTypeAggregate,
-    ...usageByBloodTypeAggregate,
-  }).filter((bloodType) => {
-    const currentStock = Number(stockByBloodTypeAggregate[bloodType] || 0)
-    const usage = Number(usageByBloodTypeAggregate[bloodType] || 0)
-    if (currentStock < 5) return true
-    if (currentStock === 0) return true
-    if (usage <= 0) return false
-    const averageDailyUsage = usage / usageWindowDays
-    const daysRemaining = currentStock / averageDailyUsage
-    return daysRemaining < 14
+  void legacyRequestTransferRecommendations
+  const requestTransferRecommendations = calculateTransferRecommendations({
+    inventory,
+    requests,
+    hospitals,
+    reserveAtSourceUnits,
+    now,
   })
+
+  // Donor recall is reserved for confirmed critical shortage alerts. Low and uncertain
+  // rows stay visible for monitoring but no longer trigger unnecessary donor outreach.
+  const shortageByBloodType = [...new Set(
+    bloodShortageForecast.filter((row) => row.shortageAlert).map((row) => row.bloodType),
+  )]
 
   const rawEligibleDonorSuggestions = shortageByBloodType.flatMap((bt) => {
     const matchingDonors = donors.filter((donor) => {
@@ -1047,6 +926,14 @@ function AdminReports() {
       pageTitle="Reports & Analytics"
       pageDescription="View predictive and prescriptive analytics for inventory, donors, and hospital requests."
     >
+      {ANALYTICS_SIMULATION_ENABLED && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm" role="status">
+          <p className="text-sm font-bold">Simulation Data Active</p>
+          <p className="mt-1 text-xs">
+            Showing the controlled March–August 2026 dataset. No live database records are being used on this page.
+          </p>
+        </div>
+      )}
       {/* Tabs */}
       <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200/90 bg-white p-3 shadow-sm ring-1 ring-slate-100/90 sm:p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex w-full flex-wrap gap-1 rounded-lg bg-slate-100/80 p-1 sm:w-auto">

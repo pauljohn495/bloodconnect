@@ -149,9 +149,16 @@ async function start() {
         await ensureDonorNotificationBroadcastsTable()
         await ensurePrcActivitiesTable()
         await ensureRequestGroupsAndEventNotifications()
-        startHospitalInventoryAlertScheduler()
-        startDonorRecallScheduler()
-        startEventNotificationScheduler()
+        const schedulersDisabled =
+          String(process.env.DISABLE_SCHEDULERS).toLowerCase() === 'true' ||
+          String(process.env.SIMULATION_MODE).toLowerCase() === 'true'
+        if (schedulersDisabled) {
+          console.log('Background notification schedulers disabled for this environment')
+        } else {
+          startHospitalInventoryAlertScheduler()
+          startDonorRecallScheduler()
+          startEventNotificationScheduler()
+        }
       } catch (migrationError) {
         console.error('❌ Schema migration failed:', migrationError.message)
         process.exit(1)

@@ -1,0 +1,549 @@
+
+--- PAGE 1 ---
+Vol.:(0123456789) 1 3 Indian J Hematol Blood Transfus (2023) 39:655–661
+https://doi.org/10.1007/s12288-023-01631-8 
+ORIGINAL ARTICLE 
+Blood Inventory Management During COVID‑19 Pandemic Using
+a Simple Mathematical Tool: A Two‑Year Study from a Tertiary
+Care Hospital in North India
+Naveen Bansal 1   · Yashik Bansal 2  · Manish Raturi 3  · Kusum Thakur 4  ·
+Ashwani Sood 5  · Satish Kumar 1 
+Received: 26 June 2022 / Accepted: 20 January 2023 / Published online: 1 February 2023
+© The Author(s), under exclusive licence to Indian Society of Hematology and Blood Transfusion 2023 
+Abstract   Multiple recurrent waves of the coronavirus
+disease 2019 (COVID-19) resulted in major fluctuations in
+blood supply and demand, which presented a major chal-
+lenge for the blood centres to maintain adequate blood
+inventory. Hence, the primary aim of the present study was
+to determine whether safety stock as a simple mathematical
+tool can be used to maintain optimum blood inventory to
+meet all blood demands. The secondary aim of the study
+was to test whether daily blood stock index (DBSI), which
+was a novel index developed by the authors and derived
+from the calculated safety stock, can be used to minimize
+blood wastage due to the outdating of packed red blood
+cells (PRBC)/whole blood (WB) units. The present study
+was a descriptive, cross-sectional study conducted from 1st
+October 2019 to 31st December 2021 at a blood centre of a
+tertiary care hospital. For the purpose of data analysis, the
+time period of study was divided into 7 periods signifying
+different phases during the COVID-19 outbreak. Data of
+PRBC/WB (referred to as red cell) collection, red cell issue
+and the daily red cell stock were collected for these 7 time
+periods. Safety stock, percentage of out-dated whole blood/
+packed red blood cell units (OB) and DBSI were calculated
+based on the data extracted. Red cell collection as well as red
+cell utilization decreased during the 1st as well as the 2nd
+wave of the COVID-19 outbreak. The blood centre was able
+to meet the blood demand of the hospital at all times, as the
+daily average red cell stock remained above the calculated
+safety stock during all periods. OB (12.4%) and DBSI (2.3)
+were highest during the lockdown period of second wave of
+COVID-19 outbreak (period E). A strong direct relationship
+was seen between OB (dependent variable) and DBSI (pre-
+dictor variable) [R   =   0.79;   p   =   0.03]. Firstly, safety stock is a
+simple, user-friendly mathematic tool which can be used for
+efficient blood inventory management not only at times of a
+pandemic/disaster but also during routine times. Secondly,
+DBSI is a logical and empirical tool to reduce OB units and
+consequently reduce blood wastage. 
+Keywords   Blood transfusion services · Blood inventory
+management · COVID-19 · Safety stock 
+Introduction 
+The coronavirus disease 2019 (COVID-19) spread at a very
+rapid pace in the world, and as a result, India declared a
+complete lockdown on 24th March 2020 [1]. Only emer-
+gency services personnel were allowed movement during the
+complete lockdown period. The abrupt lockdown resulted in
+the cancellation of voluntary blood donation camps through-
+out the country which resulted in a drastic reduction in blood
+collection severely affecting the blood transfusion services 
+*   Naveen Bansal 
+drnaveenbansal87@gmail.com
+1   Department of Transfusion Medicine, VCSG Government
+Institute of Medical Science and Research, Srinagar,
+Uttarakhand, India
+2   Department of Microbiology, VCSG Government Institute
+of Medical Science and Research, Srinagar, Uttarakhand,
+India
+3   Department of Immunohematology and Blood Transfusion,
+Himalayan Institute of Medical Sciences, Swami Rama
+Himalayan University, Jolly Grant, Dehradun, Uttarakhand,
+India
+4   Department of Transfusion Medicine, MM Institute
+of Medical Sciences and Research, Mullana, Ambala,
+Haryana, India
+5   Department of Hospital Administration, MM Institute
+of Medical Sciences and Research, Mullana, Ambala,
+Haryana, India 
+
+--- PAGE 2 ---
+656   Indian J Hematol Blood Transfus (2023) 39:655–661 1 3 
+(BTS) [2]. Subsequently, an advisory was issued by the Min-
+istry of Health and Family Welfare, Government of India on
+09.04.2020, containing a list of guidelines to ensure COVID
+appropriate behaviour at blood donation sites [3].
+BTS form the backbone of any tertiary care hospital.
+Blood sufficiency is of paramount importance for any blood
+centre [4]. Meticulous maintenance of blood inventory is one
+of the main functions of BTS administration. The ultimate
+goal of any blood centre is to maintain adequate bloodstock
+to meet all blood demands while minimizing blood wastage
+as a result of units becoming outdated beyond the date of
+expiry. In current times, emphasis is on following evidence
+based transfusion medicine practices [5]. Several algorithms
+have been proposed in the past for the management of blood
+centre inventory [6–8]. Safety stock is one such model [9]
+and is defined as the reserve stock of an inventory required
+to meet demand for a specified period in case of no fresh
+stock is available to meet the demand during that specified
+period [10].
+Multiple recurrent waves of the COVID-19 resulted
+in major fluctuations in blood supply and demand, which
+presented a major challenge for the blood centres to main-
+tain adequate blood inventory [11–13]. At the same time,
+increased blood wastage due to outdating of blood units
+attributed to COVID-19 outbreak has been reported in vari-
+ous studies [2, 14]. Hence, the primary aim of the present
+study was to determine whether safety stock as a simple
+mathematical tool can be used to maintain optimum blood
+inventory to meet all blood demands. The secondary aim
+of the study was to test whether daily blood stock index
+(DBSI), which was a novel index, developed by the authors
+and derived from the calculated safety stock, can be used to
+minimize blood wastage due to the outdating of packed red
+blood cells (PRBC)/whole blood (WB) units. 
+Materials and Methods
+Study Design, Time Definitions and Study Procedure 
+The present study was a descriptive cross-sectional study
+conducted from 1st October 2019 to 31st December 2021
+at a blood centre of a tertiary care hospital and research
+institute located in a hilly district of North India. Data was
+extracted from the blood centre records on the parameters
+namely: (i) total number of blood units collected; (ii) total
+number of PRBC/WB issued; (iii) total number of outdated
+PRBC/WB units beyond the date of expiry; (iv) daily stock
+of PRBC/WB units.
+Based on this data, blood safety stock for PRBC/WB
+was calculated. Safety stock was defined as the bloodstock,
+sufficient to meet PRBC/WB (referred to as red cell) require-
+ments for a period of 7 days (1 week) if the blood collection
+stops completely and blood usage remains to the maximum.
+Safety stock was calculated using the following formula
+[10]:
+Average lead time is defined as the time which is required
+for the production/manufacture of the product before the
+product is included in the inventory. In our hospital, usually,
+the average lead time is 2 days (0.28 weeks) which includes
+the time for collection, testing and then labelling of units.
+The maximum lead time depends on the type of disaster.
+It is the time period for which a disaster hampers the capac-
+ity of the blood centre to collect the blood units. Lockdown
+guidelines during COVID-19 outbreak in India were mostly
+issued for a period of 7 days at one time after which time
+the COVID-19 situation was reviewed and fresh guidelines
+were issued accordingly. Hence, in the present study, the
+maximum lead time as a result of the COVID-19 outbreak
+was taken as 7 days (1 week).
+For the purpose of data analysis, the study was divided
+into 7 time periods as follows: 
+(i)   Period A: The pre-COVID-19 period (1st October
+2019–23rd March 2020); 
+(ii)   Period B: The lockdown period during 1st wave of
+the COVID-19 outbreak (24th March 2020–8th June
+2020); 
+(iii)   Period C: The unlocked period during the 1st wave
+of the COVID-19 outbreak (9th June–27th October
+2020); 
+(iv)   Period D: The intervening period between the first
+and second wave of the COVID-19 outbreak (28th
+October 2020–7th April 2021); 
+(v)   Period E: The lockdown period during the 2nd wave
+of the COVID-19 outbreak (8th April 2021–21st June
+2021); 
+(vi)   Period F: The unlocked period during the 2nd wave of
+the COVID-19 outbreak (22nd June 2021–7th August
+2021); 
+(vii)   Period G: Time period after the 2nd wave of COVID-
+19 outbreak (8th August 2021–31st December 2021).
+Since the duration of the seven periods was different in
+length, for the purpose of data analysis and comparison,
+the average weekly red cell collection and issue was cal-
+culated for each period. 
+Calculated red cell safety stock 
+=  ( Maximum weekly red cell usage ) ×   Maximum lead time in weeks 
+( Average weekly red cell usage ) ×   Average lead time in weeks 
+
+--- PAGE 3 ---
+657 Indian J Hematol Blood Transfus (2023) 39:655–661 1 3 
+Average daily red cell stock was calculated using the
+following formula:
+Based on the average daily red cell stock and the cal-
+culated safety stock, the authors developed and derived
+a novel index termed as daily bloodstock index (DBSI)
+which was calculated using the following formula:
+The percentage of outdated whole blood/packed red
+blood cell (OB) was calculated as per the formula used by
+the National Accreditation Board for Hospitals & Health-
+care Providers (NABH), India [15]:
+Therefore the hypothesis to be tested was:
+H 0   =   DBSI does not predict OB;   Ha   =   DBSI can be used
+to predict OB. 
+Average daily red cell stock 
+=   Sum of daily red cell stock during a given period
+Total number of days during that period 
+DBSI   =   Average daily red cell stock during a given period
+safety stock of red cell during that period 
+OB (%) = 
+   Number of red cell units discarded due to outdating during a specified period
+Total number of red cell units prepared during that period 
+ 
+×   100 
+Outcome Measures Studied 
+The primary outcome studied was to determine the effec-
+tiveness of the safety stock formula as a mathematical
+tool for blood inventory during the COVID-19 pandemic.
+The secondary outcomes studied were: (i) to determine
+whether any relationship exists between DBSI and OB;
+(ii) to analyze the impact of the COVID-19 outbreak on
+BTS at a tertiary care hospital. 
+Statistical Analysis 
+Data was captured in Microsoft Excel spreadsheets. The
+quantitative data were expressed as mean and standard
+deviation (SD). A linear regression model was applied
+to study the effect of DBSI (predictor variable) on OB
+(outcome variable). Statistical tests were performed at a
+significance level of 0.05. 
+Ethical Considerations 
+The study was based on the ethical guidelines as given in the
+1964 “Declaration of Helsinki” and its later amendments and
+was conducted after obtaining ethical clearance from the Insti-
+tutional ethics committee vide IEC number MC/IEC/2021/26. 
+Table   1   Blood inventory
+dynamics during different
+periods
+*Expressed as mean   ±   2 S.D. (standard deviation)
+Period A (Pre pandemic period); Period B (lockdown period during first wave); Period C (Unlocked period
+during first wave); Period D (Intervening period between the first and second wave); Period E (lockdown
+phase during second wave); Period F (Unlocked phase during second wave); Period G (COVID-19 endemic
+phase)
+Period   Average PRBC/WB
+collection
+(units/week)*
+Average PRBC/WB
+Issued
+(units/week)*
+Average daily PRBC/
+WB stock*
+Calculated
+safety stock
+A   42   ±   6   39   ±   2   76   ±   7   51
+B   30   ±   12   25   ±   7   52   ±   9   40
+C   51   ±   12   51   ±   4   92   ±   12   66
+D   36   ±   9   34   ±   3   74   ±   6   43
+E   30   ±   9   25   ±   6   73   ±   6   32
+F   43   ±   12   38   ±   6   75   ±   19   39
+G   47   ±   10   49   ±   7   90   ±   15   59 
+
+--- PAGE 4 ---
+658   Indian J Hematol Blood Transfus (2023) 39:655–661 1 3 
+Results 
+The weekly red cell collection and red cell issued during periods
+were expressed as mean   ±   2 standard deviations (SD) for uni-
+form comparison. The daily red cell stock was also expressed
+as mean   ±   2 standard deviations (SD). The results are presented
+under the seven different periods as shown in Table 1. The
+period wise fluctuations in blood collection and blood issues
+are shown in Fig. 1.
+The average weekly red cell collection during 1st wave of
+COVID-19 lockdown (period B) decreased by 28.5% as com-
+pared to the pre-COVID period (period A) (30   ±   12 units vs.
+42   ±   6 units). The average weekly red cell issued during period
+B was 35.8% less as compared to period A (25   ±   7 units vs.
+39   ±   2 units).
+Similarly, the average weekly red cell collection during the
+lockdown phase of 2nd wave of the COVID-19 outbreak (period
+E) was 16.6% less as compared to period D (30   ±   9 units vs.
+36   ±   6 units). The average weekly red cell issued during period E
+was 26.4% less as compared to period D (25   ±   7 units vs. 34   ±   3
+units). The calculated safety stock was the least for period E at
+32 units.
+The DBSI and OB during different periods are shown in
+Table 2. The maximum DBSI of 2.3 was seen during period E.
+Maximum OB of 12.3% was also seen during period E. Upon 
+Fig.   1   Dynamics of red cell
+inventory during different
+periods 
+Table   2   Daily average blood stock index (DBSI) and outdated blood
+(OB) patterns
+Period   DBSI   OB (%)
+Phase A (Pre COVID-19 period)   1.5   6.6
+Phase B (lockdown period during 1st wave)   1.3   5.3
+Phase C (unlocked period during the 1st wave)   1.4   2.5
+Phase D (intervening period between the first and
+second wave)
+1.7   2.6
+Phase E (lockdown period during the 2nd wave)   2.3   12.4
+Phase F (unlocked period during the 2nd wave)   1.9   10.5
+Phase G (the endemic phase of COVID-19)   1.5   5.8 
+Fig.   2   Scatter plot showing correlation between daily blood stock
+index (DBSI) and outdated blood (OB %) 
+
+--- PAGE 5 ---
+659 Indian J Hematol Blood Transfus (2023) 39:655–661 1 3 
+simple linear regression, a strong direct relationship was seen
+between OB (dependent variable) and DBSI (predictor variable)
+[R   =   0.79;   p   =   0.03] (Fig. 2). 
+Discussion
+Utilizing the Safety Stock Tool for Blood Centre
+Inventory Management 
+Efficient blood inventory management depends upon trained
+staff, effective implementation of standard operating protocols
+and effective inventory management tools [7]. A blood inventory
+management tool should be simple to understand and apply in
+order for it to be implemented in a blood centre. COVID-19 out-
+break presented as a rapidly changing scenario which affected
+health care services around the world [16]. In the present study,
+the lockdown period of the first wave of the COVID-19 out-
+break (period B) resulted in a drastic reduction in blood col-
+lection because of: (i) cancellation of voluntary blood donation
+camps; (ii) fear of contracting COVID-19 infection among the
+potential blood donors. The red cell collection during this period
+decreased to 30   ±   12 units per week which were 28.5% less as
+compared to the pre COVID period (period A). Similar findings
+were seen in other studies [12, 17, 18]. Hence period B presented
+the hardest challenge in terms of maintaining the average red cell
+stock inventory above the calculated red cell safety stock of 40
+units. Various strategies were adopted to mitigate this decrease
+in blood collection. Firstly, an in-house blood donation camp
+was organized in collaboration with a local social organization
+following COVID appropriate behaviour. Secondly, regular
+repeat blood donors were counselled and informed about vari-
+ous measures taken by the blood centre to ensure social distanc-
+ing and enhanced infection control measures. The donors who
+agreed to donate blood were issued a blood donation appoint-
+ment letter which could be utilized as a movement pass.
+In addition, all the blood centre staff was counselled to strictly
+follow the first in first out (FIFO) policy [19]. Interestingly, the
+red cell demand also decreased during period B as the aver-
+age red cell issued during this period was 39   ±   2 units per week
+which were 35.8% less as compared to the pre-COVID period
+(period A). This was because the elective surgeries were post-
+poned and more beds and hospital manpower were reserved for
+the management of COVID-19 patients. Due to the abovemen-
+tioned interventions, the decrease in red cell collection was less
+as compared to the decrease in red cell utilization (28.5% vs
+35.8%) and the blood centre was able to maintain the average
+daily red cell stock more than the calculated safety stock levels
+at all times during period B.
+During period C, majority of the restrictions were gradu-
+ally removed by the government. There was an increase in the
+average weekly red cell collection (51   ±   12 units) as well as the
+average weekly red cell issued (51   ±   4 units). The increase in red
+cell utilization was more than the collection during this period
+(104% vs. 70%). This can be attributed to the fact that a lot more
+information became available about COVID-19 and the hospi-
+tals were able to create mechanisms for providing both COVID
+and non-COVID health care services at the same time [20]. The
+total capacity of the hospital was also expanded from 500 to 700
+beds. At the same time, the fear of COVID-19 also decreased
+among the general public [21]. However, the blood centre was
+successful in maintaining the average daily red cell stock above
+the calculated safety stock level by (i) strict implementation of
+the FIFO policy; (ii) increasing the number of voluntary blood
+donation camps; (iii) increased communication with the end-
+user clinicians for following restrictive strategy for blood trans-
+fusion [22].
+Period D was the intervening period between the 1st and 2nd
+waves of the COVID-19 pandemic. The blood centre was able
+to maintain average daily red cell stock and remained above
+the calculated safety stock level at all times during this period
+without any special measures. Period E corresponded to the
+lockdown period of the 2nd wave of the COVID-19 pandemic
+which resulted in an overwhelming of health care facilities and
+the return of the lockdown measures to control the spread of
+the COVID-19 infection. Having learnt the lessons from the
+lockdown period of 1st wave of the pandemic, the blood cen-
+tre was better prepared for period E. The blood collection only
+decreased by 16.6% compared to period D. However, the red cell
+demand decreased by 26.4% as compared to period D. This is
+again attributed to increased allocation of beds and manpower
+for COVID-19 management and postponement of elective sur-
+geries. Since the % decrease in red cell demand was greater
+than the percentage decrease in blood collection, the average
+daily red cell stock reached 73   ±   6 units which was much higher
+than the calculated safety stock of 32 units for period E. This
+resulted in an increase in the total number of “near expiry date
+red cell units”. Some of the red cell units were transferred to the
+blood centre of a government hospital in another district of the
+state. However, eventually, the increased DBSI (2.3) resulted in
+increased wastage of blood due to the OB units during period E.
+As seen in period C (the unlock period of the 1st wave of
+COVID-19), period F (the unlock period of the 2nd wave of
+COVID-19) also witnessed an increase in red cell demand
+by 52% as compared to period E as a result of reopening
+of non-COVID services in hospitals. Similarly, the blood
+collection also increased ( ↑   43.3%) but efforts were made
+to decrease the gap between the average daily red cell stock
+and the calculated safety stock to decrease blood wastage.
+Finally, during period G (the endemic stage of COVID-19),
+the red cell demand increased by 28.9%, while blood collec-
+tion was increased only by 9.3% to achieve further correction
+in the average daily bloodstock in line with the calculated
+safety stock to decrease blood wastage. 
+
+--- PAGE 6 ---
+660   Indian J Hematol Blood Transfus (2023) 39:655–661 1 3 
+COVID-19 pandemic is a learning lesson that blood cen-
+tres should be prepared for periodic health crises [16]. In
+the present study, by keeping the average daily blood stock
+above the calculated safety stock levels, the blood centre was
+able to meet the red cell requirements of the tertiary care
+hospital at all times. 
+Validity of OB as a Quality Indicator of Blood Wastage
+and the Relationship Between DBSI and OB 
+Blood stocks management scheme, which was established in
+United Kingdom in 2001, uses wastage as percentage of issue
+(WAPI) as an indicator of blood wastage [8]. WAPI is inversely
+proportional to blood utilization. In contrast, OB is inversely
+proportional to blood collection. Blood centres are in a much
+better position to control or optimize blood collection as it is
+the direct control of blood centre. Blood issued on the other
+end is related to blood demand and is dependent upon the end
+user clinical department. In 2016, WAPI was replaced by OB
+as a measure of blood wastage and also as a quality indicator
+of BTS by NABH, India [15]. Ideally, blood centres should try
+to achieve an OB of less than 7% for PRBC [23].
+In the present study, upon simple linear regression, a
+strong direct relationship was seen between OB (dependent
+variable) and DBSI (predictor variable) [R   =   0.79;   p   =   0.03].
+The maximum DBSI of 2.3 was seen in period E (the lock-
+down period of the 2nd wave of the COVID-19 pandemic)
+which resulted in an increase in the “near expiry date units”
+and was directly responsible for high OB during period E
+as well as period F. Hence, based on the results of present
+study, it is suggested that to achieve minimum OB, the blood
+collection should be adjusted so that DBSI should be kept
+in the range of 1.4–1.7. If a blood centre is supporting more
+trauma patients and obstetric emergencies, then the DBSI
+should be kept near the upper range and for blood centre
+supporting more of routine surgery and medicine cases, the
+DBSI should be kept near to the lower range.
+A limitation of the present study was that it was per-
+formed in blood centre of a tertiary care teaching hospi-
+tal situated in a remote hilly location with relatively low
+demand/ consumption of PRBC and hence it was easier to
+manage blood collection accordingly. Therefore, whether
+these indices can be applied in blood centres of hospitals
+with large demand/consumption needs to be ascertained. 
+Conclusions 
+To sum up, the COVID-19 outbreak had a significant
+impact on the BTS. Safety stock is a simple, user-friendly
+mathematic formula which can be used for efficient blood
+inventory management. At the same time, DBSI, which an
+index derived from the calculated safety stock, is a logi-
+cal and empirical tool to reduce OB units and consequently
+reduce blood wastage. However, it remains to be seen
+whether similar results can be reproduced in other blood
+centres of hospitals with large scale PRBC consumption,
+before the DBSI can be established as a predictor of OB. 
+Declarations 
+Conflict of interest   The authors declare no conflicts of interest. 
+Ethical Approval   The study was conducted after taking approval
+from the Institutional Ethics Committee. 
+References 
+1.   Soni P (2021) Effects of COVID-19 lockdown phases in
+India: an atmospheric perspective. Environ Dev Sustain
+23(8):12044–12055 
+2.   Tripathi PP, Kumawat V, Patidar GK (2022) Donor’s perspec-
+tives on blood donation during Covid-19 pandemic. Indian J
+Hematol Blood Transfus 38(3):536–545. https:// doi. org/ 10. 1007/ 
+s12288- 021- 01504-y 
+3.   Ministry of Health and Family Welfare. Government of India.
+Advisory for Voluntary Blood Donation during COVID-19 Pan-
+demic. Accessed 9 Apr 2020. https://   www.   mohfw.   gov.   in/   pdf/ 
+NBTCG UIDAN CEFOR COVID 19. pdf. Last Accessed 18 May
+2022 
+4.   Bönig H, Schmidt M, Hourfar K, Schüttrumpf J, Seifried E (2012)
+Sufficient blood, safe blood: can we have both? BMC Med 10:29.
+https:// doi. org/ 10. 1186/ 1741- 7015- 10- 29 
+5.   Garraud O, Vuk T, Lozano M, Tissot JD (2020) Transfusion
+medicine: overtime paradigm changes and emerging paradoxes.
+Transfus Clin Biol 27(4):262–267 
+6.   Sun X, Xu Z, Feng Y et al (2021) RBC inventory-management
+system based on XGBoost model. Indian J Hematol Blood Trans-
+fus 37(1):126–133. https:// doi. org/ 10. 1007/ s12288- 020- 01333-5 
+7.   Stanger SH, Yates N, Wilding R, Cotton S (2012) Blood inven-
+tory management: hospital best practice. Transfus Med Rev
+26(2):153–163 
+8.   Chapman JF, Cook R (2002) The Blood Stocks Management
+Scheme, a partnership venture between the National Blood
+Service of England and North Wales and participating hospi-
+tals for maximizing blood supply chain management. Vox Sang
+83(3):239–246 
+9.   Radasanu AC (2016) Inventory management, service level and
+safety. J Public Admin Finance Law Invent 9:145–153 
+10.   Lestari F, Ulfah, Nugraha N, Azwar B (2019) Managing inven-
+tory on blood supply chain. In: Ao SI, Gelman L, Kim H (eds)
+Transactions on engineering technologies. WCE, 2017. Springer,
+Singapore, pp 353–361. https:// doi. org/ 10. 1007/ 978- 981- 13- 0746-
+1_ 27 
+11.   Boroumand-Noughabi S, Rahmati A, Morovatdar N, Keramati
+M (2022) Significant decrease in the transfusion rates during the 
+
+--- PAGE 7 ---
+661 Indian J Hematol Blood Transfus (2023) 39:655–661 1 3 
+COVID-19 pandemic in the North East of Iran. TransfusClin Biol
+29(2):181–182 
+12.   Grandone E, Mastroianno M, Caroli A, Ostuni A (2020) Blood
+supply and transfusion support in southern Italy: findings during
+the first four weeks of the SARS-CoV-2 pandemic. Blood Trans-
+fus 18(3):230–232. https:// doi. org/ 10. 2450/ 2020. 0107- 20 
+13.   Yahia AIO (2020) Management of blood supply and demand dur-
+ing the COVID-19 pandemic in King Abdullah Hospital, Bisha,
+Saudi Arabia. Transfus Apher Sci 59(5):102836. https:// doi. org/ 
+10. 1016/j. trans ci. 2020. 102836 
+14.   Jacobs JW, Booth GS (2022) Blood shortages and changes to mas-
+sive transfusion protocols: survey of hospital practices during the
+COVID-19 pandemic. Transfus Apher Sci 61(1):103297 
+15.   Accreditation Standards on Blood Bank/Blood Centres and Trans-
+fusion Services (2016) National Accreditation Board for Hospitals
+& Healthcare Providers (NABH), 3rd edn. New Delhi, India 
+16.   Garraud O (2020) COVID-19: is a paradigm change to be
+expected in health care and transfusion medicine? TransfusClin
+Biol 27(2):59–60 
+17.   Barnes LS, Al-Riyami AZ, Ipe TS et al (2022) COVID-19 and the
+impact on blood availability and transfusion practices in low- and
+middle-income countries. Transfusion 62(2):336–345 
+18.   Costa CB, Cortez AJP, Adão DD et al (2021) Optimization of red
+blood cell unit storage during SARS-COV-2 Pandemic: adopting
+new strategies to ensure supply in a decentralized blood bank in
+Brazil. HematolTransfus Cell Ther 43(3):229–235 
+19.   Mishra S, Daga A, Gupta A (2021) Inventory management prac-
+tices in the blood bank of an institute of national importance in
+India. J Family Med Prim Care 10(12):4489–4492 
+20.   Ministry of Health and Family Welfare. Government of India.
+Updated Advisory for managing Health care workers working in
+COVID and Non-COVID areas of the hospital. Accessed 15 May
+2020. Available from: https:// www. mohfw. gov. in/. Last Accessed
+15 May 2022 
+21.   Buneviciene I, Bunevicius R, Bagdonas S, Bunevicius A (2021)
+COVID-19 media fatigue: predictors of decreasing interest and
+avoidance of COVID-19-related news. Public Health 196:124–128 
+22.   Salpeter SR, Buckley JS, Chatterjee S (2014) Impact of more
+restrictive blood transfusion strategies on clinical outcomes: a
+meta-analysis and systematic review. Am J Med 127(2):124-131.
+e3 
+23.   National Health Mission. Ministry of Health and Family Wel-
+fare. Government of India. Guidelines for recovery of processing
+charges for blood and blood components. Available from: http:// 
+naco. gov. in/ sites/ defau lt/ files/ Guide lines% 20on% 20rec overy% 
+20of%   20Pro   cessi   ng%   20Cha   rges%   20for%   20Blo   od%   20%   26% 
+20Blo od% 20Com ponen ts. pdf. Last Accessed 14 May 2022 
+Publisher’s Note   Springer Nature remains neutral with regard to
+jurisdictional claims in published maps and institutional affiliations.
+Springer Nature or its licensor (e.g. a society or other partner) holds
+exclusive rights to this article under a publishing agreement with the
+author(s) or other rightsholder(s); author self-archiving of the accepted
+manuscript version of this article is solely governed by the terms of
+such publishing agreement and applicable law. 

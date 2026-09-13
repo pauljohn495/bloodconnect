@@ -1,5 +1,8 @@
 const { pool } = require('../db')
-const { ensureBloodRequestStatusSupportsDelivery } = require('../utils/requestStatusSchema')
+const {
+  ensureBloodRequestStatusSupportsDelivery,
+  ensureBloodRequestTransferAllocations,
+} = require('../utils/requestStatusSchema')
 
 async function ensureRequestStatusHistory(conn) {
   await conn.query(`
@@ -63,55 +66,68 @@ const createTransferController = async (req, res) => {
 
   try {
     await ensureBloodRequestStatusSupportsDelivery()
+    await ensureBloodRequestTransferAllocations()
+    await ensureRequestStatusHistory(pool)
 
     const [hospitalRows] = await pool.query('SELECT id FROM hospitals WHERE id = ?', [hospitalId])
     if (hospitalRows.length === 0) {
       return res.status(404).json({ message: 'Hospital not found' })
     }
 
-    await pool.query('START TRANSACTION')
+    const conn = await pool.getConnection()
     try {
+      await conn.beginTransaction()
       const transferResults = []
 
       for (const transfer of transfers) {
-        const { inventoryId, units } = transfer
-        if (!inventoryId || !units || units <= 0) {
-          throw new Error('Invalid transfer data: inventoryId and positive units required')
+        const inventoryId = Number(transfer.inventoryId)
+        const units = Number(transfer.units)
+        if (!Number.isInteger(inventoryId) || inventoryId <= 0 || !Number.isInteger(units) || units <= 0) {
+          const error = new Error('Invalid transfer data: inventoryId and units must be positive integers')
+          error.statusCode = 400
+          throw error
         }
 
-        const [inventoryRows] = await pool.query(
+        const [inventoryRows] = await conn.query(
           `
           SELECT 
             id,
             available_units,
             blood_type,
             expiration_date,
+            status,
             COALESCE(component_type, 'whole_blood') AS component_type
           FROM blood_inventory
           WHERE id = ?
-            AND status = ?
+            AND status IN ('available', 'near_expiry')
+            AND expiration_date >= CURDATE()
             AND (hospital_id IS NULL OR hospital_id = 0)
+          FOR UPDATE
         `,
-          [inventoryId, 'available'],
+          [inventoryId],
         )
 
         if (inventoryRows.length === 0) {
-          throw new Error(`Inventory item ${inventoryId} not found or not available`)
+          const error = new Error(`Inventory item ${inventoryId} not found, expired, or not available`)
+          error.statusCode = 409
+          throw error
         }
 
         const inventory = inventoryRows[0]
-        if (inventory.available_units < units) {
-          throw new Error(
+        if (Number(inventory.available_units) < units) {
+          const error = new Error(
             `Insufficient units: requested ${units}, available ${inventory.available_units}`,
           )
+          error.statusCode = 409
+          throw error
         }
 
-        await pool.query(
+        await conn.query(
           'UPDATE blood_inventory SET available_units = available_units - ? WHERE id = ?',
           [units, inventoryId],
         )
 
-        await pool.query(
+        const [transferInsert] = await conn.query(
           `INSERT INTO blood_transfers 
            (source_inventory_id, hospital_id, blood_type, units_transferred, transferred_by, transfer_date)
            VALUES (?, ?, ?, ?, ?, NOW())`,
@@ -124,7 +140,7 @@ const createTransferController = async (req, res) => {
           throw new Error(`Inventory item ${inventoryId} has no expiration date and cannot be transferred`)
         }
 
-        const [existingDestinationRows] = await pool.query(
+        const [existingDestinationRows] = await conn.query(
           `
           SELECT id
           FROM blood_inventory
@@ -132,14 +148,15 @@ const createTransferController = async (req, res) => {
             AND blood_type = ?
             AND expiration_date = ?
             AND COALESCE(component_type, 'whole_blood') = ?
-            AND status = 'available'
+            AND status IN ('available', 'near_expiry')
           LIMIT 1
+          FOR UPDATE
         `,
           [hospitalId, inventory.blood_type, expirationDate, componentType],
         )
 
         if (existingDestinationRows.length > 0) {
-          await pool.query(
+          await conn.query(
             `
             UPDATE blood_inventory
             SET available_units = available_units + ?, units = units + ?
@@ -149,26 +166,26 @@ const createTransferController = async (req, res) => {
           )
         } else {
           try {
-            await pool.query(
+            await conn.query(
               `
               INSERT INTO blood_inventory
                 (blood_type, units, available_units, expiration_date, status, added_by, hospital_id, component_type)
-              VALUES (?, ?, ?, ?, 'available', ?, ?, ?)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `,
-              [inventory.blood_type, units, units, expirationDate, req.user.id, hospitalId, componentType],
+              [inventory.blood_type, units, units, expirationDate, inventory.status, req.user.id, hospitalId, componentType],
             )
           } catch (error) {
             if (
               error.code === 'ER_BAD_FIELD_ERROR' ||
               (error.message && error.message.includes('component_type'))
             ) {
-              await pool.query(
+              await conn.query(
                 `
                 INSERT INTO blood_inventory
                   (blood_type, units, available_units, expiration_date, status, added_by, hospital_id)
-                VALUES (?, ?, ?, ?, 'available', ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
               `,
-                [inventory.blood_type, units, units, expirationDate, req.user.id, hospitalId],
+                [inventory.blood_type, units, units, expirationDate, inventory.status, req.user.id, hospitalId],
               )
             } else {
               throw error
@@ -177,58 +194,124 @@ const createTransferController = async (req, res) => {
         }
 
         transferResults.push({
+          transferId: transferInsert.insertId,
           inventoryId,
           bloodType: inventory.blood_type,
+          componentType,
           units,
+          remainingUnits: units,
         })
       }
 
       if (requestFulfillments && Array.isArray(requestFulfillments)) {
         for (const fulfillment of requestFulfillments) {
-          const { requestId, unitsTransferred } = fulfillment
-          if (!requestId || !unitsTransferred || unitsTransferred <= 0) continue
-
-          const [requestRows] = await pool.query(
-            'SELECT id, units_requested, status FROM blood_requests WHERE id = ?',
-            [requestId],
-          )
-          if (requestRows.length === 0) continue
-
-          const request = requestRows[0]
-          let newStatus = request.status
-          if (request.status === 'approved' || request.status === 'partially_fulfilled') {
-            newStatus = 'delivered'
+          const requestId = Number(fulfillment.requestId)
+          const unitsTransferred = Number(fulfillment.unitsTransferred)
+          if (!Number.isInteger(requestId) || requestId <= 0 || !Number.isInteger(unitsTransferred) || unitsTransferred <= 0) {
+            const error = new Error('Each request fulfillment must have positive integer requestId and unitsTransferred values')
+            error.statusCode = 400
+            throw error
           }
 
-          await pool.query(
-            `UPDATE blood_requests 
-             SET status = ?, units_approved = COALESCE(units_approved, ?)
-             WHERE id = ?`,
-            [newStatus, unitsTransferred, requestId],
+          const [requestRows] = await conn.query(
+            `SELECT id, hospital_id, blood_type,
+                    COALESCE(component_type, 'whole_blood') AS component_type,
+                    units_requested, units_approved, status
+             FROM blood_requests
+             WHERE id = ? AND hospital_id = ?
+             FOR UPDATE`,
+            [requestId, hospitalId],
+          )
+          if (requestRows.length === 0) {
+            const error = new Error(`Request ${requestId} does not belong to the destination hospital`)
+            error.statusCode = 400
+            throw error
+          }
+
+          const request = requestRows[0]
+          const currentStatus = String(request.status || '').toLowerCase()
+          if (!['approved', 'partially_fulfilled'].includes(currentStatus)) {
+            const error = new Error(`Request ${requestId} cannot receive a transfer while ${currentStatus}`)
+            error.statusCode = 409
+            throw error
+          }
+
+          const [[allocationRow]] = await conn.query(
+            'SELECT COALESCE(SUM(units_allocated), 0) AS allocated FROM blood_request_transfer_allocations WHERE request_id = ?',
+            [requestId],
+          )
+          const targetUnits = Number(request.units_approved || request.units_requested || 0)
+          const previouslyAllocated = Number(allocationRow?.allocated || 0)
+          const remainingDemand = Math.max(0, targetUnits - previouslyAllocated)
+          if (unitsTransferred > remainingDemand) {
+            const error = new Error(`Request ${requestId} needs only ${remainingDemand} more unit(s), not ${unitsTransferred}`)
+            error.statusCode = 409
+            throw error
+          }
+
+          let unitsToAllocate = unitsTransferred
+          const matchingTransfers = transferResults.filter(
+            (item) =>
+              item.bloodType === request.blood_type &&
+              item.componentType === request.component_type &&
+              item.remainingUnits > 0,
+          )
+          for (const item of matchingTransfers) {
+            if (unitsToAllocate === 0) break
+            const allocated = Math.min(unitsToAllocate, item.remainingUnits)
+            await conn.query(
+              `INSERT INTO blood_request_transfer_allocations
+                 (request_id, transfer_id, units_allocated)
+               VALUES (?, ?, ?)`,
+              [requestId, item.transferId, allocated],
+            )
+            item.remainingUnits -= allocated
+            unitsToAllocate -= allocated
+          }
+
+          if (unitsToAllocate > 0) {
+            const error = new Error(
+              `Selected transfers do not contain enough ${request.blood_type} ${request.component_type} units for request ${requestId}`,
+            )
+            error.statusCode = 409
+            throw error
+          }
+
+          const totalAllocated = previouslyAllocated + unitsTransferred
+          const newStatus = totalAllocated >= targetUnits ? 'delivered' : 'partially_fulfilled'
+          await conn.query('UPDATE blood_requests SET status = ? WHERE id = ?', [newStatus, requestId])
+          await conn.query(
+            `INSERT INTO blood_request_status_history
+               (request_id, previous_status, new_status, changed_by, notes)
+             VALUES (?, ?, ?, ?, ?)`,
+            [requestId, currentStatus, newStatus, req.user.id, `${unitsTransferred} unit(s) allocated to this request`],
           )
 
-          try {
-            await pool.query(
+          if (newStatus === 'delivered') {
+            await conn.query(
               `UPDATE blood_requests
                SET delivered_at = COALESCE(delivered_at, NOW())
                WHERE id = ?`,
               [requestId],
             )
-          } catch (err) {
-            if (err.code !== 'ER_BAD_FIELD_ERROR') throw err
           }
         }
       }
 
-      await pool.query('COMMIT')
-      res.json({ message: 'Transfer completed successfully', transfers: transferResults })
+      await conn.commit()
+      res.json({
+        message: 'Transfer completed successfully',
+        transfers: transferResults.map(({ remainingUnits, ...result }) => result),
+      })
     } catch (error) {
-      await pool.query('ROLLBACK')
+      await conn.rollback()
       throw error
+    } finally {
+      conn.release()
     }
   } catch (error) {
     console.error('Transfer error:', error)
-    res.status(500).json({ message: error.message || 'Failed to transfer blood stocks' })
+    res.status(error.statusCode || 500).json({ message: error.message || 'Failed to transfer blood stocks' })
   }
 }
 
@@ -261,11 +344,22 @@ const getTransfersController = async (req, res) => {
 
 const getRequestsController = async (req, res) => {
   try {
+    await ensureBloodRequestTransferAllocations()
     let rows
     try {
       const [rowsWithPriority] = await pool.query(
         `
-        SELECT br.*, h.hospital_name
+        SELECT br.*,
+          COALESCE(
+            (SELECT SUM(rta.units_allocated)
+             FROM blood_request_transfer_allocations rta
+             WHERE rta.request_id = br.id),
+            CASE WHEN br.status IN ('delivered', 'received', 'fulfilled')
+              THEN COALESCE(br.units_approved, br.units_requested)
+              ELSE 0
+            END
+          ) AS actual_fulfilled_units,
+          h.hospital_name
         FROM blood_requests br
         JOIN hospitals h ON br.hospital_id = h.id
         ORDER BY
@@ -287,7 +381,17 @@ const getRequestsController = async (req, res) => {
       if (err.code === 'ER_BAD_FIELD_ERROR') {
         const [rowsFallback] = await pool.query(
           `
-          SELECT br.*, h.hospital_name
+          SELECT br.*,
+            COALESCE(
+              (SELECT SUM(rta.units_allocated)
+               FROM blood_request_transfer_allocations rta
+               WHERE rta.request_id = br.id),
+              CASE WHEN br.status IN ('delivered', 'received', 'fulfilled')
+                THEN COALESCE(br.units_approved, br.units_requested)
+                ELSE 0
+              END
+            ) AS actual_fulfilled_units,
+            h.hospital_name
           FROM blood_requests br
           JOIN hospitals h ON br.hospital_id = h.id
           ORDER BY br.request_date DESC
