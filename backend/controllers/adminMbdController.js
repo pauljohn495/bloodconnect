@@ -148,6 +148,19 @@ async function getDonorDonationBaseline(conn, donorUserId) {
   return Math.max(Number(mbdTotals?.total || 0), Number(recordedTotals?.total || 0))
 }
 
+async function markWholeBloodDonationDate(conn, donorUserId, donationDate) {
+  if (!donorUserId || !donationDate) return
+  await conn.query(
+    `UPDATE users
+     SET last_donation_date = CASE
+       WHEN last_donation_date IS NULL OR last_donation_date < ? THEN ?
+       ELSE last_donation_date
+     END
+     WHERE id = ? AND role = 'donor'`,
+    [donationDate, donationDate, donorUserId],
+  )
+}
+
 async function generateUniqueUsername(base = 'mbd_donor') {
   const seed = String(base || 'mbd_donor')
     .toLowerCase()
@@ -412,7 +425,7 @@ const createMbdDonorController = async (req, res) => {
   const conn = await pool.getConnection()
   try {
     await conn.beginTransaction()
-    const [exists] = await conn.query('SELECT id FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
+    const [exists] = await conn.query('SELECT id, event_date FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
     if (!exists.length) {
       await conn.rollback()
       return res.status(404).json({ message: 'MBD event not found' })
@@ -479,6 +492,10 @@ const createMbdDonorController = async (req, res) => {
         existingDonorUserId,
       ],
     )
+
+    if (existingDonorUserId != null) {
+      await markWholeBloodDonationDate(conn, existingDonorUserId, exists[0].event_date)
+    }
 
     await conn.commit()
 
@@ -682,11 +699,17 @@ const updateMbdDonorController = async (req, res) => {
     )
 
     const updated = mapDonorRow(rows[0])
-    if (updated.transferred_donor_user_id && assignedDonorId) {
-      await pool.query(
-        `UPDATE users SET assigned_donor_id = ? WHERE id = ? AND role = 'donor'`,
-        [assignedDonorId, updated.transferred_donor_user_id],
-      )
+    if (updated.transferred_donor_user_id) {
+      if (assignedDonorId) {
+        await pool.query(
+          `UPDATE users SET assigned_donor_id = ? WHERE id = ? AND role = 'donor'`,
+          [assignedDonorId, updated.transferred_donor_user_id],
+        )
+      }
+      const [eventRows] = await pool.query('SELECT event_date FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
+      if (eventRows.length) {
+        await markWholeBloodDonationDate(pool, updated.transferred_donor_user_id, eventRows[0].event_date)
+      }
     }
 
     return res.json(updated)
@@ -741,16 +764,18 @@ const transferMbdDonorToDonorListController = async (req, res) => {
     const [rows] = await conn.query(
       `
       SELECT
-        id,
-        donor_name,
-        barcode,
-        blood_type,
-        donor_number,
-        assigned_donor_id,
-        transferred_donor_user_id,
-        remarks_sd
-      FROM mbd_donor_records
-      WHERE id = ? AND mbd_event_id = ?
+        d.id,
+        d.donor_name,
+        d.barcode,
+        d.blood_type,
+        d.donor_number,
+        d.assigned_donor_id,
+        d.transferred_donor_user_id,
+        d.remarks_sd,
+        e.event_date
+      FROM mbd_donor_records d
+      INNER JOIN mbd_events e ON e.id = d.mbd_event_id
+      WHERE d.id = ? AND d.mbd_event_id = ?
       LIMIT 1
       FOR UPDATE
     `,
@@ -799,7 +824,11 @@ const transferMbdDonorToDonorListController = async (req, res) => {
           status = ?,
           is_manual_donor = 1,
           barcode = COALESCE(NULLIF(?, ''), barcode),
-          assigned_donor_id = COALESCE(NULLIF(?, ''), assigned_donor_id)
+          assigned_donor_id = COALESCE(NULLIF(?, ''), assigned_donor_id),
+          last_donation_date = CASE
+            WHEN last_donation_date IS NULL OR last_donation_date < ? THEN ?
+            ELSE last_donation_date
+          END
         WHERE id = ? AND role = 'donor'
       `,
         [
@@ -809,6 +838,8 @@ const transferMbdDonorToDonorListController = async (req, res) => {
           status,
           mbdDonor.barcode || '',
           assignedDonorId,
+          mbdDonor.event_date,
+          mbdDonor.event_date,
           targetUserId,
         ],
       )
@@ -822,7 +853,7 @@ const transferMbdDonorToDonorListController = async (req, res) => {
         INSERT INTO users (
           username, email, password_hash, role, full_name, phone, blood_type, status, last_donation_date, is_manual_donor, barcode, assigned_donor_id
         )
-        VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, NULL, 1, ?, ?)
+        VALUES (?, ?, ?, 'donor', ?, ?, ?, ?, ?, 1, ?, ?)
       `,
         [
           username,
@@ -832,6 +863,7 @@ const transferMbdDonorToDonorListController = async (req, res) => {
           transferablePhone,
           normalizedUserBloodType,
           status,
+          mbdDonor.event_date,
           mbdDonor.barcode || null,
           assignedDonorId || null,
         ],

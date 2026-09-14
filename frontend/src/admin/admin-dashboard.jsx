@@ -97,7 +97,7 @@ function AdminDashboard() {
         const [summaryData, inventoryData, transfersData, requestsData] = await Promise.all([
           apiRequest('/api/admin/dashboard/summary'),
           apiRequest('/api/admin/inventory'),
-          apiRequest('/api/admin/transfers?limit=10'),
+          apiRequest('/api/admin/transfers?limit=20'),
           apiRequest('/api/admin/requests'),
         ])
 
@@ -441,9 +441,16 @@ function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto overscroll-x-contain touch-pan-x bg-white [-webkit-overflow-scrolling:touch]">
+                <div
+                  className={`overflow-x-auto overscroll-contain touch-auto bg-white [-webkit-overflow-scrolling:touch] ${
+                    recentTransfers.length > 10 ? 'max-h-[590px] overflow-y-auto' : ''
+                  }`}
+                  role="region"
+                  aria-label="Recent transfers table"
+                  tabIndex={recentTransfers.length > 10 ? 0 : undefined}
+                >
                   <table className="min-w-full divide-y divide-slate-100 text-sm">
-                    <thead className="bg-slate-50/95">
+                    <thead className="sticky top-0 z-10 bg-slate-50/95 shadow-[0_1px_0_rgba(226,232,240,1)]">
                       <tr>
                         <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
                           Blood Type

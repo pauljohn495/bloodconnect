@@ -31,6 +31,7 @@
 .bc-portal ::selection { background: #ebc9d7; color: #59102f; }
 .bc-portal :is(h1, h2, h3) { letter-spacing: -.025em; }
 .bc-portal button, .bc-portal a { -webkit-tap-highlight-color: transparent; }
+.bc-portal :is(button, a) { touch-action: manipulation; }
 .bc-portal button { cursor: pointer; }
 .bc-portal button:disabled { cursor: default; }
 .bc-portal :is(button, a, input, textarea, select):focus-visible { outline: 2px solid #a52f49; outline-offset: 3px; }
@@ -96,6 +97,13 @@
   .bc-portal .bc-portal-heading { padding-block: 22px; border-radius: 14px; }
   .bc-portal-heading h1 { font-size: 22px; }
   .bc-portal-heading p { font-size: 12px; }
+  .bc-portal :is(h1, h2, h3, p, td, th) { overflow-wrap: anywhere; }
+  .bc-portal button { min-height: 44px; }
+  .bc-portal button[aria-label] { min-width: 44px; }
+  .bc-portal [role='dialog'] {
+    max-height: calc(100dvh - 1rem);
+    max-width: calc(100vw - 1rem);
+  }
   .bc-donor-welcome { padding: 26px 22px; }
   .bc-donor-welcome > svg { display: none; }
   .bc-portal :is(input:not([type='checkbox']):not([type='radio']), select, textarea) { font-size: 16px; }

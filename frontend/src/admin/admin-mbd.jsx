@@ -4,7 +4,7 @@ import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
 
 // ── Donor Name Autocomplete Component ────────────────────────────────────────
-function DonorNameAutocomplete({ value, onChange, onSelectUser, inputCls, labelCls }) {
+function DonorNameAutocomplete({ value, onChange, onSelectUser, inputCls }) {
   const [query, setQuery] = useState(value || '')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -848,12 +848,15 @@ function AdminMbd() {
 
   const handleTransferAllToDonorList = async () => {
     if (!selectedEvent) return
-    const listedDonors = [...donors]
-    if (!listedDonors.length) return
+    const unaddedDonors = donors.filter((donor) => !donor.transferred_donor_user_id)
+    if (!unaddedDonors.length) {
+      showNotification('All donors from this event are already in the donor list.', 'primary')
+      return
+    }
     try {
       setTransferAllLoading(true)
       let successCount = 0
-      for (const donor of listedDonors) {
+      for (const donor of unaddedDonors) {
         try {
           await transferDonorToDonorList(donor.id)
           successCount += 1
@@ -863,11 +866,11 @@ function AdminMbd() {
       }
       const data = await apiRequest(`/api/admin/mbd-events/${selectedEvent.id}/donors`)
       setDonors(Array.isArray(data) ? data : [])
-      if (successCount === listedDonors.length) {
-        showNotification(`Processed ${successCount} donor(s) to donor list.`, 'primary')
+      if (successCount === unaddedDonors.length) {
+        showNotification(`Added ${successCount} new donor(s) to the donor list.`, 'primary')
       } else if (successCount > 0) {
         showNotification(
-          `Processed ${successCount} donor(s). ${listedDonors.length - successCount} failed to transfer.`,
+          `Added ${successCount} donor(s). ${unaddedDonors.length - successCount} failed to transfer.`,
           'destructive',
         )
       } else {
@@ -1492,7 +1495,6 @@ function AdminMbd() {
                         }
                       }}
                       inputCls={inputCls}
-                      labelCls={labelCls}
                     />
                   </div>
                   <div>
@@ -1780,15 +1782,19 @@ function AdminMbd() {
                 </div>
               </form>
 
-              <div className="mt-8 flex items-center justify-between gap-3">
+              <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-sm font-semibold text-slate-900">Donors for this event</h3>
                 <button
                   type="button"
-                  disabled={transferAllLoading || donors.length === 0}
+                  disabled={transferAllLoading || donors.every((donor) => donor.transferred_donor_user_id)}
                   onClick={handleTransferAllToDonorList}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 sm:min-h-9 sm:w-auto sm:py-1.5"
                 >
-                  {transferAllLoading ? 'Adding all...' : 'Add all to donor list'}
+                  {transferAllLoading
+                    ? 'Adding donors...'
+                    : donors.length > 0 && donors.every((donor) => donor.transferred_donor_user_id)
+                      ? 'All donors added'
+                      : 'Add all to donor list'}
                 </button>
               </div>
               <div className="mt-3 overflow-x-auto rounded-2xl border border-slate-200">
@@ -1906,16 +1912,21 @@ function AdminMbd() {
         onConfirm={confirmDeleteDonor}
       />
       {mbdRequestsOpen && (
-        <div className="fixed inset-0 z-90 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-90 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <div
+            className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-2xl sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mbd-requests-title"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">MBD Requests</h3>
+              <div className="min-w-0 pr-2">
+                <h3 id="mbd-requests-title" className="text-lg font-semibold text-slate-900">MBD Requests</h3>
                 <p className="mt-1 text-sm text-slate-500">Requests submitted by registered volunteers.</p>
               </div>
               <button type="button" onClick={() => setMbdRequestsOpen(false)} className="text-slate-500 hover:text-slate-700" aria-label="Close">×</button>
             </div>
-            <div className="mt-4 max-h-[65vh] overflow-y-auto rounded-xl border border-slate-200">
+            <div className="mt-4 min-h-0 flex-1 overflow-auto overscroll-contain rounded-xl border border-slate-200 [-webkit-overflow-scrolling:touch]" role="region" aria-label="MBD requests table" tabIndex={0}>
               {mbdRequestsLoading ? (
                 <p className="px-4 py-10 text-center text-sm text-slate-500">Loading requests…</p>
               ) : mbdRequests.length === 0 ? (
@@ -1933,9 +1944,9 @@ function AdminMbd() {
         </div>
       )}
       {notification && (
-        <div className="fixed right-4 top-4 z-95 transition-all duration-300 ease-in-out">
+        <div className="fixed left-3 right-3 top-3 z-95 transition-all duration-300 ease-in-out sm:left-auto sm:right-4 sm:top-4" role="status" aria-live="polite">
           <div
-            className={`flex min-w-[300px] max-w-md items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${
+            className={`flex w-full min-w-0 max-w-md items-center gap-3 rounded-lg border px-4 py-3 shadow-lg ${
               notification.type === 'destructive'
                 ? 'border-red-200 bg-red-50 text-red-800'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-900'
@@ -1969,6 +1980,7 @@ function AdminMbd() {
                   ? 'text-red-600 hover:bg-red-100'
                   : 'text-emerald-700 hover:bg-emerald-100'
               }`}
+              aria-label="Dismiss notification"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

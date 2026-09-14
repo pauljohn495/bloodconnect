@@ -198,16 +198,25 @@ async function getUserBloodAvailability(userId) {
 async function getDonationEligibility(userId, cooldowns) {
   const [rows] = await pool.query(
     `
-    SELECT 
-      COALESCE(component_type, 'whole_blood') AS component_type,
-      MAX(actual_donation_at) AS last_completed_at
-    FROM schedule_requests
-    WHERE user_id = ? 
-      AND status = 'completed'
-      AND actual_donation_at IS NOT NULL
-    GROUP BY COALESCE(component_type, 'whole_blood')
+    SELECT component_type, MAX(last_completed_at) AS last_completed_at
+    FROM (
+      SELECT
+        COALESCE(component_type, 'whole_blood') AS component_type,
+        actual_donation_at AS last_completed_at
+      FROM schedule_requests
+      WHERE user_id = ?
+        AND status = 'completed'
+        AND actual_donation_at IS NOT NULL
+
+      UNION ALL
+
+      SELECT 'whole_blood' AS component_type, last_donation_date AS last_completed_at
+      FROM users
+      WHERE id = ? AND last_donation_date IS NOT NULL
+    ) completed_donations
+    GROUP BY component_type
   `,
-    [userId],
+    [userId, userId],
   )
 
   const now = new Date()
@@ -295,18 +304,25 @@ async function hasPendingScheduleRequest(userId) {
 async function getLastCompletedScheduleForComponent(userId, component) {
   const [rows] = await pool.query(
     `
-    SELECT actual_donation_at AS reviewed_at
-    FROM schedule_requests
-    WHERE user_id = ? 
-      AND status = 'completed'
-      AND COALESCE(component_type, 'whole_blood') = ?
-      AND actual_donation_at IS NOT NULL
-    ORDER BY actual_donation_at DESC
-    LIMIT 1
+    SELECT MAX(completed_at) AS reviewed_at
+    FROM (
+      SELECT actual_donation_at AS completed_at
+      FROM schedule_requests
+      WHERE user_id = ?
+        AND status = 'completed'
+        AND COALESCE(component_type, 'whole_blood') = ?
+        AND actual_donation_at IS NOT NULL
+
+      UNION ALL
+
+      SELECT last_donation_date AS completed_at
+      FROM users
+      WHERE id = ? AND ? = 'whole_blood' AND last_donation_date IS NOT NULL
+    ) completed_donations
   `,
-    [userId, component],
+    [userId, component, userId, component],
   )
-  return rows[0] || null
+  return rows[0]?.reviewed_at ? rows[0] : null
 }
 
 async function createScheduleRequest({

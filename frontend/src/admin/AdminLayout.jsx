@@ -179,10 +179,6 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
   })
 
   useEffect(() => {
-    setMobileOpen(false)
-  }, [location.pathname])
-
-  useEffect(() => {
     apiRequest('/api/notifications').then((data) => setNotifications(data || [])).catch(() => setNotifications([]))
   }, [location.pathname])
 
@@ -190,7 +186,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
     try {
       await apiRequest(`/api/notifications/${id}/read`, { method: 'PATCH' })
       setNotifications((items) => items.map((item) => item.id === id ? { ...item, is_read: true } : item))
-    } catch (_) {
+    } catch {
       // The notification remains unread if the update fails.
     }
   }
@@ -225,7 +221,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
   }
 
   return (
-    <div className="bc-portal min-h-screen text-slate-900 antialiased">
+    <div className="bc-portal min-h-screen w-full max-w-full overflow-x-hidden text-slate-900 antialiased">
       <a
         href="#admin-main"
         className="fixed left-4 top-4 z-100 -translate-y-16 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
@@ -237,9 +233,10 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
         <>
             {/* Tablet + desktop sidebar */}
             <aside
-              className={`hidden shrink-0 flex-col border-r border-slate-900/20 bc-portal-sidebar transition-[width] duration-200 md:flex ${
+              className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-slate-900/20 bc-portal-sidebar transition-[width] duration-200 md:flex ${
                 desktopSidebarExpanded ? 'w-64' : 'w-20'
               }`}
+              aria-label="Admin navigation"
               onMouseEnter={handleSidebarMouseEnter}
               onMouseLeave={handleSidebarMouseLeave}
               onFocus={handleSidebarMouseEnter}
@@ -286,9 +283,10 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
             {/* Mobile drawer */}
             <aside
               id="mobile-admin-nav"
-              className={`fixed inset-y-0 left-0 z-50 flex w-[min(100%,280px)] flex-col border-r border-slate-900/20 bc-portal-sidebar shadow-xl transition-transform duration-200 ease-out md:hidden ${
+              className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,calc(100vw-1rem))] flex-col border-r border-slate-900/20 bc-portal-sidebar shadow-xl transition-transform duration-200 ease-out md:hidden ${
                 mobileOpen ? 'translate-x-0' : '-translate-x-full'
               }`}
+              aria-label="Admin navigation"
               aria-hidden={!mobileOpen} inert={!mobileOpen}
             >
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
@@ -314,20 +312,22 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
         </>
 
         <div className="bc-portal-workspace flex min-h-screen min-w-0 flex-1 flex-col">
-          <div className="flex items-center justify-end gap-2 px-3 pt-2 sm:px-6 lg:px-8">
+          <div className="flex min-h-11 items-center justify-end gap-2 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((open) => !open)}
-                className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/40 sm:h-9 sm:w-9"
                 aria-label="Notifications"
                 aria-expanded={notificationsOpen}
+                aria-controls="admin-notifications"
+                aria-haspopup="true"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                {notifications.some((item) => !item.is_read) && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-600" />}
+                {notifications.some((item) => !item.is_read) && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-600" aria-hidden="true" />}
               </button>
               {notificationsOpen && (
-                <div className="fixed left-3 right-3 top-12 z-50 max-h-96 overflow-y-auto rounded-xl bg-white p-2 shadow-xl ring-1 ring-slate-200 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
+                <div id="admin-notifications" className="fixed left-3 right-3 top-14 z-50 max-h-[min(24rem,calc(100dvh-4.5rem))] overflow-y-auto rounded-xl bg-white p-2 shadow-xl ring-1 ring-slate-200 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80" role="region" aria-label="Notifications">
                   <div className="border-b border-slate-100 px-2 py-2 text-sm font-semibold text-slate-900">Notifications</div>
                   {notifications.length === 0 ? <p className="px-2 py-4 text-sm text-slate-500">No notifications yet.</p> : notifications.map((item) => (
                     <button key={item.id} type="button" onClick={() => !item.is_read && markNotificationRead(item.id)} className={`my-1 block w-full rounded-lg px-3 py-2 text-left text-sm ${item.is_read ? 'bg-slate-50 text-slate-600' : 'bg-red-50 text-slate-900'}`}>
@@ -338,8 +338,10 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
               )}
             </div>
             <button
+              type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition focus:outline-none focus:ring-2 focus:ring-red-500/40"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-700 transition focus:outline-none focus:ring-2 focus:ring-red-500/40 sm:min-h-9 sm:py-1.5"
+              aria-label="Log out of the admin portal"
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -349,7 +351,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
               Log out
             </button>
           </div>
-          <header className="bc-portal-heading z-30 mx-3 mt-2 flex min-h-13 items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_8px_25px_-20px_rgba(15,23,42,0.45)] sm:mx-6 sm:mt-3 sm:gap-4 sm:px-6 sm:py-3 lg:mx-8">
+          <header className="bc-portal-heading z-30 mx-3 mt-2 flex min-h-13 items-start justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_8px_25px_-20px_rgba(15,23,42,0.45)] sm:mx-6 sm:mt-3 sm:items-center sm:gap-4 sm:px-6 sm:py-3 lg:mx-8">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <button
                 type="button"
@@ -377,7 +379,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
 
           <main
             id="admin-main"
-            className="min-w-0 flex-1 px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8"
+            className="min-w-0 max-w-full flex-1 overflow-x-hidden px-3 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6 lg:px-8"
             tabIndex={-1}
           >
             {children}
