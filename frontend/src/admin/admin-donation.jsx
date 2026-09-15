@@ -82,6 +82,7 @@ function AdminDonation() {
   const [isDonorDetailsOpen, setIsDonorDetailsOpen] = useState(false)
   const [selectedDonorDetails, setSelectedDonorDetails] = useState(null)
   const [donorDetailAvatarFailed, setDonorDetailAvatarFailed] = useState(false)
+  const [donorSearchInput, setDonorSearchInput] = useState('')
   const [donorSearch, setDonorSearch] = useState('')
   const [donorBloodTypeFilter, setDonorBloodTypeFilter] = useState('all')
   const [donorEligibilityFilter, setDonorEligibilityFilter] = useState('all')
@@ -286,17 +287,38 @@ function AdminDonation() {
     if (selectedDonorDetails) setDonorDetailAvatarFailed(false)
   }, [selectedDonorDetails])
 
-  const donorNameForSearch = (donor) =>
-    `${(donor?.barcode || '').toString().toLowerCase()} ${(
-      donor.full_name ||
-      donor.fullName ||
-      donor.donor_name ||
-      donor.donorName ||
-      donor.username ||
-      ''
-    )
-      .toString()
-      .toLowerCase()}`
+  const donorTextForSearch = (donor) =>
+    [
+      donor?.id,
+      donor?.barcode,
+      donor?.assigned_donor_id,
+      donor?.assignedDonorId,
+      donor?.full_name,
+      donor?.fullName,
+      donor?.donor_name,
+      donor?.donorName,
+      donor?.username,
+      donor?.phone,
+      donor?.contact_phone,
+      donor?.contactPhone,
+      donor?.email,
+      donor?.blood_type,
+      donor?.bloodType,
+    ]
+      .filter((value) => value !== null && value !== undefined)
+      .map((value) => value.toString().trim().toLowerCase())
+      .filter(Boolean)
+      .join(' ')
+
+  const handleDonorSearch = (event) => {
+    event.preventDefault()
+    setDonorSearch(donorSearchInput.trim())
+  }
+
+  const handleClearDonorSearch = () => {
+    setDonorSearchInput('')
+    setDonorSearch('')
+  }
 
   const donorDisplayName = (donor) =>
     (
@@ -361,8 +383,9 @@ function AdminDonation() {
   }
 
   const filteredDonors = donors.filter((donor) => {
-    const q = donorSearch.trim().toLowerCase()
-    const matchesSearch = !q || donorNameForSearch(donor).includes(q)
+    const searchTerms = donorSearch.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const donorText = donorTextForSearch(donor)
+    const matchesSearch = searchTerms.every((term) => donorText.includes(term))
 
     const donorBloodType = (donor.blood_type || donor.bloodType || '').toUpperCase()
     const matchesBloodType = donorBloodTypeFilter === 'all' || donorBloodType === donorBloodTypeFilter
@@ -1390,23 +1413,51 @@ function AdminDonation() {
                   : 'Overview of all registered donors'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:block">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {activeSection === 'donors' ? (
+                <form
+                  role="search"
+                  aria-label="Search donors"
+                  onSubmit={handleDonorSearch}
+                  className="flex items-center gap-1.5"
+                >
+                  <label htmlFor="donor-list-search" className="sr-only">
+                    Search donors
+                  </label>
+                  <input
+                    id="donor-list-search"
+                    type="search"
+                    value={donorSearchInput}
+                    onChange={(event) => setDonorSearchInput(event.target.value)}
+                    placeholder="Name, donor ID, barcode, phone..."
+                    className="w-56 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  />
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-1"
+                  >
+                    Search
+                  </button>
+                  {(donorSearch || donorSearchInput) && (
+                    <button
+                      type="button"
+                      onClick={handleClearDonorSearch}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </form>
+              ) : (
                 <input
-                  value={activeSection === 'organizations' ? organizationSearch : donorSearch}
-                  onChange={(e) =>
-                    activeSection === 'organizations'
-                      ? setOrganizationSearch(e.target.value)
-                      : setDonorSearch(e.target.value)
-                  }
-                  placeholder={
-                    activeSection === 'organizations'
-                      ? 'Search name, contact, email...'
-                      : 'Search barcode or donor name...'
-                  }
+                  type="search"
+                  value={organizationSearch}
+                  onChange={(event) => setOrganizationSearch(event.target.value)}
+                  placeholder="Search name, contact, email..."
+                  aria-label="Search organizations"
                   className="w-56 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
                 />
-              </div>
+              )}
               {activeSection === 'donors' && (
                 <>
                   <select
@@ -1580,6 +1631,18 @@ function AdminDonation() {
                     </td>
                   </tr>
                 )}
+
+                {activeSection === 'donors' &&
+                  !isLoading &&
+                  !error &&
+                  donors.length > 0 &&
+                  filteredDonors.length === 0 && (
+                    <tr>
+                      <td className="px-4 py-10 text-center text-sm text-slate-500" colSpan={8}>
+                        No donors match the current search and filters.
+                      </td>
+                    </tr>
+                  )}
 
                 {activeSection === 'donors' &&
                   !isLoading &&

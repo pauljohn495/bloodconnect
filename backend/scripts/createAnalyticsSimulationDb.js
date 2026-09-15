@@ -4,7 +4,12 @@ const bcrypt = require('bcryptjs')
 const mysql = require('mysql2/promise')
 
 const SOURCE_DB = process.env.DB_NAME || 'bloodconnect'
-const TARGET_DB = process.env.SIMULATION_DB_NAME || `${SOURCE_DB}_simulation`
+const targetArgIndex = process.argv.indexOf('--target')
+const cliTarget = targetArgIndex >= 0 ? process.argv[targetArgIndex + 1] : null
+const TARGET_DB = cliTarget || process.env.SIMULATION_DB_NAME || `${SOURCE_DB}_simulation`
+const REPLACE_EXISTING =
+  process.argv.includes('--replace') || String(process.env.SIMULATION_REPLACE).toLowerCase() === 'true'
+const SYNC_VIEWS_ONLY = process.argv.includes('--sync-views-only')
 const DATABASE_NAME_PATTERN = /^[a-zA-Z0-9_]+$/
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -37,6 +42,26 @@ async function insertMany(connection, table, columns, rows) {
   )
 }
 
+async function syncViews(connection) {
+  const [views] = await connection.query(
+    `SELECT TABLE_NAME, VIEW_DEFINITION
+     FROM information_schema.views
+     WHERE table_schema = ?
+     ORDER BY TABLE_NAME`,
+    [SOURCE_DB],
+  )
+  for (const { TABLE_NAME: viewName, VIEW_DEFINITION: sourceDefinition } of views) {
+    const targetDefinition = String(sourceDefinition).replaceAll(
+      `\`${SOURCE_DB}\`.`,
+      `\`${TARGET_DB}\`.`,
+    )
+    await connection.query(
+      `CREATE OR REPLACE VIEW \`${TARGET_DB}\`.\`${viewName}\` AS ${targetDefinition}`,
+    )
+  }
+  console.log(`Schema: synchronized ${views.length} database views`)
+}
+
 async function main() {
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
@@ -54,8 +79,32 @@ async function main() {
   const passwordHash = await bcrypt.hash('Simulation123!', 10)
 
   try {
+    if (SYNC_VIEWS_ONLY) {
+      const [targetDatabases] = await connection.query(
+        'SELECT SCHEMA_NAME FROM information_schema.schemata WHERE schema_name = ?',
+        [TARGET_DB],
+      )
+      if (targetDatabases.length === 0) {
+        throw new Error(`Cannot synchronize views: database ${TARGET_DB} does not exist`)
+      }
+      await syncViews(connection)
+      return
+    }
+
     console.log(`Creating isolated simulation database: ${TARGET_DB}`)
-    await connection.query(`DROP DATABASE IF EXISTS \`${TARGET_DB}\``)
+    const [existingDatabases] = await connection.query(
+      'SELECT SCHEMA_NAME FROM information_schema.schemata WHERE schema_name = ?',
+      [TARGET_DB],
+    )
+    if (existingDatabases.length > 0 && !REPLACE_EXISTING) {
+      throw new Error(
+        `Refusing to overwrite existing database ${TARGET_DB}. Choose a new --target name or rerun with --replace.`,
+      )
+    }
+    if (existingDatabases.length > 0) {
+      console.log(`Replacing existing simulation database: ${TARGET_DB}`)
+      await connection.query(`DROP DATABASE \`${TARGET_DB}\``)
+    }
     await connection.query(`CREATE DATABASE \`${TARGET_DB}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
 
     const [tables] = await connection.query(
@@ -68,6 +117,7 @@ async function main() {
       await connection.query(`CREATE TABLE \`${TARGET_DB}\`.\`${table}\` LIKE \`${SOURCE_DB}\`.\`${table}\``)
     }
     await connection.query('SET FOREIGN_KEY_CHECKS = 1')
+    await syncViews(connection)
     await connection.query(`CREATE TABLE \`${TARGET_DB}\`.simulation_metadata (id INT PRIMARY KEY, reference_date DATETIME NOT NULL, period_start DATE NOT NULL, period_end DATE NOT NULL, seed_version VARCHAR(32) NOT NULL)`)
 
     const users = [

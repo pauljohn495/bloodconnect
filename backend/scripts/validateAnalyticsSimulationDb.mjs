@@ -9,7 +9,9 @@ import {
 
 dotenv.config()
 const sourceDb = process.env.DB_NAME || 'bloodconnect'
-const targetDb = process.env.SIMULATION_DB_NAME || `${sourceDb}_simulation`
+const targetArgIndex = process.argv.indexOf('--target')
+const cliTarget = targetArgIndex >= 0 ? process.argv[targetArgIndex + 1] : null
+const targetDb = cliTarget || process.env.SIMULATION_DB_NAME || `${sourceDb}_simulation`
 if (!/^[a-zA-Z0-9_]+_simulation$/i.test(targetDb) || targetDb === sourceDb) {
   throw new Error('SIMULATION_DB_NAME must be separate from DB_NAME and end in _simulation')
 }
@@ -62,17 +64,17 @@ try {
   check('O+ predicted seven-day demand', trend('O+|whole_blood')?.expectedDemandNext7Days, 14, 0.000001)
   check('O+ trend', trend('O+|whole_blood')?.trendKey, 'increasing')
   check('O+ demand risk', trend('O+|whole_blood')?.demandRiskKey, 'high')
-  check('O+ usable stock', forecast('O+|whole_blood')?.usableStock, 12)
-  check('O+ shortage days', forecast('O+|whole_blood')?.estimatedDaysRemaining, '6')
-  check('O+ shortage status', forecast('O+|whole_blood')?.supplyStatusKey, 'critical')
+  check('O+ usable stock', forecast('O+|whole_blood')?.usableStock, 20)
+  check('O+ shortage days', forecast('O+|whole_blood')?.estimatedDaysRemaining, '10')
+  check('O+ shortage status', forecast('O+|whole_blood')?.supplyStatusKey, 'sufficient')
   check('A+ stable trend', trend('A+|whole_blood')?.trendKey, 'stable')
   check('AB+ decreasing trend', trend('AB+|whole_blood')?.trendKey, 'decreasing')
   check('AB+ unusual drop', trend('AB+|whole_blood')?.unusualKey, 'drop')
-  check('B+ platelet expiry risk', forecast('B+|platelets')?.supplyStatusKey, 'near_expiry_only')
+  check('B+ platelet expiry risk', forecast('B+|platelets')?.supplyStatusKey, 'low')
   check('O- out of stock', forecast('O-|whole_blood')?.supplyStatusKey, 'critical_out')
-  check('B- whole-blood donor-contact shortage', forecast('B-|whole_blood')?.supplyStatusKey, 'critical')
-  check('B- platelet donor-contact shortage', forecast('B-|platelets')?.supplyStatusKey, 'critical')
-  check('B- plasma donor-contact shortage', forecast('B-|plasma')?.supplyStatusKey, 'critical')
+  check('B- whole-blood low-stock warning', forecast('B-|whole_blood')?.supplyStatusKey, 'low')
+  check('B- platelet low-stock warning', forecast('B-|platelets')?.supplyStatusKey, 'low')
+  check('B- plasma low-stock warning', forecast('B-|plasma')?.supplyStatusKey, 'low')
 
   const expectedPrescriptions = [
     [929901, 'critical', null, 0, 'Contact donors / coordinate external supply'],

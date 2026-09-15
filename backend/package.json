@@ -11,6 +11,7 @@
     "test:analytics-logic": "node simulation/validateAnalyticsLogic.mjs",
     "simulation:db:create": "node scripts/createAnalyticsSimulationDb.js",
     "simulation:db:test": "node scripts/validateAnalyticsSimulationDb.mjs",
+    "simulation:db:import-controlled-2025": "node scripts/importControlledDataset2025ToTestDb.js",
     "seed:admin": "node scripts/createAdmin.js",
     "seed:superadmin": "node scripts/createSuperAdmin.js"
   },

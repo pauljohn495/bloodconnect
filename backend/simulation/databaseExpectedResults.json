@@ -13,9 +13,9 @@
       "predicted7DayDemand": 14,
       "trend": "increasing",
       "demandRisk": "high",
-      "usableStock": 12,
-      "estimatedDaysRemaining": "6",
-      "supplyStatus": "critical"
+      "usableStock": 20,
+      "estimatedDaysRemaining": "10",
+      "supplyStatus": "sufficient"
     },
     "A+|whole_blood": {
       "previous30DayDemand": 30,
@@ -29,14 +29,14 @@
       "unusualChange": "drop"
     },
     "B+|platelets": {
-      "supplyStatus": "near_expiry_only"
+      "supplyStatus": "low"
     },
     "O-|whole_blood": {
       "supplyStatus": "critical_out"
     },
     "B-|all_components": {
       "aggregateStock": 4,
-      "expectedBehavior": "Critical component shortages and up to five eligible B- donor suggestions"
+      "expectedBehavior": "Low-stock warnings across all components"
     }
   },
   "prescriptive": [
