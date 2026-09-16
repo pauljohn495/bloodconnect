@@ -189,9 +189,14 @@ function AdminRequests() {
             </div>
           </div>
 
-          <div className={adminPanel.amber.tableScroll}>
+          <div
+            className={`${adminPanel.amber.tableScroll} max-h-[min(65dvh,48rem)] overflow-y-auto overscroll-y-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-600`}
+            role="region"
+            aria-label="Active hospital requests"
+            tabIndex={0}
+          >
             <table className="min-w-full divide-y divide-slate-100 text-xs">
-              <thead className={adminPanel.amber.thead}>
+              <thead className={`${adminPanel.amber.thead} sticky top-0 z-10 shadow-sm`}>
                 <tr>
                   <th className={`whitespace-nowrap px-4 py-2 text-left text-xs ${adminPanel.amber.th}`}>
                     Hospital
