@@ -1560,9 +1560,22 @@ function AdminDonation() {
             </div>
           </div>
 
-          <div className={adminPanel.emerald.tableScroll}>
+          <div
+            className={`${adminPanel.emerald.tableScroll} ${
+              activeSection === 'donors'
+                ? 'max-h-[min(65dvh,48rem)] overflow-y-auto overscroll-y-contain focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-600'
+                : ''
+            }`}
+            role={activeSection === 'donors' ? 'region' : undefined}
+            aria-label={activeSection === 'donors' ? 'Donor list' : undefined}
+            tabIndex={activeSection === 'donors' ? 0 : undefined}
+          >
             <table className="min-w-full divide-y divide-slate-100 text-sm">
-              <thead className={adminPanel.emerald.thead}>
+              <thead
+                className={`${adminPanel.emerald.thead} ${
+                  activeSection === 'donors' ? 'sticky top-0 z-10 shadow-sm' : ''
+                }`}
+              >
                 <tr>
                   {activeSection === 'donors' ? (
                     <>

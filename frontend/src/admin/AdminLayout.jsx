@@ -221,7 +221,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
   }
 
   return (
-    <div className="bc-portal min-h-screen w-full max-w-full overflow-x-hidden text-slate-900 antialiased">
+    <div className="bc-portal min-h-dvh w-full max-w-full overflow-x-clip text-slate-900 antialiased">
       <a
         href="#admin-main"
         className="fixed left-4 top-4 z-100 -translate-y-16 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white shadow-lg transition focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
@@ -229,11 +229,11 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
         Skip to main content
       </a>
 
-      <div className="flex min-h-screen">
+      <div className="flex min-h-dvh items-start">
         <>
             {/* Tablet + desktop sidebar */}
             <aside
-              className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-slate-900/20 bc-portal-sidebar transition-[width] duration-200 md:flex ${
+              className={`sticky top-0 hidden h-dvh shrink-0 self-start flex-col border-r border-slate-900/20 bc-portal-sidebar transition-[width] duration-200 md:flex ${
                 desktopSidebarExpanded ? 'w-64' : 'w-20'
               }`}
               aria-label="Admin navigation"
@@ -311,7 +311,7 @@ function AdminLayout({ children, pageTitle, pageDescription }) {
             </aside>
         </>
 
-        <div className="bc-portal-workspace flex min-h-screen min-w-0 flex-1 flex-col">
+        <div className="bc-portal-workspace flex min-h-dvh min-w-0 flex-1 flex-col">
           <div className="flex min-h-11 items-center justify-end gap-2 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
             <div className="relative">
               <button
