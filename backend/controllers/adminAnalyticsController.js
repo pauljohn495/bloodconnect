@@ -437,7 +437,8 @@ const getWastagePrescriptionsController = async (req, res) => {
 const getHistoricalWastageController = async (req, res) => {
   try {
     const { days = 90 } = req.query
-    const period = parseInt(days, 10)
+    const parsedPeriod = Number.parseInt(days, 10)
+    const period = Math.min(Math.max(Number.isFinite(parsedPeriod) ? parsedPeriod : 90, 1), 3650)
 
     const [wastageByDate] = await pool.query(
       `

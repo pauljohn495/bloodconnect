@@ -8,6 +8,17 @@ const {
   isEmailTaken,
 } = require('../models/adminUserModel')
 const { successResponse } = require('../utils/response')
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,50}$/
+
+function validateAdminFields({ fullName, email, username, password }) {
+  if (String(fullName).trim().length > 120) return 'Full name must be 120 characters or fewer'
+  if (!USERNAME_PATTERN.test(String(username).trim())) return 'Username must be 3-50 characters and use only letters, numbers, dots, hyphens, or underscores'
+  const cleanEmail = String(email).trim().toLowerCase()
+  if (cleanEmail.length > 254 || !EMAIL_PATTERN.test(cleanEmail)) return 'Invalid email format'
+  if (password !== undefined && (typeof password !== 'string' || password.length < 8 || password.length > 128)) return 'Password must be 8-128 characters'
+  return null
+}
 
 async function getAdminsController(req, res, next) {
   try {
@@ -28,6 +39,13 @@ async function createAdminController(req, res, next) {
     // Basic validation
     if (!fullName || !email || !username || !password) {
       const error = new Error('All fields are required')
+      error.statusCode = 400
+      throw error
+    }
+
+    const validationMessage = validateAdminFields({ fullName, email, username, password })
+    if (validationMessage) {
+      const error = new Error(validationMessage)
       error.statusCode = 400
       throw error
     }
@@ -104,6 +122,14 @@ async function updateAdminController(req, res, next) {
     // Basic validation
     if (!fullName || !email || !username) {
       const error = new Error('Full name, email, and username are required')
+      error.statusCode = 400
+      throw error
+    }
+
+
+    const validationMessage = validateAdminFields({ fullName, email, username })
+    if (validationMessage) {
+      const error = new Error(validationMessage)
       error.statusCode = 400
       throw error
     }

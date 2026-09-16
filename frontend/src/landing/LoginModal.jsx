@@ -70,15 +70,15 @@ export default function LoginModal({ onClose, canRegister }) {
 
   return <Modal title="Good to have you back." eyebrow="YOUR BLOODCONNECT PORTAL" onClose={onClose}>
     <p className="bc-modal-intro">Sign in to stay connected and keep making a difference.</p>
-    <div className="bc-toggle bc-role-toggle" aria-label="Account type">{['donor', 'hospital', 'admin'].map(item => <button key={item} disabled={busy} aria-pressed={role === item} onClick={() => { setRole(item); setDonorIdMode(false); setError(''); setGoogleError('') }}>{item}</button>)}</div>
+    <div className="bc-toggle bc-role-toggle" aria-label="Account type">{['donor', 'hospital', 'admin'].map(item => <button type="button" key={item} disabled={busy} aria-pressed={role === item} onClick={() => { setRole(item); setDonorIdMode(false); setError(''); setGoogleError('') }}>{item}</button>)}</div>
     <form onSubmit={submit} className="bc-login-form">
       <label htmlFor="bc-identifier">{isDonorId ? 'Donor ID' : 'Username or email'}<input id="bc-identifier" required disabled={busy} value={identifier} onChange={event => setIdentifier(event.target.value)} autoComplete={isDonorId ? 'off' : 'username'} placeholder={isDonorId ? 'e.g. BC-12345' : 'Enter your username or email'} /></label>
       {!isDonorId && <label htmlFor="bc-password">Password<input id="bc-password" required disabled={busy} type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" placeholder="Enter your password" /></label>}
       {role === 'donor' && <button type="button" className="bc-text-link" disabled={busy} onClick={() => { setDonorIdMode(value => !value); setError('') }}>{isDonorId ? 'Use username / email instead' : 'Use donor ID instead'}</button>}
       {error && <p className="bc-form-error" role="alert">{error}</p>}
-      <button disabled={busy} className="bc-button bc-button-primary bc-full-width">{busy ? 'Signing in…' : `Sign in as ${role}`}<Icon name="arrow" /></button>
+      <button type="submit" disabled={busy} className="bc-button bc-button-primary bc-full-width">{busy ? 'Signing in…' : `Sign in as ${role}`}<Icon name="arrow" /></button>
     </form>
     {role === 'donor' && <div className="bc-google-login"><div className="bc-divider-label">or continue with</div>{googleClientId ? <div ref={googleButtonRef} className={busy ? 'bc-google-busy' : ''} /> : <p className="bc-login-note">Google sign-in is currently unavailable.</p>}{googleError && <p className="bc-form-error" role="alert">{googleError}</p>}</div>}
-    {canRegister && <p className="bc-login-register">New to BloodConnect? <button className="bc-text-link" onClick={() => navigate('/register')}>Create an account</button></p>}
+    {canRegister && <p className="bc-login-register">New to BloodConnect? <button type="button" className="bc-text-link" onClick={() => navigate('/register')}>Create an account</button></p>}
   </Modal>
 }

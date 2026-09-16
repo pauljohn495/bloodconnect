@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
-import { useFeatureFlags } from '../featureFlagsContext.jsx'
+import { useFeatureFlags } from '../featureFlags.js'
 
 const PORTAL_LABELS = {
   admin: 'Admin console',

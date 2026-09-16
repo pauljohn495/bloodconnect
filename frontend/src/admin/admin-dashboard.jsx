@@ -1,19 +1,16 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
-import { useFeatureFlags } from '../featureFlagsContext.jsx'
+import { useFeatureFlags } from '../featureFlags.js'
 import { apiRequest } from '../api.js'
-import HospitalSupplyMap from '../HospitalSupplyMap.jsx'
-import PrcActivitiesDashboardSection from './PrcActivitiesDashboardSection.jsx'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
+
+const HospitalSupplyMap = lazy(() => import('../HospitalSupplyMap.jsx'))
+const PrcActivitiesDashboardSection = lazy(() => import('./PrcActivitiesDashboardSection.jsx'))
+const TrendChart = lazy(() => import('./TrendChart.jsx'))
+
+function PanelLoading({ label }) {
+  return <div className="flex h-full min-h-40 items-center justify-center rounded-2xl bg-white text-xs text-slate-500" role="status">Loading {label}…</div>
+}
 
 /** Small decorative icons for stat cards (stroke uses currentColor for theme contrast). */
 function IconUsers({ className }) {
@@ -276,7 +273,9 @@ function AdminDashboard() {
             <section className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,2.5fr)_minmax(0,1.2fr)]">
               {/* Supply Mapping container */}
               <div className="min-w-0 min-h-[580px] lg:min-h-[650px]">
-                <HospitalSupplyMap />
+                <Suspense fallback={<PanelLoading label="supply map" />}>
+                  <HospitalSupplyMap />
+                </Suspense>
               </div>
 
               <div className="flex min-h-[580px] flex-col gap-4 lg:min-h-[650px]">
@@ -332,28 +331,15 @@ function AdminDashboard() {
                         No blood stock trend data yet.
                       </div>
                     ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
+                      <Suspense fallback={<PanelLoading label="chart" />}>
+                        <TrendChart
                           data={stockTrendData.slice(stockTrendData.length - stockTrendRangeDays)}
-                          margin={{ top: 12, right: 12, left: 0, bottom: 8 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                          <Tooltip
-                            formatter={(value) => [`${value} units`, 'Available blood']}
-                            labelFormatter={(label, payload) => payload?.[0]?.payload?.dateKey || label}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="units"
-                            stroke="#dc2626"
-                            strokeWidth={2.5}
-                            dot={{ r: 2, fill: '#dc2626' }}
-                            activeDot={{ r: 4 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                          dataKey="units"
+                          color="#dc2626"
+                          unit="units"
+                          label="Available blood"
+                        />
+                      </Suspense>
                     )}
                   </div>
                 </div>
@@ -401,35 +387,26 @@ function AdminDashboard() {
                         No request trend data yet.
                       </div>
                     ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
+                      <Suspense fallback={<PanelLoading label="chart" />}>
+                        <TrendChart
                           data={requestTrendData.slice(requestTrendData.length - requestTrendRangeDays)}
-                          margin={{ top: 12, right: 12, left: 0, bottom: 8 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                          <Tooltip
-                            formatter={(value) => [`${value} requests`, 'Request count']}
-                            labelFormatter={(label, payload) => payload?.[0]?.payload?.dateKey || label}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="count"
-                            stroke="#2563eb"
-                            strokeWidth={2.5}
-                            dot={{ r: 2, fill: '#2563eb' }}
-                            activeDot={{ r: 4 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                          dataKey="count"
+                          color="#2563eb"
+                          unit="requests"
+                          label="Request count"
+                        />
+                      </Suspense>
                     )}
                   </div>
                 </div>
               </div>
             </section>
 
-            {isFlagEnabled('admin', 'admin.prc_activities') && <PrcActivitiesDashboardSection />}
+            {isFlagEnabled('admin', 'admin.prc_activities') && (
+              <Suspense fallback={<div className="mt-6"><PanelLoading label="activities" /></div>}>
+                <PrcActivitiesDashboardSection />
+              </Suspense>
+            )}
 
             {/* Recent Transferred Table */}
             <section className="mt-6">

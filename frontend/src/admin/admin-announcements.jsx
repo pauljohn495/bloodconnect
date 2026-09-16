@@ -31,11 +31,6 @@ function statusLabel(status) {
   return s ? s.label : status
 }
 
-function postCategoryLabel(category) {
-  const c = POST_CATEGORY_OPTIONS.find((o) => o.value === category)
-  return c ? c.label : category
-}
-
 function toDatetimeLocalValue(value) {
   if (!value) return ''
   const d = new Date(value)
@@ -97,13 +92,6 @@ function TypeIcon({ type, className = 'h-4 w-4' }) {
 function typeBadgeClasses(type) {
   if (type === 'urgent_need') return 'bg-red-100 text-red-800 ring-red-200'
   if (type === 'blood_drive') return 'bg-rose-100 text-rose-800 ring-rose-200'
-  return 'bg-slate-100 text-slate-700 ring-slate-200'
-}
-
-function postCategoryBadgeClasses(category) {
-  if (category === 'top_donors') return 'bg-rose-100 text-rose-800 ring-rose-200'
-  if (category === 'top_organizers') return 'bg-violet-100 text-violet-800 ring-violet-200'
-  if (category === 'top_municipality') return 'bg-sky-100 text-sky-800 ring-sky-200'
   return 'bg-slate-100 text-slate-700 ring-slate-200'
 }
 
@@ -298,7 +286,16 @@ function AdminAnnouncements() {
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
-    files.forEach((file) => {
+    const remainingSlots = Math.max(0, 8 - postForm.imageUrls.length)
+    const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+    const acceptedFiles = files
+      .filter((file) => allowedTypes.has(file.type) && file.size <= 2 * 1024 * 1024)
+      .slice(0, remainingSlots)
+
+    if (acceptedFiles.length !== files.length) {
+      showNotification('Upload up to 8 PNG, JPEG, WebP, or GIF images, each no larger than 2 MB.', 'destructive')
+    }
+    acceptedFiles.forEach((file) => {
       const reader = new FileReader()
       reader.onload = (ev) => {
         setPostForm((f) => ({ ...f, imageUrls: [...f.imageUrls, ev.target.result] }))
@@ -973,11 +970,11 @@ function AdminAnnouncements() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <span className="text-xs font-semibold text-slate-600">Click to upload images</span>
-                    <span className="text-[11px] text-slate-400">PNG, JPG, GIF, WEBP — multiple allowed</span>
+                    <span className="text-[11px] text-slate-400">PNG, JPG, GIF, WEBP — up to 8 files, 2 MB each</span>
                     <input
                       id="post-images"
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
                       multiple
                       className="sr-only"
                       onChange={handleImageUpload}

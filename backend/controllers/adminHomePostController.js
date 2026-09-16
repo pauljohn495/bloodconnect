@@ -1,6 +1,26 @@
 const { pool } = require('../db')
 
 const ALLOWED_CATEGORIES = new Set(['top_donors', 'top_organizers', 'top_municipality'])
+const IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base64,/i
+const MAX_IMAGES = 8
+const MAX_IMAGE_LENGTH = 3_000_000
+const MAX_TOTAL_IMAGE_LENGTH = 12_000_000
+
+function validateImageUrls(raw) {
+  if (raw === undefined) return []
+  if (!Array.isArray(raw)) return null
+  if (raw.length > MAX_IMAGES) return null
+
+  let totalLength = 0
+  for (const value of raw) {
+    if (typeof value !== 'string') return null
+    totalLength += value.length
+    const validDataImage = value.length <= MAX_IMAGE_LENGTH && IMAGE_DATA_URL_PATTERN.test(value)
+    const validRemoteImage = value.length <= 2048 && /^https?:\/\//i.test(value)
+    if ((!validDataImage && !validRemoteImage) || totalLength > MAX_TOTAL_IMAGE_LENGTH) return null
+  }
+  return raw
+}
 
 /**
  * Parse image_urls from DB (stored as JSON array string or null).
@@ -56,11 +76,14 @@ const createHomePostController = async (req, res) => {
 
   // imageUrls: array of base64 data URL strings
   const imageUrlsRaw = req.body?.imageUrls
-  const imageUrls = Array.isArray(imageUrlsRaw) ? imageUrlsRaw : []
+  const imageUrls = validateImageUrls(imageUrlsRaw)
+  if (!imageUrls) return res.status(400).json({ message: `imageUrls must contain at most ${MAX_IMAGES} supported images` })
   const imageUrlsJson = imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
 
   if (!title) return res.status(400).json({ message: 'title is required' })
+  if (title.length > 255) return res.status(400).json({ message: 'title must be 255 characters or fewer' })
   if (!body.trim()) return res.status(400).json({ message: 'body is required' })
+  if (body.length > 50_000) return res.status(400).json({ message: 'body must be 50,000 characters or fewer' })
 
   try {
     const [result] = await pool.query(
@@ -87,7 +110,7 @@ const createHomePostController = async (req, res) => {
 
 const updateHomePostController = async (req, res) => {
   const id = Number(req.params.id)
-  if (!Number.isFinite(id) || id < 1) return res.status(400).json({ message: 'Invalid post id' })
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ message: 'Invalid post id' })
 
   const fields = []
   const values = []
@@ -104,6 +127,7 @@ const updateHomePostController = async (req, res) => {
   if (req.body?.title !== undefined) {
     const title = String(req.body.title).trim()
     if (!title) return res.status(400).json({ message: 'title cannot be empty' })
+    if (title.length > 255) return res.status(400).json({ message: 'title must be 255 characters or fewer' })
     fields.push('title = ?')
     values.push(title)
   }
@@ -111,12 +135,14 @@ const updateHomePostController = async (req, res) => {
   if (req.body?.body !== undefined) {
     const body = String(req.body.body)
     if (!body.trim()) return res.status(400).json({ message: 'body cannot be empty' })
+    if (body.length > 50_000) return res.status(400).json({ message: 'body must be 50,000 characters or fewer' })
     fields.push('body = ?')
     values.push(body)
   }
 
   if (req.body?.imageUrls !== undefined) {
-    const imageUrls = Array.isArray(req.body.imageUrls) ? req.body.imageUrls : []
+    const imageUrls = validateImageUrls(req.body.imageUrls)
+    if (!imageUrls) return res.status(400).json({ message: `imageUrls must contain at most ${MAX_IMAGES} supported images` })
     fields.push('image_urls = ?')
     values.push(imageUrls.length > 0 ? JSON.stringify(imageUrls) : null)
   }
@@ -152,7 +178,7 @@ const updateHomePostController = async (req, res) => {
 
 const deleteHomePostController = async (req, res) => {
   const id = Number(req.params.id)
-  if (!Number.isFinite(id) || id < 1) return res.status(400).json({ message: 'Invalid post id' })
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ message: 'Invalid post id' })
 
   try {
     const [result] = await pool.query('DELETE FROM home_posts WHERE id = ?', [id])
@@ -167,7 +193,8 @@ const deleteHomePostController = async (req, res) => {
 const getPublicHomePostsController = async (req, res) => {
   try {
     // Return up to 6 most recent published posts for the landing page
-    const limit = Math.min(Number(req.query?.limit) || 6, 20)
+    const requestedLimit = Number.parseInt(String(req.query?.limit || '6'), 10)
+    const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 6, 1), 20)
     const [rows] = await pool.query(
       `
       SELECT id, category, title, body, image_urls, is_published, created_at, updated_at

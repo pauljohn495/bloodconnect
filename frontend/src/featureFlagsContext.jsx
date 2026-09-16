@@ -1,7 +1,31 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getApiBaseUrl } from './api.js'
+import { FeatureFlagsContext } from './featureFlags.js'
 
-const FeatureFlagsContext = createContext(null)
+const FEATURE_FLAG_CACHE_MS = 60_000
+let cachedFeatureFlags = null
+let cachedAt = 0
+let featureFlagsRequest = null
+
+async function fetchFeatureFlags(force = false) {
+  const cacheIsFresh = cachedFeatureFlags && Date.now() - cachedAt < FEATURE_FLAG_CACHE_MS
+  if (!force && cacheIsFresh) return cachedFeatureFlags
+  if (!force && featureFlagsRequest) return featureFlagsRequest
+
+  featureFlagsRequest = fetch(`${getApiBaseUrl()}/api/feature-flags`)
+    .then(async (response) => {
+      const json = await response.json()
+      if (!response.ok) throw new Error(json?.message || 'Failed to load feature flags')
+      cachedFeatureFlags = json.data ?? json
+      cachedAt = Date.now()
+      return cachedFeatureFlags
+    })
+    .finally(() => {
+      featureFlagsRequest = null
+    })
+
+  return featureFlagsRequest
+}
 
 export function FeatureFlagsProvider({ children }) {
   const [loading, setLoading] = useState(true)
@@ -10,16 +34,11 @@ export function FeatureFlagsProvider({ children }) {
   const [registry, setRegistry] = useState([])
   const [error, setError] = useState(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${getApiBaseUrl()}/api/feature-flags`)
-      const json = await res.json()
-      if (!res.ok) {
-        throw new Error(json?.message || 'Failed to load feature flags')
-      }
-      const data = json.data ?? json
+      const data = await fetchFeatureFlags(force)
       setFlags(data.flags || null)
       setRouteChecks(data.routeChecks || [])
       setRegistry(data.registry || [])
@@ -32,6 +51,8 @@ export function FeatureFlagsProvider({ children }) {
       setLoading(false)
     }
   }, [])
+
+  const refresh = useCallback(() => load(true), [load])
 
   useEffect(() => {
     load()
@@ -64,20 +85,12 @@ export function FeatureFlagsProvider({ children }) {
       flags,
       routeChecks,
       registry,
-      refresh: load,
+      refresh,
       isFlagEnabled,
       isPathEnabled,
     }),
-    [loading, error, flags, routeChecks, registry, load, isFlagEnabled, isPathEnabled],
+    [loading, error, flags, routeChecks, registry, refresh, isFlagEnabled, isPathEnabled],
   )
 
   return <FeatureFlagsContext.Provider value={value}>{children}</FeatureFlagsContext.Provider>
-}
-
-export function useFeatureFlags() {
-  const ctx = useContext(FeatureFlagsContext)
-  if (!ctx) {
-    throw new Error('useFeatureFlags must be used within FeatureFlagsProvider')
-  }
-  return ctx
 }

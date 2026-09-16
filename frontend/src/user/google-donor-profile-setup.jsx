@@ -47,9 +47,13 @@ function GoogleDonorProfileSetup() {
 
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-700">Username</label>
+              <label htmlFor="google-profile-username" className="block text-xs font-medium text-slate-700">Username</label>
               <input
+                id="google-profile-username"
                 type="text"
+                minLength={3}
+                maxLength={50}
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
@@ -59,8 +63,9 @@ function GoogleDonorProfileSetup() {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-700">Blood Type</label>
+              <label htmlFor="google-profile-blood-type" className="block text-xs font-medium text-slate-700">Blood Type</label>
               <select
+                id="google-profile-blood-type"
                 value={bloodType}
                 onChange={(e) => setBloodType(e.target.value)}
                 className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
@@ -79,9 +84,12 @@ function GoogleDonorProfileSetup() {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-slate-700">Contact Number</label>
+              <label htmlFor="google-profile-phone" className="block text-xs font-medium text-slate-700">Contact Number</label>
               <input
+                id="google-profile-phone"
                 type="tel"
+                maxLength={25}
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100"
@@ -90,7 +98,7 @@ function GoogleDonorProfileSetup() {
               />
             </div>
 
-            {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+            {error && <p className="text-xs font-medium text-red-600" role="alert">{error}</p>}
 
             <button
               type="submit"

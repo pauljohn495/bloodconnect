@@ -36,6 +36,8 @@ const hospitalRoutes = require('./routes/hospitalRoutes')
 const userRoutes = require('./routes/userRoutes')
 const notificationRoutes = require('./routes/notificationRoutes')
 const errorHandler = require('./middleware/errorHandler')
+const { applySecurityHeaders } = require('./middleware/security')
+const { errorResponse } = require('./utils/response')
 const { startHospitalInventoryAlertScheduler } = require('./services/hospitalInventoryAlertService')
 const { startDonorRecallScheduler } = require('./services/donorRecallScheduler')
 const { startEventNotificationScheduler } = require('./services/eventNotificationService')
@@ -61,8 +63,12 @@ const envOrigins = [process.env.FRONTEND_URL, process.env.FRONTEND_ORIGIN]
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
-const allowedOrigins = [...new Set([...DEFAULT_DEV_ORIGINS, ...envOrigins])]
+const developmentOrigins = process.env.NODE_ENV === 'production' ? [] : DEFAULT_DEV_ORIGINS
+const allowedOrigins = [...new Set([...developmentOrigins, ...envOrigins])]
 
+app.disable('x-powered-by')
+app.set('trust proxy', 1)
+app.use(applySecurityHeaders)
 app.use(
   cors({
     origin(origin, callback) {
@@ -76,7 +82,13 @@ app.use(
     },
   }),
 )
-app.use(express.json({ limit: '16mb' }))
+app.use('/api/admin/home-posts', express.json({ limit: '16mb' }))
+app.use('/api/user/me', express.json({ limit: '4mb' }))
+app.use(express.json({ limit: '1mb' }))
+app.use((req, res, next) => {
+  if (req.body == null) req.body = {}
+  next()
+})
 
 // Lightweight request timing for staging performance checks. It logs no bodies,
 // credentials, tokens, or query-string values.
@@ -175,4 +187,8 @@ async function start() {
   })
 }
 
-start()
+if (require.main === module) {
+  start()
+}
+
+module.exports = { app, start }

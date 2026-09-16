@@ -29,7 +29,7 @@ export function FeedState({ feed, icon, emptyTitle, emptyText }) {
   if (feed.status === 'success' && feed.items.length) return null
   if (feed.status === 'loading') return <div className="bc-feed-loading" role="status"><span className="bc-sr-only">Loading updates…</span>{[0, 1, 2].map(item => <div key={item} className="bc-skeleton"><span /><span /><span /></div>)}</div>
   const error = feed.status === 'error'
-  return <div className="bc-empty" role="status"><span className="bc-icon-tile"><Icon name={icon} /></span><h3>{error ? 'We couldn’t load these updates' : emptyTitle}</h3><p>{error ? 'Please try again to see the latest information.' : emptyText}</p>{error && <button className="bc-button bc-button-secondary" onClick={feed.retry}>Try again<Icon name="arrow" /></button>}</div>
+  return <div className="bc-empty" role="status"><span className="bc-icon-tile"><Icon name={icon} /></span><h3>{error ? 'We couldn’t load these updates' : emptyTitle}</h3><p>{error ? 'Please try again to see the latest information.' : emptyText}</p>{error && <button type="button" className="bc-button bc-button-secondary" onClick={feed.retry}>Try again<Icon name="arrow" /></button>}</div>
 }
 
 export function Modal({ title, eyebrow, onClose, children }) {
@@ -54,5 +54,5 @@ export function Modal({ title, eyebrow, onClose, children }) {
     document.addEventListener('keydown', handleKey)
     return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', handleKey); if (previousFocus?.isConnected) previousFocus.focus() }
   }, [])
-  return <div className="bc-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose() }}><section ref={dialogRef} className="bc-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><button className="bc-modal-close bc-icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button><p className="bc-eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2>{children}</section></div>
+  return <div className="bc-modal-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose() }}><section ref={dialogRef} className="bc-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}><button type="button" className="bc-modal-close bc-icon-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button><p className="bc-eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2>{children}</section></div>
 }

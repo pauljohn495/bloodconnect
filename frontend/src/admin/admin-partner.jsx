@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 import { adminPanel } from './admin-ui.jsx'
+import ConfirmDialog from '../ConfirmDialog.jsx'
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -112,24 +113,8 @@ function AdminPartner() {
   const [fulfilledRequests, setFulfilledRequests] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [selectedRequestIds, setSelectedRequestIds] = useState(new Set())
-
-  const selectedRequests = useMemo(() => hospitalApprovedRequests.filter((req) => selectedRequestIds.has(req.requestId)), [hospitalApprovedRequests, selectedRequestIds])
-
-  const selectedBloodProducts = useMemo(
-    () => new Set(selectedRequests.map((req) => `${req.bloodType}|${req.componentType || 'whole_blood'}`)),
-    [selectedRequests],
-  )
-
-  const filteredInventory = useMemo(
-    () => selectedBloodProducts.size > 0
-      ? availableInventory.filter((item) =>
-          selectedBloodProducts.has(
-            `${item.blood_type || item.bloodType}|${item.component_type || item.componentType || 'whole_blood'}`,
-          ),
-        )
-      : availableInventory,
-    [selectedBloodProducts, availableInventory],
-  )
+  const [hospitalToDelete, setHospitalToDelete] = useState(null)
+  const [isDeletingHospital, setIsDeletingHospital] = useState(false)
 
   const loadHospitals = async () => {
     try {
@@ -263,19 +248,20 @@ function AdminPartner() {
     }
   }
 
-  const handleDeleteHospital = async (hospital) => {
-    const name = hospital.hospital_name || hospital.hospitalName || 'this hospital'
-    const confirmed = window.confirm(`Delete ${name}? This will remove its hospital login too.`)
-    if (!confirmed) return
-
+  const handleDeleteHospital = async () => {
+    if (!hospitalToDelete) return
     try {
-      await apiRequest(`/api/admin/hospitals/${hospital.id}`, { method: 'DELETE' })
+      setIsDeletingHospital(true)
+      await apiRequest(`/api/admin/hospitals/${hospitalToDelete.id}`, { method: 'DELETE' })
       setOpenMenuHospitalId(null)
       await loadHospitals()
+      setHospitalToDelete(null)
       showNotification('Hospital deleted successfully!', 'primary')
     } catch (err) {
       console.error('Failed to delete hospital', err)
       showNotification(err.message || 'Failed to delete hospital', 'destructive')
+    } finally {
+      setIsDeletingHospital(false)
     }
   }
 
@@ -355,7 +341,7 @@ function AdminPartner() {
     setFulfilledRequests([])
   }
 
-  const handleStockToggle = (inventoryId, availableUnits) => {
+  const handleStockToggle = (inventoryId) => {
     setSelectedStocks((prev) => {
       const newStocks = { ...prev }
       if (newStocks[inventoryId]) {
@@ -747,7 +733,8 @@ function AdminPartner() {
                 onClick={() => {
                   const hospital = hospitals.find((h) => h.id === openMenuHospitalId)
                   if (hospital) {
-                    handleDeleteHospital(hospital)
+                    setHospitalToDelete(hospital)
+                    setOpenMenuHospitalId(null)
                   }
                 }}
               >
@@ -817,6 +804,9 @@ function AdminPartner() {
                 </label>
                 <input
                   type="password"
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
@@ -952,6 +942,9 @@ function AdminPartner() {
                 </label>
                 <input
                   type="password"
+                  minLength={editPassword ? 8 : undefined}
+                  maxLength={128}
+                  autoComplete="new-password"
                   value={editPassword}
                   onChange={(e) => setEditPassword(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
@@ -1529,6 +1522,16 @@ function AdminPartner() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(hospitalToDelete)}
+        title="Delete hospital?"
+        message={`Delete ${hospitalToDelete?.hospital_name || hospitalToDelete?.hospitalName || 'this hospital'}? This will also remove its hospital login.`}
+        confirmLabel="Delete hospital"
+        loading={isDeletingHospital}
+        onConfirm={handleDeleteHospital}
+        onCancel={() => setHospitalToDelete(null)}
+      />
 
       </React.Fragment>
     </AdminLayout>

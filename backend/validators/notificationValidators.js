@@ -2,9 +2,9 @@ const { errorResponse } = require('../utils/response')
 
 function validateNotificationIdParam(req, res, next) {
   const { id } = req.params
-  const notificationId = parseInt(id, 10)
+  const notificationId = Number(id)
 
-  if (Number.isNaN(notificationId)) {
+  if (!Number.isSafeInteger(notificationId) || notificationId <= 0) {
     return errorResponse(res, {
       statusCode: 400,
       message: 'Invalid notification id',

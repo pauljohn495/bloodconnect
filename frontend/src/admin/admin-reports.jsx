@@ -614,12 +614,6 @@ function AdminReports() {
       return acc
     }, {})
 
-  const getLocationName = (locationKey) => {
-    if (locationKey === 'central') return 'Central Inventory'
-    if (locationKey.startsWith('h:')) return getHospitalName(Number(locationKey.slice(2)))
-    return locationKey
-  }
-
   const legacyRequestTransferRecommendations = activeHospitalRequests
     .map((req) => {
       const bloodType = req.blood_type || req.bloodType
@@ -903,23 +897,6 @@ function AdminReports() {
   const expiringActionByRowKey = Object.fromEntries(
     expiringActionSuggestions.map((s) => [`${s.bloodType}|${s.componentType}`, s]),
   )
-
-  const handleFulfillRequest = async (requestId) => {
-    try {
-      await apiRequest(`/api/admin/requests/${requestId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: 'fulfilled',
-        }),
-      })
-      // Refresh only the requests list so analytics update
-      const updatedRequests = await apiRequest('/api/admin/requests')
-      setRequests(updatedRequests || [])
-    } catch (err) {
-      console.error('Failed to fulfill request from reports page', err)
-      // Keep it simple here; main status handling is on the Requests page
-    }
-  }
 
   return (
     <AdminLayout

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminLayout from './AdminLayout.jsx'
 import { apiRequest } from '../api.js'
 import { adminPanel } from './admin-ui.jsx'
@@ -26,9 +26,26 @@ function AdminUsers() {
 
   const currentUserRole = localStorage.getItem('role')
 
+  const showNotification = useCallback((message, type = 'primary') => {
+    setNotification({ message, type })
+    setTimeout(() => setNotification(null), 5000)
+  }, [])
+
+  const loadAdmins = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const data = await apiRequest('/api/admin/admins')
+      setAdmins(data)
+    } catch (error) {
+      showNotification(error.message || 'Failed to load admins', 'destructive')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [showNotification])
+
   useEffect(() => {
     loadAdmins()
-  }, [])
+  }, [loadAdmins])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -37,23 +54,6 @@ function AdminUsers() {
     window.addEventListener('scroll', handleScroll, true)
     return () => window.removeEventListener('scroll', handleScroll, true)
   }, [openMenuAdminId])
-
-  const loadAdmins = async () => {
-    try {
-      setIsLoading(true)
-      const data = await apiRequest('/api/admin/admins')
-      setAdmins(data)
-    } catch (err) {
-      showNotification('Failed to load admins', 'destructive')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const showNotification = (message, type = 'primary') => {
-    setNotification({ message, type })
-    setTimeout(() => setNotification(null), 5000)
-  }
 
   const handleCreateAdmin = async (e) => {
     e.preventDefault()
@@ -331,7 +331,9 @@ function AdminUsers() {
                     value={formData.password}
                     onChange={handleInputChange}
                     required
-                    minLength="6"
+                    minLength="8"
+                    maxLength="128"
+                    autoComplete="new-password"
                     className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500"
                   />
                 </div>

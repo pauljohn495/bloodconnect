@@ -2,7 +2,7 @@ import '../portal-theme.css'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../BrandLogo.jsx'
-import { useFeatureFlags } from '../featureFlagsContext.jsx'
+import { useFeatureFlags } from '../featureFlags.js'
 
 const HOSPITAL_SIDEBAR_HOVER_KEY = 'hospitalSidebarHovered'
 const iconClassName = 'h-5 w-5 shrink-0'
@@ -100,7 +100,6 @@ function NavLinks({ onNavigate, isExpanded, items }) {
 }
 
 function HospitalLayout({ children, pageTitle, pageDescription }) {
-  const location = useLocation()
   const navigate = useNavigate()
   const { isFlagEnabled } = useFeatureFlags()
   const sidebarItems = useMemo(() => {
@@ -111,10 +110,6 @@ function HospitalLayout({ children, pageTitle, pageDescription }) {
     if (typeof window === 'undefined') return false
     return localStorage.getItem(HOSPITAL_SIDEBAR_HOVER_KEY) === 'true'
   })
-
-  useEffect(() => {
-    setMobileOpen(false)
-  }, [location.pathname])
 
   useEffect(() => {
     if (!mobileOpen) return

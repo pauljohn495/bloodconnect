@@ -5,7 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import { createServer } from 'vite'
 
-const server = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom', logLevel: 'error' })
+const server = await createServer({
+  server: { middlewareMode: true, hmr: false },
+  optimizeDeps: { noDiscovery: true },
+  appType: 'custom',
+  logLevel: 'error',
+})
 let checks = 0
 const check = (name, run) => { run(); checks += 1; console.log(`PASS ${name}`) }
 const noop = () => {}

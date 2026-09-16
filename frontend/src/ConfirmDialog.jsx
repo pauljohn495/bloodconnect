@@ -1,3 +1,5 @@
+import { useEffect, useId, useRef } from 'react'
+
 /**
  * Accessible confirmation overlay — use for destructive actions instead of window.confirm.
  */
@@ -12,6 +14,56 @@ export default function ConfirmDialog({
   loading = false,
   confirmTone = 'danger',
 }) {
+  const dialogRef = useRef(null)
+  const onCancelRef = useRef(onCancel)
+  const loadingRef = useRef(loading)
+  const titleId = useId()
+  const descriptionId = useId()
+
+  useEffect(() => {
+    onCancelRef.current = onCancel
+    loadingRef.current = loading
+  }, [loading, onCancel])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.focus()
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !loadingRef.current) {
+        event.preventDefault()
+        onCancelRef.current()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusable = [...(dialogRef.current?.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]') || [])]
+        .filter((element) => element.getClientRects().length > 0)
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (!first) {
+        event.preventDefault()
+      } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      if (previousFocus?.isConnected) previousFocus.focus()
+    }
+  }, [open])
+
   if (!open) return null
 
   const confirmBtnClass =
@@ -32,16 +84,18 @@ export default function ConfirmDialog({
         disabled={loading}
       />
       <div
+        ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-desc"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
         className="relative z-10 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
       >
-        <h3 id="confirm-dialog-title" className="text-lg font-bold text-slate-900">
+        <h3 id={titleId} className="text-lg font-bold text-slate-900">
           {title}
         </h3>
-        <p id="confirm-dialog-desc" className="mt-2 text-sm leading-relaxed text-slate-600">
+        <p id={descriptionId} className="mt-2 text-sm leading-relaxed text-slate-600">
           {message}
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">

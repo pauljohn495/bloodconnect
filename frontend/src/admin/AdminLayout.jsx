@@ -2,7 +2,7 @@ import '../portal-theme.css'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../BrandLogo.jsx'
-import { useFeatureFlags } from '../featureFlagsContext.jsx'
+import { useFeatureFlags } from '../featureFlags.js'
 import { apiRequest } from '../api.js'
 
 const ADMIN_SIDEBAR_HOVER_KEY = 'adminSidebarHovered'

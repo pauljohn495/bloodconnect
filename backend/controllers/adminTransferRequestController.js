@@ -317,7 +317,8 @@ const createTransferController = async (req, res) => {
 
 const getTransfersController = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit, 10) || 10
+    const parsedLimit = Number.parseInt(req.query.limit, 10)
+    const limit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 10, 1), 100)
     const [rows] = await pool.query(
       `
       SELECT 

@@ -259,7 +259,8 @@ async function getHistoricalWastage(req, res, next) {
     if (!hospitalId) return
 
     const { days = 90 } = req.query
-    const intDays = parseInt(days, 10) || 90
+    const parsedDays = Number.parseInt(days, 10)
+    const intDays = Math.min(Math.max(Number.isFinite(parsedDays) ? parsedDays : 90, 1), 3650)
 
     const result = await getHospitalHistoricalWastage(hospitalId, intDays)
 

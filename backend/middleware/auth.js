@@ -14,7 +14,10 @@ function auth(requiredRoles = []) {
       if (!secret) {
         return res.status(503).json({ message: 'Authentication is not configured' })
       }
-      const decoded = jwt.verify(token, secret)
+      const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] })
+      if (!decoded || !Number.isInteger(Number(decoded.id)) || typeof decoded.role !== 'string') {
+        return res.status(401).json({ message: 'Invalid or expired token' })
+      }
       req.user = decoded
 
       if (requiredRoles.length && !requiredRoles.includes(decoded.role)) {
@@ -22,8 +25,7 @@ function auth(requiredRoles = []) {
       }
 
       next()
-    } catch (error) {
-      console.error('JWT verification failed:', error)
+    } catch {
       return res.status(401).json({ message: 'Invalid or expired token' })
     }
   }

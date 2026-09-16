@@ -134,7 +134,8 @@ async function sendDonorNotifyController(req, res, next) {
 
 async function listDonorNotifyHistoryController(req, res, next) {
   try {
-    const limit = Math.min(Number.parseInt(String(req.query?.limit || '50'), 10) || 50, 100)
+    const parsedLimit = Number.parseInt(String(req.query?.limit || '50'), 10)
+    const limit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 50, 1), 100)
     const [rows] = await pool.query(
       `
       SELECT id, title, message, sent_by_name, recipient_count, eligible_only, blood_types_json, created_at

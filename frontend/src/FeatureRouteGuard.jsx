@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { useFeatureFlags } from './featureFlagsContext.jsx'
+import { useFeatureFlags } from './featureFlags.js'
 
 const EXACT_ALLOWLIST = new Set([
   '/module-unavailable',

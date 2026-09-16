@@ -19,27 +19,46 @@ const API_BASE_URL = getApiBaseUrl()
 export async function apiRequest(path, options = {}) {
   const token = localStorage.getItem('token')
 
+  const hasBody = options.body !== undefined && options.body !== null
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+
   const headers = {
-    'Content-Type': 'application/json',
+    ...(hasBody && !isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  })
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error
+    throw new Error('Unable to reach the server. Check your connection and try again.', {
+      cause: error,
+    })
+  }
 
   let data = null
-  try {
-    data = await response.json()
-  } catch {
-    // ignore JSON parse errors for empty responses
+  if (response.status !== 204) {
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      try {
+        data = await response.json()
+      } catch {
+        data = null
+      }
+    }
   }
 
   if (!response.ok) {
-    const message = data?.message || 'Request failed'
-    throw new Error(message)
+    const message = data?.message || `Request failed (${response.status})`
+    const error = new Error(message)
+    error.status = response.status
+    error.details = data?.errors || null
+    throw error
   }
 
   // Support standardized API responses of shape:

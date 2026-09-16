@@ -6,11 +6,12 @@ import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 import { BrandLogo } from '../BrandLogo.jsx'
 import { responsiveTableContainer } from '../admin/admin-ui.jsx'
 import { DashboardAnnouncementsPanel } from '../AnnouncementFeed.jsx'
-import { useFeatureFlags } from '../featureFlagsContext.jsx'
+import { useFeatureFlags } from '../featureFlags.js'
 
 const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
 const RC143_REQUESTS_KEY = 'bloodconnect_rc143_activity_requests'
 const SCHEDULE_BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = false
 
 function UserDashboard() {
   const navigate = useNavigate()
@@ -429,21 +430,8 @@ function UserDashboard() {
     }
   }
 
-  const openRequestActivityModal = () => {
-    setActivityRequestForm({
-      title: '',
-      details: '',
-      location: '',
-    })
-    setIsRequestActivityModalOpen(true)
-  }
-
   const closeRequestActivityModal = () => {
     setIsRequestActivityModalOpen(false)
-  }
-
-  const openRequestHistoryModal = () => {
-    setIsRequestHistoryModalOpen(true)
   }
 
   const closeRequestHistoryModal = () => {
@@ -763,14 +751,16 @@ function UserDashboard() {
               <button
                 type="button"
                 onClick={handleOpenScheduleModal}
-                disabled={scheduleRequest && scheduleRequest.status === 'pending'}
+                disabled={eligibilityLoading || (scheduleRequest && scheduleRequest.status === 'pending')}
                 className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition sm:w-auto sm:py-2 ${
-                  scheduleRequest && scheduleRequest.status === 'pending'
+                  eligibilityLoading || (scheduleRequest && scheduleRequest.status === 'pending')
                     ? 'cursor-not-allowed bg-slate-400'
                     : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {scheduleRequest && scheduleRequest.status === 'pending'
+                {eligibilityLoading
+                  ? 'Checking eligibility…'
+                  : scheduleRequest && scheduleRequest.status === 'pending'
                   ? 'Blood request pending'
                   : 'Schedule blood request'}
               </button>
@@ -789,7 +779,7 @@ function UserDashboard() {
           </section>
         )}
 
-        {false && isRc143Volunteer && (
+        {SHOW_LEGACY_RC143_ACTIVITY_REQUESTS && isRc143Volunteer && (
           <section className="mb-8">
             <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/90">
               <div className="border-b border-slate-100 bg-white px-4 py-4 sm:px-6">

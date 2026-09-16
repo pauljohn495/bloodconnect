@@ -43,6 +43,8 @@ function maxExpirationYmdFromToday() {
   return `${y}-${m}-${day}`
 }
 
+const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = false
+
 function AdminDonation() {
   const WHOLE_BLOOD_COOLDOWN_DAYS = 90
   const BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -154,12 +156,12 @@ function AdminDonation() {
   const [rc143VolContact, setRc143VolContact] = useState('')
   const [rc143VolAddress, setRc143VolAddress] = useState('')
   const [rc143VolContactNumber, setRc143VolContactNumber] = useState('')
-  const showNotification = (message, type = 'primary') => {
+  const showNotification = useCallback((message, type = 'primary') => {
     setNotification({ message, type })
     setTimeout(() => {
       setNotification(null)
     }, 5000)
-  }
+  }, [])
 
   const loadDonors = async () => {
     try {
@@ -223,7 +225,7 @@ function AdminDonation() {
       setIsOrganizationsLoading(false)
     }
   }
-  const loadMunicipalities = async () => {
+  const loadMunicipalities = useCallback(async () => {
     try {
       setMunicipalitiesLoading(true)
       setMunicipalities(await apiRequest('/api/admin/municipalities'))
@@ -232,16 +234,16 @@ function AdminDonation() {
     } finally {
       setMunicipalitiesLoading(false)
     }
-  }
+  }, [showNotification])
 
-  const loadRc143Volunteers = async () => {
+  const loadRc143Volunteers = useCallback(async () => {
     try {
       const data = await apiRequest('/api/admin/rc143-volunteers')
       setRc143Volunteers(Array.isArray(data) ? data : [])
     } catch (err) {
       showNotification(err.message || 'Failed to load RC143 volunteers', 'destructive')
     }
-  }
+  }, [showNotification])
 
   useEffect(() => {
     loadDonors()
@@ -257,10 +259,10 @@ function AdminDonation() {
     if (activeSection === 'rc143') {
       loadRc143Volunteers()
     }
-  }, [activeSection])
+  }, [activeSection, loadRc143Volunteers])
   useEffect(() => {
     if (activeSection === 'municipalities') loadMunicipalities()
-  }, [activeSection])
+  }, [activeSection, loadMunicipalities])
 
   const createMunicipality = async (e) => {
     e.preventDefault()
@@ -1310,7 +1312,7 @@ function AdminDonation() {
                 </div>
               </div>
 
-              {false && (<div>
+              {SHOW_LEGACY_RC143_ACTIVITY_REQUESTS && (<div>
                 <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
                   <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
                   Volunteer activity requests

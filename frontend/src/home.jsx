@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BrandLogo } from './BrandLogo.jsx'
-import { useFeatureFlags } from './featureFlagsContext.jsx'
+import { useFeatureFlags } from './featureFlags.js'
 import { Icon, Modal, FeedState } from './landing/shared.jsx'
 import { formatDate, usePublicFeed } from './landing/data.js'
 import LoginModal from './landing/LoginModal.jsx'
@@ -17,8 +17,8 @@ function DonorPhoto() {
         <img
           src={donorPhoto}
           alt="A blood donor receiving care from a healthcare worker during a donation"
-          width="6000"
-          height="4000"
+          width="1600"
+          height="1067"
           fetchPriority="high"
           decoding="async"
         />
@@ -152,7 +152,7 @@ export default function Home() {
 
       <section id="community" className="bc-community"><div className="bc-container bc-community-grid"><div><p className="bc-eyebrow">THE PEOPLE BEHIND THE PURPOSE</p><p className="bc-community-disciplines">Volunteers • Logistics • Information Technology</p><h2>Always First,<br />Always Ready,<br /><em>Always There</em></h2><p>Compassion is where it starts. Connection is how it grows. Together, we’re building a community that’s ready to make a difference.</p></div><figure className="bc-community-photo">
           <div className="bc-community-photo-frame">
-            <img src={teamPhoto} alt="A healthcare worker preparing donation records and supplies at a community blood drive" width="5952" height="3720" loading="lazy" decoding="async" />
+            <img src={teamPhoto} alt="A healthcare worker preparing donation records and supplies at a community blood drive" width="1600" height="1000" loading="lazy" decoding="async" />
           </div>
           <figcaption><Icon name="users" /><span>Care in action. Community at heart.</span></figcaption>
         </figure></div></section>

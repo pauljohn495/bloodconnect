@@ -103,7 +103,10 @@ function HospitalSupplyMap() {
       try {
         setIsLoading(true)
         setError('')
-        const data = await apiRequest('/api/admin/hospitals')
+        const [data, inventory] = await Promise.all([
+          apiRequest('/api/admin/hospitals'),
+          apiRequest('/api/admin/inventory?scope=all'),
+        ])
 
         if (!isMounted) return
 
@@ -122,64 +125,36 @@ function HospitalSupplyMap() {
           })
           .filter(Boolean)
 
-        const enriched = await Promise.all(
-          baseHospitals.map(async (h) => {
-            try {
-              const inventory = await apiRequest(`/api/admin/inventory?hospitalId=${h.id}`)
+        const inventoryByHospital = (Array.isArray(inventory) ? inventory : []).reduce((map, row) => {
+          const hospitalId = Number(row.hospital_id ?? row.hospitalId)
+          const available = Number(row.available_units ?? row.availableUnits ?? row.units ?? 0)
+          if (!Number.isFinite(hospitalId) || row.status === 'expired' || available <= 0) return map
 
-              const totals = inventory.reduce(
-                (acc, row) => {
-                  const status = row.status
-                  const available =
-                    row.available_units ?? row.availableUnits ?? row.units ?? 0
+          const totals = map.get(hospitalId) || { wholeBlood: 0, platelets: 0, plasma: 0 }
+          const component = row.component_type || row.componentType || 'whole_blood'
+          if (component === 'platelets') totals.platelets += available
+          else if (component === 'plasma') totals.plasma += available
+          else totals.wholeBlood += available
+          map.set(hospitalId, totals)
+          return map
+        }, new Map())
 
-                  if (status === 'expired' || available <= 0) {
-                    return acc
-                  }
-
-                  const component =
-                    row.component_type || row.componentType || 'whole_blood'
-
-                  if (component === 'platelets') {
-                    acc.platelets += available
-                  } else if (component === 'plasma') {
-                    acc.plasma += available
-                  } else {
-                    acc.wholeBlood += available
-                  }
-
-                  return acc
-                },
-                { wholeBlood: 0, platelets: 0, plasma: 0 },
-              )
-
-              const totalUnits =
-                totals.wholeBlood + totals.platelets + totals.plasma
-              const status = getStatus(totalUnits)
-
-              return {
-                ...h,
-                totalUnits,
-                wholeBloodUnits: totals.wholeBlood,
-                plateletUnits: totals.platelets,
-                plasmaUnits: totals.plasma,
-                status,
-              }
-            } catch {
-              const totalUnits = 0
-              const status = getStatus(totalUnits)
-
-              return {
-                ...h,
-                totalUnits,
-                wholeBloodUnits: 0,
-                plateletUnits: 0,
-                plasmaUnits: 0,
-                status,
-              }
-            }
-          }),
-        )
+        const enriched = baseHospitals.map((hospital) => {
+          const totals = inventoryByHospital.get(Number(hospital.id)) || {
+            wholeBlood: 0,
+            platelets: 0,
+            plasma: 0,
+          }
+          const totalUnits = totals.wholeBlood + totals.platelets + totals.plasma
+          return {
+            ...hospital,
+            totalUnits,
+            wholeBloodUnits: totals.wholeBlood,
+            plateletUnits: totals.platelets,
+            plasmaUnits: totals.plasma,
+            status: getStatus(totalUnits),
+          }
+        })
 
         setHospitals(enriched)
         setLastUpdated(new Date())

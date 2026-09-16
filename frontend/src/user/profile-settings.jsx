@@ -150,7 +150,18 @@ function ProfileSettings() {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0]
     if (file) {
-      // In a real app, you would upload the file and get a URL
+      const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+      if (!allowedTypes.has(file.type)) {
+        setError('Choose a PNG, JPEG, WebP, or GIF image.')
+        e.target.value = ''
+        return
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        setError('Profile images must be 2 MB or smaller.')
+        e.target.value = ''
+        return
+      }
+      setError('')
       const reader = new FileReader()
       reader.onloadend = () => {
         setEditedData((prev) => ({ ...prev, avatar: reader.result }))
@@ -358,7 +369,7 @@ function ProfileSettings() {
                           </svg>
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
                             onChange={handleAvatarChange}
                             className="hidden"
                           />

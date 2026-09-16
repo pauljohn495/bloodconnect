@@ -151,11 +151,14 @@ function DonorRegistration() {
 
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700">
+                <label htmlFor="registration-full-name" className="block text-xs font-medium text-zinc-700">
                   Full Name
                 </label>
                 <input
+                  id="registration-full-name"
                   type="text"
+                  maxLength={120}
+                  autoComplete="name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:bg-white focus:border-[#a52f49] focus:ring-2 focus:ring-[#ead2dc]"
@@ -164,11 +167,15 @@ function DonorRegistration() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700">
+                <label htmlFor="registration-username" className="block text-xs font-medium text-zinc-700">
                   Username
                 </label>
                 <input
+                  id="registration-username"
                   type="text"
+                  minLength={3}
+                  maxLength={50}
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:bg-white focus:border-[#a52f49] focus:ring-2 focus:ring-[#ead2dc]"
@@ -178,11 +185,14 @@ function DonorRegistration() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700">
+                <label htmlFor="registration-email" className="block text-xs font-medium text-zinc-700">
                   Email <span className="text-zinc-400">(optional)</span>
                 </label>
                 <input
+                  id="registration-email"
                   type="email"
+                  maxLength={254}
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:bg-white focus:border-[#a52f49] focus:ring-2 focus:ring-[#ead2dc]"
@@ -191,11 +201,14 @@ function DonorRegistration() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700">
+                <label htmlFor="registration-phone" className="block text-xs font-medium text-zinc-700">
                   Mobile Number
                 </label>
                 <input
+                  id="registration-phone"
                   type="tel"
+                  maxLength={25}
+                  autoComplete="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:bg-white focus:border-[#a52f49] focus:ring-2 focus:ring-[#ead2dc]"
@@ -205,10 +218,11 @@ function DonorRegistration() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700">
+                <label htmlFor="registration-blood-type" className="block text-xs font-medium text-zinc-700">
                   Blood Type
                 </label>
                 <select
+                  id="registration-blood-type"
                   value={bloodType}
                   onChange={(e) => setBloodType(e.target.value)}
                   className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:bg-white focus:border-[#a52f49] focus:ring-2 focus:ring-[#ead2dc]"
@@ -227,11 +241,15 @@ function DonorRegistration() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700">
+                <label htmlFor="registration-password" className="block text-xs font-medium text-zinc-700">
                   Password
                 </label>
                 <input
+                  id="registration-password"
                   type="password"
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:bg-white focus:border-[#a52f49] focus:ring-2 focus:ring-[#ead2dc]"
@@ -240,11 +258,15 @@ function DonorRegistration() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-zinc-700">
+                <label htmlFor="registration-confirm-password" className="block text-xs font-medium text-zinc-700">
                   Confirm Password
                 </label>
                 <input
+                  id="registration-confirm-password"
                   type="password"
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="block w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:bg-white focus:border-[#a52f49] focus:ring-2 focus:ring-[#ead2dc]"
@@ -253,13 +275,13 @@ function DonorRegistration() {
               </div>
 
               {error && (
-                <p className="text-xs font-medium text-[#a52f49]">
+                <p className="text-xs font-medium text-[#a52f49]" role="alert">
                   {error}
                 </p>
               )}
 
               {success && (
-                <p className="text-xs font-medium text-[#82203e]">
+                <p className="text-xs font-medium text-[#82203e]" role="status">
                   {success}
                 </p>
               )}
