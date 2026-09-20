@@ -326,6 +326,7 @@ async function ensureMbdTables() {
       id INT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(255) NOT NULL,
       organizer_name VARCHAR(255) NOT NULL DEFAULT '',
+      organization_id INT NULL,
       event_date DATE NOT NULL,
       location VARCHAR(512) NOT NULL,
       municipality_id INT NULL,
@@ -333,7 +334,9 @@ async function ensureMbdTables() {
       deferral_counts_json MEDIUMTEXT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_mbd_events_event_date (event_date)
+      INDEX idx_mbd_events_event_date (event_date),
+      INDEX idx_mbd_events_organization (organization_id),
+      CONSTRAINT fk_mbd_event_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
   await pool.query(`
@@ -389,6 +392,12 @@ async function ensureMbdTables() {
       "ALTER TABLE mbd_events ADD COLUMN organizer_name VARCHAR(255) NOT NULL DEFAULT '' AFTER name",
     )
     console.log('Schema: added mbd_events.organizer_name')
+  }
+  if (!(await columnExists('mbd_events', 'organization_id'))) {
+    await pool.query('ALTER TABLE mbd_events ADD COLUMN organization_id INT NULL AFTER organizer_name')
+    await pool.query('ALTER TABLE mbd_events ADD INDEX idx_mbd_events_organization (organization_id)')
+    await pool.query('ALTER TABLE mbd_events ADD CONSTRAINT fk_mbd_event_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL')
+    console.log('Schema: added mbd_events.organization_id')
   }
   if (!(await columnExists('mbd_events', 'deferral_counts_json'))) {
     await pool.query(

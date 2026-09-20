@@ -5,13 +5,25 @@ const getOrganizationDonationRankingController = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-        SELECT 
+        SELECT
           o.id as organization_id,
           o.name as organization_name,
-          COALESCE(SUM(odi.units), 0) as total_units_donated
-        FROM organization_donations od
-        JOIN organizations o ON o.id = od.organization_id
-        JOIN organization_donation_items odi ON odi.donation_id = od.id
+          COALESCE(SUM(contributions.units), 0) as total_units_donated
+        FROM organizations o
+        JOIN (
+          SELECT od.organization_id, SUM(odi.units) AS units
+          FROM organization_donations od
+          JOIN organization_donation_items odi ON odi.donation_id = od.id
+          GROUP BY od.organization_id
+
+          UNION ALL
+
+          SELECT e.organization_id, COUNT(d.id) AS units
+          FROM mbd_events e
+          JOIN mbd_donor_records d ON d.mbd_event_id = e.id
+          WHERE e.organization_id IS NOT NULL
+          GROUP BY e.organization_id
+        ) contributions ON contributions.organization_id = o.id
         GROUP BY o.id, o.name
         ORDER BY total_units_donated DESC, o.name ASC
         LIMIT ?

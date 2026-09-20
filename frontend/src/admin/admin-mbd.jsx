@@ -441,6 +441,7 @@ function ConfirmModal({ open, title, message, confirmText = 'Confirm', cancelTex
 const emptyCreateForm = () => ({
   name: '',
   organizerName: '',
+  organizationId: '',
   rc143VolunteerId: '',
   eventDate: '',
   location: '',
@@ -497,6 +498,7 @@ function AdminMbd() {
   const [mbdRequestsLoading, setMbdRequestsLoading] = useState(false)
   const [registeredVolunteers, setRegisteredVolunteers] = useState([])
   const [municipalities, setMunicipalities] = useState([])
+  const [organizations, setOrganizations] = useState([])
 
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
@@ -533,6 +535,16 @@ function AdminMbd() {
     }
   }, [])
 
+  const loadOrganizations = useCallback(async () => {
+    try {
+      const data = await apiRequest('/api/admin/organizations')
+      setOrganizations(Array.isArray(data) ? data : [])
+    } catch (e) {
+      showNotification(e.message || 'Failed to load organizations', 'destructive')
+      setOrganizations([])
+    }
+  }, [])
+
   const openMbdRequests = async () => {
     setMbdRequestsOpen(true)
     setMbdRequestsLoading(true)
@@ -563,13 +575,13 @@ function AdminMbd() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      await Promise.all([loadEvents(), loadRegisteredVolunteers(), loadMunicipalities()])
+      await Promise.all([loadEvents(), loadRegisteredVolunteers(), loadMunicipalities(), loadOrganizations()])
       if (!cancelled) setLoading(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [loadEvents, loadRegisteredVolunteers, loadMunicipalities])
+  }, [loadEvents, loadRegisteredVolunteers, loadMunicipalities, loadOrganizations])
 
   const openModal = async (row) => {
     setSelectedEvent(row)
@@ -624,6 +636,7 @@ function AdminMbd() {
         body: JSON.stringify({
           name: createForm.name.trim(),
           organizerName: createForm.organizerName.trim(),
+          organizationId: createForm.organizationId ? Number(createForm.organizationId) : null,
           rc143VolunteerId: Number(createForm.rc143VolunteerId),
           eventDate: createForm.eventDate,
           location: createForm.location.trim(),
@@ -1067,6 +1080,7 @@ function AdminMbd() {
             <div><strong>VENUE:</strong> ${escapeHtml(selectedEvent.location)}</div>
             <div><strong>EVENT:</strong> ${escapeHtml(selectedEvent.name)}</div>
             <div><strong>ORGANIZER:</strong> ${escapeHtml(selectedEvent.organizer_name || '')}</div>
+            <div><strong>SPONSORING ORGANIZATION:</strong> ${escapeHtml(selectedEvent.organization_name || '')}</div>
           </div>
 
           <div class="grid">
@@ -1210,7 +1224,7 @@ function AdminMbd() {
           </div>
         </div>
         <form onSubmit={handleCreateMbd} className="border-b border-slate-100 px-5 py-5 sm:px-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div>
               <label className={labelCls} htmlFor="mbd-name">
                 MBD name
@@ -1223,6 +1237,20 @@ function AdminMbd() {
                 placeholder="e.g. City Hall drive"
                 autoComplete="off"
               />
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="mbd-organization">
+                Sponsoring organization
+              </label>
+              <select
+                id="mbd-organization"
+                className={inputCls}
+                value={createForm.organizationId}
+                onChange={(ev) => setCreateForm((f) => ({ ...f, organizationId: ev.target.value }))}
+              >
+                <option value="">None</option>
+                {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+              </select>
             </div>
             <div>
               <label className={labelCls} htmlFor="mbd-organizer">
@@ -1305,6 +1333,7 @@ function AdminMbd() {
               <tr>
                 <th className={`${p.th} px-4 py-3`}>MBD name</th>
                 <th className={`${p.th} px-4 py-3`}>Organizer</th>
+                <th className={`${p.th} px-4 py-3`}>Organization</th>
                 <th className={`${p.th} px-4 py-3`}>Date</th>
                 <th className={`${p.th} px-4 py-3`}>Location</th>
                 <th className={`${p.th} px-4 py-3`}>Municipality</th>
@@ -1315,14 +1344,14 @@ function AdminMbd() {
             <tbody className={p.tbody}>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
                     Loading…
                   </td>
                 </tr>
               )}
               {!loading && events.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
                     No MBD events yet. Create one above.
                   </td>
                 </tr>
@@ -1345,6 +1374,9 @@ function AdminMbd() {
                     <td className="px-4 py-3 font-semibold text-slate-900">{row.name}</td>
                     <td className="max-w-[200px] truncate px-4 py-3 text-slate-700" title={row.organizer_name || ''}>
                       {row.organizer_name || '—'}
+                    </td>
+                    <td className="max-w-[200px] truncate px-4 py-3 text-slate-700" title={row.organization_name || ''}>
+                      {row.organization_name || '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-700">{formatEventDate(row.event_date)}</td>
                     <td className="max-w-[280px] truncate px-4 py-3 text-slate-700" title={row.location}>
@@ -1399,6 +1431,11 @@ function AdminMbd() {
                 {(selectedEvent.organizer_name || '').trim() ? (
                   <p className="mt-1 text-sm text-slate-600">
                     Organizer: <span className="font-medium text-slate-800">{selectedEvent.organizer_name}</span>
+                  </p>
+                ) : null}
+                {(selectedEvent.organization_name || '').trim() ? (
+                  <p className="mt-1 text-sm text-slate-600">
+                    Sponsoring organization: <span className="font-medium text-slate-800">{selectedEvent.organization_name}</span>
                   </p>
                 ) : null}
               </div>

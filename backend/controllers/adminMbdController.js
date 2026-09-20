@@ -65,6 +65,8 @@ const mapEventRow = (row) => ({
   id: row.id,
   name: row.name,
   organizer_name: row.organizer_name != null ? String(row.organizer_name) : '',
+  organization_id: row.organization_id != null ? Number(row.organization_id) : null,
+  organization_name: row.organization_name || null,
   event_date: row.event_date,
   location: row.location,
   municipality_id: row.municipality_id != null ? Number(row.municipality_id) : null,
@@ -184,6 +186,8 @@ const listMbdEventsController = async (req, res) => {
         e.id,
         e.name,
         e.organizer_name,
+        e.organization_id,
+        o.name AS organization_name,
         e.event_date,
         e.location,
         e.municipality_id,
@@ -193,7 +197,9 @@ const listMbdEventsController = async (req, res) => {
         e.created_at,
         e.updated_at,
         (SELECT COUNT(*) FROM mbd_donor_records d WHERE d.mbd_event_id = e.id) AS donor_count
-      FROM mbd_events e LEFT JOIN municipalities m ON m.id = e.municipality_id
+      FROM mbd_events e
+      LEFT JOIN organizations o ON o.id = e.organization_id
+      LEFT JOIN municipalities m ON m.id = e.municipality_id
       ORDER BY e.event_date DESC, e.id DESC
     `,
     )
@@ -221,6 +227,8 @@ const createMbdEventController = async (req, res) => {
   const eventDateAlt = req.body.event_date != null ? String(req.body.event_date).trim() : ''
   const dateNorm = eventDate || eventDateAlt
   const location = req.body.location != null ? String(req.body.location).trim() : ''
+  const organizationRaw = req.body.organizationId ?? req.body.organization_id
+  const organizationId = organizationRaw == null || organizationRaw === '' ? null : Number(organizationRaw)
   const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
   const volunteerId = Number(req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id)
 
@@ -239,20 +247,27 @@ const createMbdEventController = async (req, res) => {
   if (!location) {
     return res.status(400).json({ message: 'location is required' })
   }
+  if (organizationId != null && (!Number.isInteger(organizationId) || organizationId < 1)) {
+    return res.status(400).json({ message: 'Invalid sponsoring organization' })
+  }
   if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
   if (!Number.isInteger(volunteerId) || volunteerId < 1) return res.status(400).json({ message: 'Select a volunteer' })
 
   try {
+    if (organizationId != null) {
+      const [organizations] = await pool.query('SELECT id FROM organizations WHERE id = ? LIMIT 1', [organizationId])
+      if (!organizations.length) return res.status(400).json({ message: 'Selected organization was not found' })
+    }
     const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
     if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
     const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
     if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
     const [result] = await pool.query(
       `
-      INSERT INTO mbd_events (name, organizer_name, event_date, location, municipality_id, rc143_volunteer_id, deferral_counts_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO mbd_events (name, organizer_name, organization_id, event_date, location, municipality_id, rc143_volunteer_id, deferral_counts_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `,
-      [name, organizerName, dateNorm, location, municipalityId, volunteerId, JSON.stringify(normalizeDeferralCounts(null))],
+      [name, organizerName, organizationId, dateNorm, location, municipalityId, volunteerId, JSON.stringify(normalizeDeferralCounts(null))],
     )
 
     const [rows] = await pool.query(
@@ -261,6 +276,8 @@ const createMbdEventController = async (req, res) => {
         e.id,
         e.name,
         e.organizer_name,
+        e.organization_id,
+        o.name AS organization_name,
         e.event_date,
         e.location,
         e.deferral_counts_json,
@@ -268,6 +285,7 @@ const createMbdEventController = async (req, res) => {
         e.updated_at,
         0 AS donor_count
       FROM mbd_events e
+      LEFT JOIN organizations o ON o.id = e.organization_id
       WHERE e.id = ?
     `,
       [result.insertId],
