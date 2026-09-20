@@ -82,12 +82,15 @@ const {
 } = require('../controllers/adminHomePostController')
 const {
   listMbdEventsController,
+  listMbdHistoryController,
   createMbdEventController,
+  updateMbdEventController,
   listMbdDonorsController,
   createMbdDonorController,
   updateMbdDonorController,
   deleteMbdDonorController,
   deleteMbdEventController,
+  restoreMbdEventController,
   transferMbdDonorToDonorListController,
   getMbdDeferralsController,
   updateMbdDeferralsController,
@@ -302,9 +305,16 @@ router.post('/municipalities', createMunicipalityController)
 router.get('/mbd-requests', listMbdRequestsController)
 router.put('/mbd-requests/:id/status', updateMbdRequestStatusController)
 router.get('/mbd-events', listMbdEventsController)
+router.get('/mbd-events-history', listMbdHistoryController)
 
 // POST /api/admin/mbd-events
 router.post('/mbd-events', createMbdEventController)
+
+// PUT /api/admin/mbd-events/:id
+router.put('/mbd-events/:id', updateMbdEventController)
+
+// PUT /api/admin/mbd-events/:id/restore
+router.put('/mbd-events/:id/restore', restoreMbdEventController)
 
 // DELETE /api/admin/mbd-events/:id
 router.delete('/mbd-events/:id', deleteMbdEventController)

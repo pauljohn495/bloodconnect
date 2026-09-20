@@ -397,9 +397,11 @@ async function ensureMbdTables() {
       municipality_id INT NULL,
       rc143_volunteer_id INT NULL,
       deferral_counts_json MEDIUMTEXT NULL,
+      deleted_at DATETIME NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_mbd_events_event_date (event_date)
+      INDEX idx_mbd_events_event_date (event_date),
+      INDEX idx_mbd_events_deleted_at (deleted_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
   await pool.query(`
@@ -462,6 +464,11 @@ async function ensureMbdTables() {
       'ALTER TABLE mbd_events ADD COLUMN deferral_counts_json MEDIUMTEXT NULL AFTER location',
     )
     console.log('Schema: added mbd_events.deferral_counts_json')
+  }
+  if (!(await columnExists('mbd_events', 'deleted_at'))) {
+    await pool.query('ALTER TABLE mbd_events ADD COLUMN deleted_at DATETIME NULL AFTER deferral_counts_json')
+    await pool.query('ALTER TABLE mbd_events ADD INDEX idx_mbd_events_deleted_at (deleted_at)')
+    console.log('Schema: added mbd_events.deleted_at')
   }
   if (!(await columnExists('mbd_donor_records', 'assigned_donor_id'))) {
     await pool.query(

@@ -22,7 +22,7 @@ async function listRc143VolunteersController(req, res) {
              COALESCE(u.full_name, u.username, CONCAT('User #', u.id)) AS fullName,
              v.organization, v.occupation, v.contact, v.address,
              v.contact_number AS contactNumber, v.created_at AS registeredAt, v.updated_at AS updatedAt,
-             (SELECT COUNT(*) FROM mbd_donor_records d WHERE d.rc143_volunteer_id = v.id) AS donorCount
+             (SELECT COUNT(*) FROM mbd_donor_records d INNER JOIN mbd_events e ON e.id = d.mbd_event_id WHERE d.rc143_volunteer_id = v.id AND e.deleted_at IS NULL) AS donorCount
       FROM rc143_volunteers v INNER JOIN users u ON u.id = v.user_id
       ORDER BY v.created_at DESC
     `)

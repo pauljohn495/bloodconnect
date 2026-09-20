@@ -3,9 +3,10 @@ const { pool } = require('../db')
 async function listMunicipalitiesController(req, res) {
   try {
     const [rows] = await pool.query(`
-      SELECT m.id, m.name, m.created_at, COUNT(d.id) AS donor_count
+      SELECT m.id, m.name, m.created_at, COUNT(e.id) AS donor_count
       FROM municipalities m
       LEFT JOIN mbd_donor_records d ON d.municipality_id = m.id
+      LEFT JOIN mbd_events e ON e.id = d.mbd_event_id AND e.deleted_at IS NULL
       GROUP BY m.id, m.name, m.created_at
       ORDER BY m.name ASC
     `)

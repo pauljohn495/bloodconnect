@@ -469,11 +469,13 @@ const toDigits = (value) => String(value ?? '').replace(/\D/g, '')
 function AdminMbd() {
   const p = adminPanel.rose
   const modalScrollRef = useRef(null)
+  const eventFormRef = useRef(null)
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [createForm, setCreateForm] = useState(emptyCreateForm)
   const [creating, setCreating] = useState(false)
+  const [editingEventId, setEditingEventId] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [donors, setDonors] = useState([])
@@ -499,6 +501,10 @@ function AdminMbd() {
   const [registeredVolunteers, setRegisteredVolunteers] = useState([])
   const [municipalities, setMunicipalities] = useState([])
   const [organizations, setOrganizations] = useState([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyEvents, setHistoryEvents] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [restoringEventId, setRestoringEventId] = useState(null)
 
   const showNotification = (message, type = 'primary') => {
     setNotification({ message, type })
@@ -555,6 +561,37 @@ function AdminMbd() {
       showNotification(e.message || 'Failed to load MBD requests', 'destructive')
     } finally {
       setMbdRequestsLoading(false)
+    }
+  }
+
+  const loadMbdHistory = async () => {
+    setHistoryLoading(true)
+    try {
+      const data = await apiRequest('/api/admin/mbd-events-history')
+      setHistoryEvents(Array.isArray(data) ? data : [])
+    } catch (e) {
+      showNotification(e.message || 'Failed to load MBD history', 'destructive')
+      setHistoryEvents([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const openMbdHistory = () => {
+    setHistoryOpen(true)
+    loadMbdHistory()
+  }
+
+  const restoreMbdEvent = async (event) => {
+    setRestoringEventId(event.id)
+    try {
+      await apiRequest(`/api/admin/mbd-events/${event.id}/restore`, { method: 'PUT' })
+      showNotification(`MBD event "${event.name}" restored.`, 'primary')
+      await Promise.all([loadEvents(), loadMbdHistory()])
+    } catch (e) {
+      showNotification(e.message || 'Could not restore MBD event', 'destructive')
+    } finally {
+      setRestoringEventId(null)
     }
   }
 
@@ -631,8 +668,9 @@ function AdminMbd() {
     }
     setCreating(true)
     try {
-      await apiRequest('/api/admin/mbd-events', {
-        method: 'POST',
+      const isEditing = editingEventId != null
+      await apiRequest(isEditing ? `/api/admin/mbd-events/${editingEventId}` : '/api/admin/mbd-events', {
+        method: isEditing ? 'PUT' : 'POST',
         body: JSON.stringify({
           name: createForm.name.trim(),
           organizerName: createForm.organizerName.trim(),
@@ -644,8 +682,9 @@ function AdminMbd() {
         }),
       })
       setCreateForm(emptyCreateForm())
+      setEditingEventId(null)
       await loadEvents()
-      showNotification('MBD event created.', 'primary')
+      showNotification(isEditing ? 'MBD event updated.' : 'MBD event created.', 'primary')
     } catch (err) {
       showNotification(err.message || 'Could not create MBD', 'destructive')
     } finally {
@@ -747,6 +786,25 @@ function AdminMbd() {
     setEditingDonorId(null)
     setSelectedExistingDonorId(null)
     setDonorForm({ ...emptyDonorForm(), municipalityId: selectedEvent?.municipality_id != null ? String(selectedEvent.municipality_id) : '', rc143VolunteerId: selectedEvent?.rc143_volunteer_id != null ? String(selectedEvent.rc143_volunteer_id) : '' })
+  }
+
+  const startEditMbdEvent = (event) => {
+    setEditingEventId(event.id)
+    setCreateForm({
+      name: event.name || '',
+      organizerName: event.organizer_name || '',
+      organizationId: event.organization_id != null ? String(event.organization_id) : '',
+      rc143VolunteerId: event.rc143_volunteer_id != null ? String(event.rc143_volunteer_id) : '',
+      eventDate: event.event_date ? String(event.event_date).split('T')[0] : '',
+      location: event.location || '',
+      municipalityId: event.municipality_id != null ? String(event.municipality_id) : '',
+    })
+    requestAnimationFrame(() => eventFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  const cancelEditMbdEvent = () => {
+    setEditingEventId(null)
+    setCreateForm(emptyCreateForm())
   }
 
   const openCustomDeferralModal = () => {
@@ -903,7 +961,8 @@ function AdminMbd() {
     }
     try {
       await apiRequest(`/api/admin/mbd-events/${deleteMbdEventTarget.id}`, { method: 'DELETE' })
-      showNotification(`MBD event "${deleteMbdEventTarget.name}" deleted.`, 'primary')
+      showNotification(`MBD event "${deleteMbdEventTarget.name}" moved to history.`, 'primary')
+      if (editingEventId === deleteMbdEventTarget.id) cancelEditMbdEvent()
       await loadEvents()
     } catch (err) {
       showNotification(err.message || 'Could not delete MBD event', 'destructive')
@@ -1216,12 +1275,19 @@ function AdminMbd() {
       pageTitle="MBD (Mobile Blood Donation)"
       pageDescription="Create donation drives and record donors collected during each mobile blood donation event."
     >
-      <div className={p.outer}>
+      <div ref={eventFormRef} className={p.outer}>
         <div className={p.header}>
           <div>
-            <h2 className={p.title}>Create MBD event</h2>
-            <p className={p.subtitle}>Add a drive before recording donor intake for that date and location.</p>
+            <h2 className={p.title}>{editingEventId ? 'Edit MBD event' : 'Create MBD event'}</h2>
+            <p className={p.subtitle}>{editingEventId ? 'Update the event information below.' : 'Add a drive before recording donor intake for that date and location.'}</p>
           </div>
+          <button
+            type="button"
+            onClick={openMbdHistory}
+            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            MBD History
+          </button>
         </div>
         <form onSubmit={handleCreateMbd} className="border-b border-slate-100 px-5 py-5 sm:px-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -1301,6 +1367,15 @@ function AdminMbd() {
             </div>
           </div>
           <div className="mt-4 flex justify-end gap-2">
+            {editingEventId ? (
+              <button
+                type="button"
+                onClick={cancelEditMbdEvent}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Cancel edit
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={openMbdRequests}
@@ -1313,7 +1388,7 @@ function AdminMbd() {
               disabled={creating}
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60"
             >
-              {creating ? 'Creating…' : 'Create MBD'}
+              {creating ? (editingEventId ? 'Saving…' : 'Creating…') : (editingEventId ? 'Save changes' : 'Create MBD')}
             </button>
           </div>
         </form>
@@ -1385,7 +1460,19 @@ function AdminMbd() {
                     <td className="px-4 py-3 text-slate-700">{row.municipality_name || '—'}</td>
                     <td className="px-4 py-3 text-right font-medium text-slate-800">{row.donor_count ?? 0}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation()
+                            startEditMbdEvent(row)
+                          }}
+                          className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                          title={`Edit "${row.name}"`}
+                        >
+                          Edit
+                        </button>
+                        <button
                         type="button"
                         onClick={(ev) => {
                           ev.stopPropagation()
@@ -1399,7 +1486,8 @@ function AdminMbd() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                         Delete
-                      </button>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1927,10 +2015,10 @@ function AdminMbd() {
         title="Delete MBD event?"
         message={
           deleteMbdEventTarget
-            ? `Permanently delete "${deleteMbdEventTarget.name}" and all ${deleteMbdEventTarget.donor_count ?? 0} donor record(s) for this event? This cannot be undone.`
+            ? `Move "${deleteMbdEventTarget.name}" and its ${deleteMbdEventTarget.donor_count ?? 0} donor record(s) to MBD History? You can restore it later.`
             : 'Delete this MBD event?'
         }
-        confirmText="Delete event"
+        confirmText="Move to history"
         onCancel={() => {
           setDeleteMbdEventConfirmOpen(false)
           setDeleteMbdEventTarget(null)
@@ -1973,6 +2061,68 @@ function AdminMbd() {
                   <thead className="bg-slate-50"><tr><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Volunteer</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Title</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Message</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Location</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Status</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Submitted</th><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Actions</th></tr></thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {mbdRequests.map((request) => <tr key={request.id}><td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">{request.volunteer_name}<div className="mt-1 text-xs font-normal text-slate-500">{request.volunteer_phone || '—'}</div></td><td className="px-4 py-3 font-medium text-slate-900">{request.title}</td><td className="px-4 py-3 text-slate-700">{request.message}</td><td className="px-4 py-3 text-slate-700">{request.location}</td><td className="px-4 py-3"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${request.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : request.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{request.status || 'pending'}</span></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{new Date(request.created_at).toLocaleString()}</td><td className="whitespace-nowrap px-4 py-3"><div className="flex gap-2"><button type="button" disabled={request.status === 'approved'} onClick={() => updateMbdRequestStatus(request.id, 'approved')} className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Approve</button><button type="button" disabled={request.status === 'rejected'} onClick={() => updateMbdRequestStatus(request.id, 'rejected')} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Reject</button></div></td></tr>)}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {historyOpen && (
+        <div className="fixed inset-0 z-90 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <button type="button" className="absolute inset-0 cursor-default" aria-label="Close history" onClick={() => setHistoryOpen(false)} />
+          <div
+            className="relative z-10 flex max-h-[92dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-2xl sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mbd-history-title"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="min-w-0 pr-2">
+                <h3 id="mbd-history-title" className="text-lg font-semibold text-slate-900">MBD History</h3>
+                <p className="mt-1 text-sm text-slate-500">Deleted events and their donor records remain available for restoration.</p>
+              </div>
+              <button type="button" onClick={() => setHistoryOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">×</button>
+            </div>
+            <div className="mt-4 min-h-0 flex-1 overflow-auto overscroll-contain rounded-xl border border-slate-200" role="region" aria-label="Deleted MBD events" tabIndex={0}>
+              {historyLoading ? (
+                <p className="px-4 py-10 text-center text-sm text-slate-500">Loading history…</p>
+              ) : historyEvents.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-slate-500">No deleted MBD events.</p>
+              ) : (
+                <table className="min-w-full divide-y divide-slate-100 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Event</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Event date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Location</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Organization</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Donors</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">Deleted</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {historyEvents.map((event) => (
+                      <tr key={event.id}>
+                        <td className="px-4 py-3 font-semibold text-slate-900">{event.name}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatEventDate(event.event_date)}</td>
+                        <td className="max-w-[220px] truncate px-4 py-3 text-slate-700" title={event.location}>{event.location}</td>
+                        <td className="px-4 py-3 text-slate-700">{event.organization_name || '—'}</td>
+                        <td className="px-4 py-3 text-right text-slate-700">{event.donor_count ?? 0}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">{event.deleted_at ? new Date(event.deleted_at).toLocaleString() : '—'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            disabled={restoringEventId === event.id}
+                            onClick={() => restoreMbdEvent(event)}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                          >
+                            {restoringEventId === event.id ? 'Restoring…' : 'Restore'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               )}

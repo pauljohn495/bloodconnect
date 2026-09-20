@@ -74,6 +74,7 @@ const mapEventRow = (row) => ({
   rc143_volunteer_id: row.rc143_volunteer_id != null ? Number(row.rc143_volunteer_id) : null,
   donor_count: row.donor_count != null ? Number(row.donor_count) : 0,
   deferral_counts: normalizeDeferralCounts(row.deferral_counts_json || null),
+  deleted_at: row.deleted_at || null,
   created_at: row.created_at,
   updated_at: row.updated_at,
 })
@@ -194,12 +195,14 @@ const listMbdEventsController = async (req, res) => {
         m.name AS municipality_name,
         e.rc143_volunteer_id,
         e.deferral_counts_json,
+        e.deleted_at,
         e.created_at,
         e.updated_at,
         (SELECT COUNT(*) FROM mbd_donor_records d WHERE d.mbd_event_id = e.id) AS donor_count
       FROM mbd_events e
       LEFT JOIN organizations o ON o.id = e.organization_id
       LEFT JOIN municipalities m ON m.id = e.municipality_id
+      WHERE e.deleted_at IS NULL
       ORDER BY e.event_date DESC, e.id DESC
     `,
     )
@@ -307,6 +310,52 @@ const createMbdEventController = async (req, res) => {
   }
 }
 
+const updateMbdEventController = async (req, res) => {
+  const eventId = parseEventId(req)
+  if (!eventId) return res.status(400).json({ message: 'Invalid MBD event id' })
+
+  const name = String(req.body.name ?? '').trim()
+  const organizerName = String(req.body.organizerName ?? req.body.organizer_name ?? '').trim()
+  const dateNorm = String(req.body.eventDate ?? req.body.event_date ?? '').trim()
+  const location = String(req.body.location ?? '').trim()
+  const organizationRaw = req.body.organizationId ?? req.body.organization_id
+  const organizationId = organizationRaw == null || organizationRaw === '' ? null : Number(organizationRaw)
+  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
+  const volunteerId = Number(req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id)
+
+  if (!name || !organizerName || !dateNorm || !location) {
+    return res.status(400).json({ message: 'name, organizerName, eventDate and location are required' })
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateNorm)) return res.status(400).json({ message: 'eventDate must be YYYY-MM-DD' })
+  if (organizationId != null && (!Number.isInteger(organizationId) || organizationId < 1)) return res.status(400).json({ message: 'Invalid sponsoring organization' })
+  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
+  if (!Number.isInteger(volunteerId) || volunteerId < 1) return res.status(400).json({ message: 'Select a volunteer' })
+
+  try {
+    const [events] = await pool.query('SELECT id FROM mbd_events WHERE id = ? AND deleted_at IS NULL LIMIT 1', [eventId])
+    if (!events.length) return res.status(404).json({ message: 'Active MBD event not found' })
+    if (organizationId != null) {
+      const [organizations] = await pool.query('SELECT id FROM organizations WHERE id = ? LIMIT 1', [organizationId])
+      if (!organizations.length) return res.status(400).json({ message: 'Selected organization was not found' })
+    }
+    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
+    if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+
+    await pool.query(
+      `UPDATE mbd_events
+       SET name = ?, organizer_name = ?, organization_id = ?, event_date = ?, location = ?, municipality_id = ?, rc143_volunteer_id = ?
+       WHERE id = ? AND deleted_at IS NULL`,
+      [name, organizerName, organizationId, dateNorm, location, municipalityId, volunteerId, eventId],
+    )
+    return res.json({ message: 'MBD event updated' })
+  } catch (error) {
+    console.error('Update MBD event error:', error)
+    return res.status(500).json({ message: 'Failed to update MBD event' })
+  }
+}
+
 const listMbdDonorsController = async (req, res) => {
   const eventId = parseEventId(req)
   if (!eventId) {
@@ -314,7 +363,7 @@ const listMbdDonorsController = async (req, res) => {
   }
 
   try {
-    const [exists] = await pool.query('SELECT id FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
+    const [exists] = await pool.query('SELECT id FROM mbd_events WHERE id = ? AND deleted_at IS NULL LIMIT 1', [eventId])
     if (!exists.length) {
       return res.status(404).json({ message: 'MBD event not found' })
     }
@@ -443,7 +492,7 @@ const createMbdDonorController = async (req, res) => {
   const conn = await pool.getConnection()
   try {
     await conn.beginTransaction()
-    const [exists] = await conn.query('SELECT id, event_date FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
+    const [exists] = await conn.query('SELECT id, event_date FROM mbd_events WHERE id = ? AND deleted_at IS NULL LIMIT 1', [eventId])
     if (!exists.length) {
       await conn.rollback()
       return res.status(404).json({ message: 'MBD event not found' })
@@ -555,6 +604,40 @@ const createMbdDonorController = async (req, res) => {
     return res.status(500).json({ message: 'Failed to create donor record' })
   } finally {
     conn.release()
+  }
+}
+
+const listMbdHistoryController = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT
+        e.id,
+        e.name,
+        e.organizer_name,
+        e.organization_id,
+        o.name AS organization_name,
+        e.event_date,
+        e.location,
+        e.municipality_id,
+        m.name AS municipality_name,
+        e.rc143_volunteer_id,
+        e.deferral_counts_json,
+        e.deleted_at,
+        e.created_at,
+        e.updated_at,
+        (SELECT COUNT(*) FROM mbd_donor_records d WHERE d.mbd_event_id = e.id) AS donor_count
+      FROM mbd_events e
+      LEFT JOIN organizations o ON o.id = e.organization_id
+      LEFT JOIN municipalities m ON m.id = e.municipality_id
+      WHERE e.deleted_at IS NOT NULL
+      ORDER BY e.deleted_at DESC, e.id DESC
+    `,
+    )
+    return res.json(rows.map(mapEventRow))
+  } catch (error) {
+    console.error('List MBD history error:', error)
+    return res.status(500).json({ message: 'Failed to fetch MBD history' })
   }
 }
 
@@ -724,7 +807,7 @@ const updateMbdDonorController = async (req, res) => {
           [assignedDonorId, updated.transferred_donor_user_id],
         )
       }
-      const [eventRows] = await pool.query('SELECT event_date FROM mbd_events WHERE id = ? LIMIT 1', [eventId])
+      const [eventRows] = await pool.query('SELECT event_date FROM mbd_events WHERE id = ? AND deleted_at IS NULL LIMIT 1', [eventId])
       if (eventRows.length) {
         await markWholeBloodDonationDate(pool, updated.transferred_donor_user_id, eventRows[0].event_date)
       }
@@ -793,7 +876,7 @@ const transferMbdDonorToDonorListController = async (req, res) => {
         e.event_date
       FROM mbd_donor_records d
       INNER JOIN mbd_events e ON e.id = d.mbd_event_id
-      WHERE d.id = ? AND d.mbd_event_id = ?
+      WHERE d.id = ? AND d.mbd_event_id = ? AND e.deleted_at IS NULL
       LIMIT 1
       FOR UPDATE
     `,
@@ -923,7 +1006,7 @@ const getMbdDeferralsController = async (req, res) => {
   }
   try {
     const [rows] = await pool.query(
-      'SELECT id, deferral_counts_json FROM mbd_events WHERE id = ? LIMIT 1',
+      'SELECT id, deferral_counts_json FROM mbd_events WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [eventId],
     )
     if (!rows.length) {
@@ -949,7 +1032,7 @@ const updateMbdDeferralsController = async (req, res) => {
   const nextCounts = normalizeDeferralCounts(req.body?.deferralCounts ?? req.body?.deferral_counts ?? null)
   try {
     const [result] = await pool.query(
-      'UPDATE mbd_events SET deferral_counts_json = ? WHERE id = ?',
+      'UPDATE mbd_events SET deferral_counts_json = ? WHERE id = ? AND deleted_at IS NULL',
       [JSON.stringify(nextCounts), eventId],
     )
     if (!result.affectedRows) {
@@ -973,13 +1056,14 @@ const deleteMbdEventController = async (req, res) => {
     return res.status(400).json({ message: 'Invalid MBD event id' })
   }
   try {
-    // Delete donor records first (cascade-safe fallback)
-    await pool.query('DELETE FROM mbd_donor_records WHERE mbd_event_id = ?', [eventId])
-    const [result] = await pool.query('DELETE FROM mbd_events WHERE id = ?', [eventId])
+    const [result] = await pool.query(
+      'UPDATE mbd_events SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL',
+      [eventId],
+    )
     if (!result.affectedRows) {
       return res.status(404).json({ message: 'MBD event not found' })
     }
-    return res.json({ message: 'MBD event deleted' })
+    return res.json({ message: 'MBD event moved to history' })
   } catch (error) {
     if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
       return res.status(500).json({
@@ -991,14 +1075,33 @@ const deleteMbdEventController = async (req, res) => {
   }
 }
 
+const restoreMbdEventController = async (req, res) => {
+  const eventId = parseEventId(req)
+  if (!eventId) return res.status(400).json({ message: 'Invalid MBD event id' })
+  try {
+    const [result] = await pool.query(
+      'UPDATE mbd_events SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL',
+      [eventId],
+    )
+    if (!result.affectedRows) return res.status(404).json({ message: 'Deleted MBD event not found' })
+    return res.json({ message: 'MBD event restored' })
+  } catch (error) {
+    console.error('Restore MBD event error:', error)
+    return res.status(500).json({ message: 'Failed to restore MBD event' })
+  }
+}
+
 module.exports = {
   listMbdEventsController,
+  listMbdHistoryController,
   createMbdEventController,
+  updateMbdEventController,
   listMbdDonorsController,
   createMbdDonorController,
   updateMbdDonorController,
   deleteMbdDonorController,
   deleteMbdEventController,
+  restoreMbdEventController,
   transferMbdDonorToDonorListController,
   getMbdDeferralsController,
   updateMbdDeferralsController,

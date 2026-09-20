@@ -21,7 +21,7 @@ const getOrganizationDonationRankingController = async (req, res) => {
           SELECT e.organization_id, COUNT(d.id) AS units
           FROM mbd_events e
           JOIN mbd_donor_records d ON d.mbd_event_id = e.id
-          WHERE e.organization_id IS NOT NULL
+          WHERE e.organization_id IS NOT NULL AND e.deleted_at IS NULL
           GROUP BY e.organization_id
         ) contributions ON contributions.organization_id = o.id
         GROUP BY o.id, o.name
@@ -125,9 +125,10 @@ const getMunicipalityDonationRankingController = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `
-        SELECT m.id AS municipality_id, m.name AS municipality_name, COUNT(d.id) AS donor_count
+        SELECT m.id AS municipality_id, m.name AS municipality_name, COUNT(e.id) AS donor_count
         FROM municipalities m
         LEFT JOIN mbd_donor_records d ON d.municipality_id = m.id
+        LEFT JOIN mbd_events e ON e.id = d.mbd_event_id AND e.deleted_at IS NULL
         GROUP BY m.id, m.name
         ORDER BY donor_count DESC, m.name ASC
         LIMIT ?
