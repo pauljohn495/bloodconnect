@@ -662,8 +662,8 @@ function AdminMbd() {
 
   const handleCreateMbd = async (e) => {
     e.preventDefault()
-    if (!createForm.name.trim() || !createForm.organizerName.trim() || !createForm.eventDate || !createForm.location.trim() || !createForm.municipalityId) {
-      showNotification('Fill in MBD name, organizer, date, location, and municipality.', 'destructive')
+    if (!createForm.name.trim() || !createForm.eventDate || !createForm.location.trim()) {
+      showNotification('Fill in MBD name, date, and location.', 'destructive')
       return
     }
     setCreating(true)
@@ -675,10 +675,10 @@ function AdminMbd() {
           name: createForm.name.trim(),
           organizerName: createForm.organizerName.trim(),
           organizationId: createForm.organizationId ? Number(createForm.organizationId) : null,
-          rc143VolunteerId: Number(createForm.rc143VolunteerId),
+          rc143VolunteerId: createForm.rc143VolunteerId ? Number(createForm.rc143VolunteerId) : null,
           eventDate: createForm.eventDate,
           location: createForm.location.trim(),
-          municipalityId: Number(createForm.municipalityId),
+          municipalityId: createForm.municipalityId ? Number(createForm.municipalityId) : null,
         }),
       })
       setCreateForm(emptyCreateForm())
@@ -698,7 +698,7 @@ function AdminMbd() {
     bloodType: donorForm.bloodType,
     donorNumber: donorForm.donorNumber.trim(),
     assignedDonorId: donorForm.assignedDonorId.trim(),
-    municipalityId: Number(donorForm.municipalityId),
+    municipalityId: donorForm.municipalityId === '' ? null : Number(donorForm.municipalityId),
     rc143VolunteerId: donorForm.rc143VolunteerId === '' ? null : Number(donorForm.rc143VolunteerId),
     age: donorForm.age === '' ? '' : Number(donorForm.age),
     gender: donorForm.gender,
@@ -719,10 +719,6 @@ function AdminMbd() {
     if (!selectedEvent) return
     if (!donorForm.donorName.trim()) {
       showNotification('Donor name is required.', 'destructive')
-      return
-    }
-    if (!donorForm.municipalityId) {
-      showNotification('Municipality is required.', 'destructive')
       return
     }
     setDonorSaving(true)
@@ -1327,16 +1323,15 @@ function AdminMbd() {
                 className={inputCls}
                 value={createForm.rc143VolunteerId}
                 onChange={(ev) => { const volunteer = registeredVolunteers.find((item) => String(item.id) === ev.target.value); setCreateForm((f) => ({ ...f, rc143VolunteerId: ev.target.value, organizerName: volunteer?.fullName || '' })) }}
-                required
               >
-                <option value="">Select registered volunteer</option>
+                <option value="">None</option>
                 {registeredVolunteers.map((volunteer) => <option key={volunteer.id} value={volunteer.id}>{volunteer.fullName}</option>)}
               </select>
             </div>
             <div>
               <label className={labelCls} htmlFor="mbd-municipality">Municipality</label>
-              <select id="mbd-municipality" required className={inputCls} value={createForm.municipalityId} onChange={(ev) => setCreateForm((f) => ({ ...f, municipalityId: ev.target.value }))}>
-                <option value="">Select municipality</option>
+              <select id="mbd-municipality" className={inputCls} value={createForm.municipalityId} onChange={(ev) => setCreateForm((f) => ({ ...f, municipalityId: ev.target.value }))}>
+                <option value="">None</option>
                 {municipalities.map((municipality) => <option key={municipality.id} value={municipality.id}>{municipality.name}</option>)}
               </select>
             </div>

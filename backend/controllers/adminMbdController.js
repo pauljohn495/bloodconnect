@@ -232,14 +232,13 @@ const createMbdEventController = async (req, res) => {
   const location = req.body.location != null ? String(req.body.location).trim() : ''
   const organizationRaw = req.body.organizationId ?? req.body.organization_id
   const organizationId = organizationRaw == null || organizationRaw === '' ? null : Number(organizationRaw)
-  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
-  const volunteerId = Number(req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id)
+  const municipalityRaw = req.body.municipalityId ?? req.body.municipality_id
+  const municipalityId = municipalityRaw == null || municipalityRaw === '' ? null : Number(municipalityRaw)
+  const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
+  const volunteerId = volunteerRaw == null || volunteerRaw === '' ? null : Number(volunteerRaw)
 
   if (!name) {
     return res.status(400).json({ message: 'name is required' })
-  }
-  if (!organizerName) {
-    return res.status(400).json({ message: 'organizerName is required' })
   }
   if (!dateNorm) {
     return res.status(400).json({ message: 'eventDate is required' })
@@ -253,18 +252,22 @@ const createMbdEventController = async (req, res) => {
   if (organizationId != null && (!Number.isInteger(organizationId) || organizationId < 1)) {
     return res.status(400).json({ message: 'Invalid sponsoring organization' })
   }
-  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
-  if (!Number.isInteger(volunteerId) || volunteerId < 1) return res.status(400).json({ message: 'Select a volunteer' })
+  if (municipalityId != null && (!Number.isInteger(municipalityId) || municipalityId < 1)) return res.status(400).json({ message: 'Invalid municipality' })
+  if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
 
   try {
     if (organizationId != null) {
       const [organizations] = await pool.query('SELECT id FROM organizations WHERE id = ? LIMIT 1', [organizationId])
       if (!organizations.length) return res.status(400).json({ message: 'Selected organization was not found' })
     }
-    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
-    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
-    const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
-    if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+    if (municipalityId != null) {
+      const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+      if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    }
+    if (volunteerId != null) {
+      const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
+      if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+    }
     const [result] = await pool.query(
       `
       INSERT INTO mbd_events (name, organizer_name, organization_id, event_date, location, municipality_id, rc143_volunteer_id, deferral_counts_json)
@@ -320,16 +323,18 @@ const updateMbdEventController = async (req, res) => {
   const location = String(req.body.location ?? '').trim()
   const organizationRaw = req.body.organizationId ?? req.body.organization_id
   const organizationId = organizationRaw == null || organizationRaw === '' ? null : Number(organizationRaw)
-  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
-  const volunteerId = Number(req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id)
+  const municipalityRaw = req.body.municipalityId ?? req.body.municipality_id
+  const municipalityId = municipalityRaw == null || municipalityRaw === '' ? null : Number(municipalityRaw)
+  const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
+  const volunteerId = volunteerRaw == null || volunteerRaw === '' ? null : Number(volunteerRaw)
 
-  if (!name || !organizerName || !dateNorm || !location) {
-    return res.status(400).json({ message: 'name, organizerName, eventDate and location are required' })
+  if (!name || !dateNorm || !location) {
+    return res.status(400).json({ message: 'name, eventDate and location are required' })
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateNorm)) return res.status(400).json({ message: 'eventDate must be YYYY-MM-DD' })
   if (organizationId != null && (!Number.isInteger(organizationId) || organizationId < 1)) return res.status(400).json({ message: 'Invalid sponsoring organization' })
-  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
-  if (!Number.isInteger(volunteerId) || volunteerId < 1) return res.status(400).json({ message: 'Select a volunteer' })
+  if (municipalityId != null && (!Number.isInteger(municipalityId) || municipalityId < 1)) return res.status(400).json({ message: 'Invalid municipality' })
+  if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
 
   try {
     const [events] = await pool.query('SELECT id FROM mbd_events WHERE id = ? AND deleted_at IS NULL LIMIT 1', [eventId])
@@ -338,10 +343,14 @@ const updateMbdEventController = async (req, res) => {
       const [organizations] = await pool.query('SELECT id FROM organizations WHERE id = ? LIMIT 1', [organizationId])
       if (!organizations.length) return res.status(400).json({ message: 'Selected organization was not found' })
     }
-    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
-    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
-    const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
-    if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+    if (municipalityId != null) {
+      const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+      if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    }
+    if (volunteerId != null) {
+      const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
+      if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
+    }
 
     await pool.query(
       `UPDATE mbd_events
@@ -454,14 +463,15 @@ const createMbdDonorController = async (req, res) => {
   const numRaw = req.body.numDonations != null ? req.body.numDonations : req.body.num_donations
   const existingDonorUserIdRaw = req.body.existingDonorUserId
   const existingDonorUserId = existingDonorUserIdRaw == null || existingDonorUserIdRaw === '' ? null : Number(existingDonorUserIdRaw)
-  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
+  const municipalityRaw = req.body.municipalityId ?? req.body.municipality_id
+  const municipalityId = municipalityRaw == null || municipalityRaw === '' ? null : Number(municipalityRaw)
   const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
   const volunteerId = volunteerRaw === '' || volunteerRaw == null ? null : Number(volunteerRaw)
 
   if (!donorName) {
     return res.status(400).json({ message: 'donorName is required' })
   }
-  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
+  if (municipalityId != null && (!Number.isInteger(municipalityId) || municipalityId < 1)) return res.status(400).json({ message: 'Invalid municipality' })
   if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
   if (existingDonorUserId != null && (!Number.isInteger(existingDonorUserId) || existingDonorUserId < 1)) return res.status(400).json({ message: 'Invalid existing donor' })
   if (!BLOOD_TYPES.has(bloodType)) {
@@ -497,10 +507,12 @@ const createMbdDonorController = async (req, res) => {
       await conn.rollback()
       return res.status(404).json({ message: 'MBD event not found' })
     }
-    const [municipalities] = await conn.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
-    if (!municipalities.length) {
-      await conn.rollback()
-      return res.status(400).json({ message: 'Selected municipality was not found' })
+    if (municipalityId != null) {
+      const [municipalities] = await conn.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+      if (!municipalities.length) {
+        await conn.rollback()
+        return res.status(400).json({ message: 'Selected municipality was not found' })
+      }
     }
     if (volunteerId != null) {
       const [volunteers] = await conn.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
@@ -688,14 +700,15 @@ const updateMbdDonorController = async (req, res) => {
   const incrementDonation = req.body.incrementDonation === true
   const existingDonorUserIdRaw = req.body.existingDonorUserId
   const existingDonorUserId = existingDonorUserIdRaw == null || existingDonorUserIdRaw === '' ? null : Number(existingDonorUserIdRaw)
-  const municipalityId = Number(req.body.municipalityId ?? req.body.municipality_id)
+  const municipalityRaw = req.body.municipalityId ?? req.body.municipality_id
+  const municipalityId = municipalityRaw == null || municipalityRaw === '' ? null : Number(municipalityRaw)
   const volunteerRaw = req.body.rc143VolunteerId ?? req.body.rc143_volunteer_id
   const volunteerId = volunteerRaw === '' || volunteerRaw == null ? null : Number(volunteerRaw)
 
   if (!donorName) {
     return res.status(400).json({ message: 'donorName is required' })
   }
-  if (!Number.isInteger(municipalityId) || municipalityId < 1) return res.status(400).json({ message: 'Select a municipality' })
+  if (municipalityId != null && (!Number.isInteger(municipalityId) || municipalityId < 1)) return res.status(400).json({ message: 'Invalid municipality' })
   if (volunteerId != null && (!Number.isInteger(volunteerId) || volunteerId < 1)) return res.status(400).json({ message: 'Invalid volunteer' })
   if (existingDonorUserId != null && (!Number.isInteger(existingDonorUserId) || existingDonorUserId < 1)) return res.status(400).json({ message: 'Invalid existing donor' })
   if (!BLOOD_TYPES.has(bloodType)) {
@@ -724,8 +737,10 @@ const updateMbdDonorController = async (req, res) => {
   }
 
   try {
-    const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
-    if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    if (municipalityId != null) {
+      const [municipalities] = await pool.query('SELECT id FROM municipalities WHERE id = ? LIMIT 1', [municipalityId])
+      if (!municipalities.length) return res.status(400).json({ message: 'Selected municipality was not found' })
+    }
     if (volunteerId != null) {
       const [volunteers] = await pool.query('SELECT id FROM rc143_volunteers WHERE id = ? LIMIT 1', [volunteerId])
       if (!volunteers.length) return res.status(400).json({ message: 'Selected volunteer was not found' })
