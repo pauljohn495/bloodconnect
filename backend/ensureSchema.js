@@ -9,6 +9,72 @@ async function columnExists(tableName, columnName) {
   return rows[0].c > 0
 }
 
+async function indexExists(tableName, indexName) {
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+    [tableName, indexName],
+  )
+  return rows[0].c > 0
+}
+
+async function foreignKeyExists(tableName, constraintName) {
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+       AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'`,
+    [tableName, constraintName],
+  )
+  return rows[0].c > 0
+}
+
+async function ensureMbdOrganizationRelationship() {
+  const [organizationIdRows] = await pool.query(
+    `SELECT COLUMN_TYPE
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'organizations' AND COLUMN_NAME = 'id'
+     LIMIT 1`,
+  )
+  if (!organizationIdRows.length) {
+    throw new Error('Schema: organizations.id is required before creating the MBD organization relationship')
+  }
+
+  const organizationIdType = String(organizationIdRows[0].COLUMN_TYPE || '').trim().toLowerCase()
+  if (!/^(tinyint|smallint|mediumint|int|bigint)(\(\d+\))?( unsigned)?$/.test(organizationIdType)) {
+    throw new Error(`Schema: unsupported organizations.id type: ${organizationIdType || 'unknown'}`)
+  }
+
+  const [mbdOrganizationRows] = await pool.query(
+    `SELECT COLUMN_TYPE
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mbd_events' AND COLUMN_NAME = 'organization_id'
+     LIMIT 1`,
+  )
+  if (!mbdOrganizationRows.length) {
+    await pool.query(
+      `ALTER TABLE mbd_events ADD COLUMN organization_id ${organizationIdType} NULL AFTER organizer_name`,
+    )
+    console.log(`Schema: added mbd_events.organization_id as ${organizationIdType}`)
+  } else {
+    const currentType = String(mbdOrganizationRows[0].COLUMN_TYPE || '').trim().toLowerCase()
+    if (currentType !== organizationIdType) {
+      await pool.query(
+        `ALTER TABLE mbd_events MODIFY COLUMN organization_id ${organizationIdType} NULL`,
+      )
+      console.log(`Schema: aligned mbd_events.organization_id with organizations.id (${organizationIdType})`)
+    }
+  }
+
+  if (!(await indexExists('mbd_events', 'idx_mbd_events_organization'))) {
+    await pool.query('ALTER TABLE mbd_events ADD INDEX idx_mbd_events_organization (organization_id)')
+  }
+  if (!(await foreignKeyExists('mbd_events', 'fk_mbd_event_organization'))) {
+    await pool.query(
+      'ALTER TABLE mbd_events ADD CONSTRAINT fk_mbd_event_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL',
+    )
+  }
+}
+
 /** Adds donor profile / manual-entry flags used by admin donor details and profile sync. */
 async function ensureDonorProfileColumns() {
   if (!(await columnExists('users', 'profile_image_url'))) {
@@ -326,7 +392,6 @@ async function ensureMbdTables() {
       id INT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(255) NOT NULL,
       organizer_name VARCHAR(255) NOT NULL DEFAULT '',
-      organization_id INT NULL,
       event_date DATE NOT NULL,
       location VARCHAR(512) NOT NULL,
       municipality_id INT NULL,
@@ -334,9 +399,7 @@ async function ensureMbdTables() {
       deferral_counts_json MEDIUMTEXT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_mbd_events_event_date (event_date),
-      INDEX idx_mbd_events_organization (organization_id),
-      CONSTRAINT fk_mbd_event_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+      INDEX idx_mbd_events_event_date (event_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
   await pool.query(`
@@ -393,12 +456,7 @@ async function ensureMbdTables() {
     )
     console.log('Schema: added mbd_events.organizer_name')
   }
-  if (!(await columnExists('mbd_events', 'organization_id'))) {
-    await pool.query('ALTER TABLE mbd_events ADD COLUMN organization_id INT NULL AFTER organizer_name')
-    await pool.query('ALTER TABLE mbd_events ADD INDEX idx_mbd_events_organization (organization_id)')
-    await pool.query('ALTER TABLE mbd_events ADD CONSTRAINT fk_mbd_event_organization FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL')
-    console.log('Schema: added mbd_events.organization_id')
-  }
+  await ensureMbdOrganizationRelationship()
   if (!(await columnExists('mbd_events', 'deferral_counts_json'))) {
     await pool.query(
       'ALTER TABLE mbd_events ADD COLUMN deferral_counts_json MEDIUMTEXT NULL AFTER location',
