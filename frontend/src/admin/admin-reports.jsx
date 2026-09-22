@@ -1409,7 +1409,7 @@ function AdminReports() {
                         )}
                       </div>
                       <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                        <p className="text-[11px] font-medium text-slate-600">Predicted Demand (next 7 days)</p>
+                        <p className="text-[11px] font-medium text-slate-600">Forecasted Demand (next 7 days)</p>
                         <p className="mt-1 text-base font-semibold text-slate-900">
                           {Math.round(
                             bloodUsageTrendRows.reduce((sum, r) => sum + r.expectedDemandNext7Days, 0),
