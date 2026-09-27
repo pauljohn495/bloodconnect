@@ -162,6 +162,11 @@ dump on a disposable staging database first.
    existing donor email and a new Google account. A new account must continue to
    `/complete-google-donor-profile` to supply username, phone, and blood type.
 
+The frontend opts the Google button into FedCM on supported Chrome versions so
+the browser can mediate sign-in without relying on a popup window. The Vercel
+`Cross-Origin-Opener-Policy: same-origin-allow-popups` header remains necessary
+as a compatibility fallback for browsers using the non-FedCM popup flow.
+
 Use exact production URLs for production OAuth clients. Vercel preview deployments
 have different origins and will not be authorized unless each preview origin is
 added explicitly; use the stable production deployment for acceptance testing.

@@ -79,6 +79,10 @@ export async function mountGoogleIdentityButton({
     googleIdentity.initialize({
       client_id: clientId,
       callback: (response) => state.activeCredentialHandler?.(response),
+      // Let supported browsers mediate sign-in instead of relying on a popup
+      // window, which may be blocked by browser privacy settings.
+      use_fedcm_for_button: true,
+      button_auto_select: false,
     })
     state.clientId = clientId
   }

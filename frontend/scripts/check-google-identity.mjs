@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 let initializeCalls = 0
 let renderCalls = 0
 let configuredCallback
+let initializationOptions
 const received = []
 
 globalThis.window = {
@@ -11,6 +12,7 @@ globalThis.window = {
       id: {
         initialize(options) {
           initializeCalls += 1
+          initializationOptions = options
           configuredCallback = options.callback
         },
         renderButton() {
@@ -44,6 +46,7 @@ configuredCallback({ credential: 'credential-value' })
 assert.equal(initializeCalls, 1, 'GIS must initialize once across component mounts')
 assert.equal(renderCalls, 2, 'each component mount should render its own button')
 assert.deepEqual(received, [['second', 'credential-value']], 'credentials must use the active page handler')
+assert.equal(initializationOptions.use_fedcm_for_button, true, 'FedCM button flow must be enabled')
 
 await assert.rejects(
   mountGoogleIdentityButton({
@@ -55,4 +58,4 @@ await assert.rejects(
   /client ID changed/,
 )
 
-console.log('Google Identity singleton checks: 4/4 passed')
+console.log('Google Identity singleton and FedCM checks: 5/5 passed')
