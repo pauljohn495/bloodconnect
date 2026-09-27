@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import {
+  calculateDonorAvailability,
   calculateShortageForecast,
   calculateTransferRecommendations,
   calculateUsageTrends,
@@ -66,6 +67,39 @@ check('negative usage is rejected', () => {
   const row = calculateShortageForecast({ inventory: [inventory()], requests: [request({ units_approved: -30 })], now }).rows[0]
   assert.equal(row.usage, 0)
   assert.equal(row.supplyStatusKey, 'sufficient_no_usage')
+})
+check('donor availability applies whole-blood, platelet, and plasma recovery intervals', () => {
+  const result = calculateDonorAvailability({
+    now,
+    horizonDays: 30,
+    donors: [
+      { last_donation_date: '2026-06-11', last_donation_type: 'whole_blood' },
+      { last_donation_date: '2026-08-27', last_donation_type: 'platelets' },
+      { last_donation_date: '2026-08-20', last_donation_type: 'plasma' },
+    ],
+  })
+  assert.equal(result.eligibleNow, 1)
+  assert.equal(result.becomingInHorizon, 2)
+  assert.equal(result.canDonateWithinHorizon, 3)
+  assert.equal(result.percentWithinHorizon, 100)
+})
+check('donors without a valid donation date are treated as eligible now', () => {
+  const result = calculateDonorAvailability({
+    now,
+    donors: [{ last_donation_date: null }, { last_donation_date: 'not-a-date' }],
+  })
+  assert.equal(result.eligibleNow, 2)
+})
+check('donor availability changes consistently with the selected horizon', () => {
+  const donors = [{ last_donation_date: '2026-06-20', last_donation_type: 'whole_blood' }]
+  assert.equal(calculateDonorAvailability({ donors, now, horizonDays: 7 }).becomingInHorizon, 0)
+  assert.equal(calculateDonorAvailability({ donors, now, horizonDays: 30 }).becomingInHorizon, 1)
+})
+check('empty donor data produces actionable low-availability output', () => {
+  const result = calculateDonorAvailability({ donors: [], now, horizonDays: 30 })
+  assert.equal(result.label, 'Low Availability')
+  assert.match(result.insight, /Add donors/)
+  assert.match(result.recommendation, /Register donors/)
 })
 check('source allocations are cumulative and preserve reserve', () => {
   const rows = calculateTransferRecommendations({

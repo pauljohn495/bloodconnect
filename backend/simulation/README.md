@@ -1,15 +1,16 @@
-# Controlled Analytics Simulation
+# Controlled analytics processing and consistency test
 
-This fixture validates BloodConnect's predictive and prescriptive rules without using client data.
-It uses a fixed clock (`2026-09-01T12:00:00Z`), six months of deterministic history, known
-inventory conditions, pending requests, donors, and four withheld seven-day outcomes.
+This fixture checks that BloodConnect processes controlled data into known expected outputs and
+returns those outputs consistently without using client data. It uses a fixed clock
+(`2026-09-01T12:00:00Z`), six months of deterministic history, known inventory conditions,
+pending requests, and donors.
 
 ## Run
 
 From `backend`:
 
 ```powershell
-npm run test:analytics-simulation
+npm run test:analytics-processing
 ```
 
 The command does not connect to MySQL and does not modify operational data. It imports the same
@@ -25,15 +26,18 @@ analytics engine used by the application and writes `simulation/output/validatio
 | AB+ falls from 30 to 10 units | Decreasing trend and unusual drop |
 | O- has demand but only expired inventory | Critical out-of-stock status and donor/external supply action |
 | B+ platelets all expire within seven days | Expiry is surfaced; status also reflects recent demand |
+| Four donor recovery records evaluated over 30 days | 2 eligible now, 1 newly eligible, 75% available, September peak, High Availability |
 | A- plasma request with central supply | Dispatch 13 units from Central Inventory |
 | O+ plasma available above another hospital's reserve | Transfer 20 units from that hospital |
 | A+ platelet request already covered locally | No transfer required |
 
-`expectedResults.json` is the human-reviewable oracle. `controlledData.mjs` contains the inputs and
-withheld outcomes. The report includes exact rule checks plus MAE, MAPE, and forecast bias.
+`expectedResults.json` is the human-reviewable oracle. The report includes exact expected-output
+checks, five identical-run comparisons, an equivalent cloned-input comparison, an input-mutation
+check, and a SHA-256 fingerprint of the complete output.
 
-Synthetic accuracy proves deterministic behavior under known conditions; it does not replace a
-later backtest using real client demand.
+A pass demonstrates functional conformance and deterministic behavior for these controlled cases.
+It is not an accuracy percentage and does not establish clinical effectiveness or real-world
+forecasting performance.
 
 ## Visual UI test
 

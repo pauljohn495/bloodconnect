@@ -4,9 +4,11 @@ import { apiRequest } from '../api.js'
 import { adminReportLoading, adminReportSection, responsiveTableContainer } from './admin-ui.jsx'
 import { BloodTypeBadge } from '../BloodTypeBadge.jsx'
 import {
+  calculateDonorAvailability,
   calculateShortageForecast,
   calculateTransferRecommendations,
   calculateUsageTrends,
+  WHOLE_BLOOD_RECOVERY_DAYS,
 } from './analyticsEngine.js'
 import analyticsSimulationData from './analyticsSimulationData.js'
 
@@ -414,98 +416,26 @@ function AdminReports() {
 
   const bloodUsageTrendSuggestion = bloodUsageTrendBaseSuggestion
 
-  // Donor Availability Prediction (recovery intervals aligned with admin donor details API)
-  const WHOLE_BLOOD_RECOVERY_DAYS = 90
-  const getRecoveryDaysForLastDonation = (donor) => {
-    const t = (donor.last_donation_type || donor.lastDonationType || 'whole_blood').toString().toLowerCase()
-    if (t === 'platelets') return 14
-    if (t === 'plasma') return 28
-    return WHOLE_BLOOD_RECOVERY_DAYS
-  }
-
-  const donorAvailabilityHorizonEnd = new Date(now.getTime() + donorAvailabilityHorizonDays * msPerDay)
-  const nextWeekEnd = new Date(now.getTime() + 7 * msPerDay)
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
-  let donorAvailEligibleNow = 0
-  let donorAvailBecomingInHorizon = 0
-  let donorAvailBecomingNextWeek = 0
-  const donorAvailMonthBuckets = {}
-
-  donors.forEach((donor) => {
-    const lastRaw = donor.last_donation_date || donor.lastDonationDate
-    if (!lastRaw) {
-      donorAvailEligibleNow += 1
-      return
-    }
-    const last = new Date(lastRaw)
-    if (Number.isNaN(last.getTime())) {
-      donorAvailEligibleNow += 1
-      return
-    }
-    const recovery = getRecoveryDaysForLastDonation(donor)
-    const nextEligible = new Date(last)
-    nextEligible.setDate(nextEligible.getDate() + recovery)
-
-    if (nextEligible <= now) {
-      donorAvailEligibleNow += 1
-      return
-    }
-
-    const ym = `${nextEligible.getFullYear()}-${String(nextEligible.getMonth() + 1).padStart(2, '0')}`
-    donorAvailMonthBuckets[ym] = (donorAvailMonthBuckets[ym] || 0) + 1
-
-    if (nextEligible <= donorAvailabilityHorizonEnd) donorAvailBecomingInHorizon += 1
-    if (nextEligible <= nextWeekEnd) donorAvailBecomingNextWeek += 1
+  // Donor availability uses the same tested analytics function as the validation suite.
+  const donorAvailability = calculateDonorAvailability({
+    donors,
+    now,
+    horizonDays: donorAvailabilityHorizonDays,
   })
-
-  const donorAvailTotal = donors.length
-  const donorAvailCanDonateWithinHorizon = donorAvailEligibleNow + donorAvailBecomingInHorizon
-  const donorAvailPctWithinHorizon =
-    donorAvailTotal > 0 ? Math.round((donorAvailCanDonateWithinHorizon / donorAvailTotal) * 100) : 0
-
-  const donorAvailPeakMonthEntry = Object.entries(donorAvailMonthBuckets)
-    .filter(([ym]) => ym >= currentMonthKey)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
-
-  const donorAvailPeakMonthLabel = donorAvailPeakMonthEntry
-    ? new Date(`${donorAvailPeakMonthEntry[0]}-01T12:00:00`).toLocaleString('en-US', { month: 'long' })
+  const donorAvailTotal = donorAvailability.total
+  const donorAvailEligibleNow = donorAvailability.eligibleNow
+  const donorAvailBecomingInHorizon = donorAvailability.becomingInHorizon
+  const donorAvailBecomingNextWeek = donorAvailability.becomingNextWeek
+  const donorAvailCanDonateWithinHorizon = donorAvailability.canDonateWithinHorizon
+  const donorAvailPctWithinHorizon = donorAvailability.percentWithinHorizon
+  const donorAvailPeakMonthLabel = donorAvailability.peakMonthLabel
+  const donorAvailPeakMonthEntry = donorAvailability.peakMonthKey
+    ? [donorAvailability.peakMonthKey, donorAvailability.peakMonthCount]
     : null
-
-  let donorAvailabilityLevelKey = 'low'
-  if (donorAvailTotal === 0) donorAvailabilityLevelKey = 'low'
-  else if (donorAvailPctWithinHorizon >= 55 || donorAvailBecomingInHorizon >= Math.max(8, donorAvailTotal * 0.2)) {
-    donorAvailabilityLevelKey = 'high'
-  } else if (donorAvailPctWithinHorizon >= 30 || donorAvailBecomingInHorizon >= Math.max(3, donorAvailTotal * 0.08)) {
-    donorAvailabilityLevelKey = 'moderate'
-  }
-
-  const donorAvailabilityLabel =
-    donorAvailabilityLevelKey === 'high'
-      ? 'High Availability'
-      : donorAvailabilityLevelKey === 'moderate'
-        ? 'Moderate Availability'
-        : 'Low Availability'
-
-  const donorAvailabilityInsight =
-    donorAvailTotal === 0
-      ? 'Add donors to see availability forecasts.'
-      : donorAvailPeakMonthLabel && donorAvailPeakMonthEntry[1] > 0
-        ? `A ${donorAvailPeakMonthEntry[1] >= donorAvailTotal * 0.12 ? 'high' : 'notable'} number of donors are expected to become eligible in ${donorAvailPeakMonthLabel} based on last donation dates and recovery intervals (whole blood ${WHOLE_BLOOD_RECOVERY_DAYS} days). About ${donorAvailPctWithinHorizon}% of registered donors can donate within the next ${donorAvailabilityHorizonDays} days (already eligible or completing recovery in that window).`
-        : donorAvailBecomingInHorizon > 0
-          ? `Over the next ${donorAvailabilityHorizonDays} days, ${donorAvailBecomingInHorizon} donor${donorAvailBecomingInHorizon === 1 ? '' : 's'} will become newly eligible. Combined with donors already eligible, about ${donorAvailPctWithinHorizon}% of your donor base can participate in that period.`
-          : `Most active donors are either already eligible or still outside the selected ${donorAvailabilityHorizonDays}-day window—expect lower short-term turnout unless new donors join.`
-
-  const donorAvailabilityRecommendation =
-    donorAvailTotal === 0
-      ? 'Register donors and record donation dates so recovery-based forecasts can run.'
-      : donorAvailabilityLevelKey === 'high' && donorAvailPeakMonthLabel
-        ? `Schedule blood donation drives in ${donorAvailPeakMonthLabel} to maximize participation when the largest group finishes recovery.${donorAvailBecomingNextWeek >= 3 ? ` Send reminders to donors who become eligible in the next 7 days (${donorAvailBecomingNextWeek} donors).` : ''}`
-        : donorAvailBecomingNextWeek >= 3
-          ? `Send reminders to donors who will become eligible next week (${donorAvailBecomingNextWeek} donors) to fill appointment slots early.`
-          : donorAvailabilityLevelKey === 'low'
-            ? 'Run targeted outreach and consider mobile drives to grow the eligible pool; few donors unlock in the current window.'
-            : `Plan campaigns around the ${donorAvailabilityHorizonDays}-day window (${donorAvailCanDonateWithinHorizon} donors can donate) and keep nudging donors who are already eligible.`
+  const donorAvailabilityLevelKey = donorAvailability.levelKey
+  const donorAvailabilityLabel = donorAvailability.label
+  const donorAvailabilityInsight = donorAvailability.insight
+  const donorAvailabilityRecommendation = donorAvailability.recommendation
 
   const getDonorAvailabilityClasses = (levelKey) => {
     if (levelKey === 'high') return 'bg-emerald-50 text-emerald-800 ring-emerald-200'

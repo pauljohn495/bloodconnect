@@ -1,4 +1,5 @@
 const MS_PER_DAY = 1000 * 60 * 60 * 24
+export const WHOLE_BLOOD_RECOVERY_DAYS = 90
 export const SHORTAGE_POLICY = Object.freeze({
   forecastHorizonDays: 7,
   criticalCoverageRatio: 0.2,
@@ -16,6 +17,129 @@ export const normalizeComponentType = (value) => {
 }
 
 export const normalizeBloodType = (value) => (value || '').toString().trim().toUpperCase()
+
+const donorRecoveryDays = (donor) => {
+  const donationType = (donor.last_donation_type || donor.lastDonationType || 'whole_blood')
+    .toString()
+    .toLowerCase()
+  if (donationType === 'platelets') return 14
+  if (donationType === 'plasma') return 28
+  return WHOLE_BLOOD_RECOVERY_DAYS
+}
+
+export function calculateDonorAvailability({
+  donors,
+  now = new Date(),
+  horizonDays = 30,
+}) {
+  const safeDonors = Array.isArray(donors) ? donors : []
+  const safeHorizonDays = Number(horizonDays)
+  if (!(now instanceof Date) || Number.isNaN(now.getTime()) ||
+      !Number.isFinite(safeHorizonDays) || safeHorizonDays <= 0) {
+    return {
+      total: safeDonors.length,
+      eligibleNow: 0,
+      becomingInHorizon: 0,
+      becomingNextWeek: 0,
+      canDonateWithinHorizon: 0,
+      percentWithinHorizon: 0,
+      peakMonthKey: null,
+      peakMonthLabel: null,
+      peakMonthCount: 0,
+      levelKey: 'low',
+      label: 'Low Availability',
+      insight: 'Donor availability could not be calculated because the date or forecast window is invalid.',
+      recommendation: 'Use a valid forecast date and a positive forecast window.',
+    }
+  }
+
+  const horizonEnd = new Date(now.getTime() + safeHorizonDays * MS_PER_DAY)
+  const nextWeekEnd = new Date(now.getTime() + 7 * MS_PER_DAY)
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  let eligibleNow = 0
+  let becomingInHorizon = 0
+  let becomingNextWeek = 0
+  const monthBuckets = {}
+
+  safeDonors.forEach((donor) => {
+    const lastRaw = donor.last_donation_date || donor.lastDonationDate
+    if (!lastRaw) {
+      eligibleNow += 1
+      return
+    }
+    const last = new Date(lastRaw)
+    if (Number.isNaN(last.getTime())) {
+      eligibleNow += 1
+      return
+    }
+    const nextEligible = new Date(last)
+    nextEligible.setDate(nextEligible.getDate() + donorRecoveryDays(donor))
+    if (nextEligible <= now) {
+      eligibleNow += 1
+      return
+    }
+
+    const monthKey = `${nextEligible.getFullYear()}-${String(nextEligible.getMonth() + 1).padStart(2, '0')}`
+    monthBuckets[monthKey] = (monthBuckets[monthKey] || 0) + 1
+    if (nextEligible <= horizonEnd) becomingInHorizon += 1
+    if (nextEligible <= nextWeekEnd) becomingNextWeek += 1
+  })
+
+  const total = safeDonors.length
+  const canDonateWithinHorizon = eligibleNow + becomingInHorizon
+  const percentWithinHorizon = total > 0 ? Math.round((canDonateWithinHorizon / total) * 100) : 0
+  const peakMonthEntry = Object.entries(monthBuckets)
+    .filter(([monthKey]) => monthKey >= currentMonthKey)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null
+  const peakMonthKey = peakMonthEntry?.[0] || null
+  const peakMonthCount = peakMonthEntry?.[1] || 0
+  const peakMonthLabel = peakMonthKey
+    ? new Date(`${peakMonthKey}-01T12:00:00`).toLocaleString('en-US', { month: 'long' })
+    : null
+
+  let levelKey = 'low'
+  if (total > 0 && (percentWithinHorizon >= 55 || becomingInHorizon >= Math.max(8, total * 0.2))) {
+    levelKey = 'high'
+  } else if (total > 0 && (percentWithinHorizon >= 30 || becomingInHorizon >= Math.max(3, total * 0.08))) {
+    levelKey = 'moderate'
+  }
+  const label = levelKey === 'high'
+    ? 'High Availability'
+    : levelKey === 'moderate' ? 'Moderate Availability' : 'Low Availability'
+  const insight = total === 0
+    ? 'Add donors to see availability forecasts.'
+    : peakMonthLabel && peakMonthCount > 0
+      ? `A ${peakMonthCount >= total * 0.12 ? 'high' : 'notable'} number of donors are expected to become eligible in ${peakMonthLabel} based on last donation dates and recovery intervals (whole blood ${WHOLE_BLOOD_RECOVERY_DAYS} days). About ${percentWithinHorizon}% of registered donors can donate within the next ${safeHorizonDays} days (already eligible or completing recovery in that window).`
+      : becomingInHorizon > 0
+        ? `Over the next ${safeHorizonDays} days, ${becomingInHorizon} donor${becomingInHorizon === 1 ? '' : 's'} will become newly eligible. Combined with donors already eligible, about ${percentWithinHorizon}% of your donor base can participate in that period.`
+        : `Most active donors are either already eligible or still outside the selected ${safeHorizonDays}-day window-expect lower short-term turnout unless new donors join.`
+  const recommendation = total === 0
+    ? 'Register donors and record donation dates so recovery-based forecasts can run.'
+    : levelKey === 'high' && peakMonthLabel
+      ? `Schedule blood donation drives in ${peakMonthLabel} to maximize participation when the largest group finishes recovery.${becomingNextWeek >= 3 ? ` Send reminders to donors who become eligible in the next 7 days (${becomingNextWeek} donors).` : ''}`
+      : becomingNextWeek >= 3
+        ? `Send reminders to donors who will become eligible next week (${becomingNextWeek} donors) to fill appointment slots early.`
+        : levelKey === 'low'
+          ? 'Run targeted outreach and consider mobile drives to grow the eligible pool; few donors unlock in the current window.'
+          : `Plan campaigns around the ${safeHorizonDays}-day window (${canDonateWithinHorizon} donors can donate) and keep nudging donors who are already eligible.`
+
+  return {
+    total,
+    eligibleNow,
+    becomingInHorizon,
+    becomingNextWeek,
+    canDonateWithinHorizon,
+    percentWithinHorizon,
+    peakMonthKey,
+    peakMonthLabel,
+    peakMonthCount,
+    monthBuckets,
+    levelKey,
+    label,
+    insight,
+    recommendation,
+  }
+}
 
 const calendarDiffInDays = (dateA, dateB) => {
   const a = new Date(dateA)

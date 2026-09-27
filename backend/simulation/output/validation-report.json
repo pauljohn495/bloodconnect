@@ -1,6 +1,73 @@
 {
-  "generatedAt": "2026-09-13T12:39:10.052Z",
-  "simulationReferenceDate": "2026-09-01T12:00:00.000Z",
+  "title": "BloodConnect analytics data-processing and output-consistency validation",
+  "purpose": "Checks that controlled inputs are processed into known expected outputs and that identical inputs produce identical results.",
+  "generatedAt": "2026-09-27T15:09:15.740Z",
+  "referenceDate": "2026-09-01T12:00:00.000Z",
+  "result": "PASS",
+  "summary": {
+    "fixture_integrity": {
+      "passed": 2,
+      "failed": 0,
+      "total": 2
+    },
+    "output_correctness": {
+      "passed": 120,
+      "failed": 0,
+      "total": 120
+    },
+    "output_consistency": {
+      "passed": 5,
+      "failed": 0,
+      "total": 5
+    },
+    "input_integrity": {
+      "passed": 1,
+      "failed": 0,
+      "total": 1
+    }
+  },
+  "checks": 128,
+  "passed": 128,
+  "failed": 0,
+  "analyticsCovered": {
+    "predictive": [
+      "blood shortage forecast",
+      "blood usage trends",
+      "donor availability insights"
+    ],
+    "prescriptive": [
+      "donor outreach/campaign recommendation",
+      "inventory transfer recommendations"
+    ]
+  },
+  "verifiedOutputs": {
+    "donorAvailability": {
+      "total": 4,
+      "eligibleNow": 2,
+      "becomingInHorizon": 1,
+      "becomingNextWeek": 0,
+      "canDonateWithinHorizon": 3,
+      "percentWithinHorizon": 75,
+      "peakMonthKey": "2026-09",
+      "peakMonthLabel": "September",
+      "peakMonthCount": 1,
+      "monthBuckets": {
+        "2026-09": 1,
+        "2026-11": 1
+      },
+      "levelKey": "high",
+      "label": "High Availability",
+      "insight": "A high number of donors are expected to become eligible in September based on last donation dates and recovery intervals (whole blood 90 days). About 75% of registered donors can donate within the next 30 days (already eligible or completing recovery in that window).",
+      "recommendation": "Schedule blood donation drives in September to maximize participation when the largest group finishes recovery."
+    }
+  },
+  "consistency": {
+    "repeatedRuns": 5,
+    "exactOutputComparison": true,
+    "clonedInputComparison": true,
+    "inputMutationCheck": true,
+    "outputSha256": "728d5cca06d8f198340417d77d726015c960fcd6ccb6b8c1aa3563f88e91c73d"
+  },
   "dataset": {
     "historicalPeriod": {
       "start": "2026-03-01",
@@ -11,48 +78,10 @@
     "donorRecords": 4,
     "hospitalRecords": 2
   },
-  "result": "PASS",
-  "checks": 110,
-  "passed": 110,
-  "failed": 0,
-  "forecastAccuracy": {
-    "meanAbsoluteError": 0.12499999999999989,
-    "meanAbsolutePercentageError": 8.333333333333325,
-    "bias": 0.12499999999999989,
-    "holdoutComparisons": [
-      {
-        "bloodType": "O+",
-        "componentType": "whole_blood",
-        "actualUnitsNext7Days": 14,
-        "predictedUnitsNext7Days": 14,
-        "error": 0,
-        "absoluteError": 0
-      },
-      {
-        "bloodType": "A+",
-        "componentType": "whole_blood",
-        "actualUnitsNext7Days": 7,
-        "predictedUnitsNext7Days": 7,
-        "error": 0,
-        "absoluteError": 0
-      },
-      {
-        "bloodType": "AB+",
-        "componentType": "whole_blood",
-        "actualUnitsNext7Days": 2,
-        "predictedUnitsNext7Days": 2.333333333333333,
-        "error": 0.33333333333333304,
-        "absoluteError": 0.33333333333333304
-      },
-      {
-        "bloodType": "O-",
-        "componentType": "whole_blood",
-        "actualUnitsNext7Days": 1,
-        "predictedUnitsNext7Days": 1.1666666666666665,
-        "error": 0.16666666666666652,
-        "absoluteError": 0.16666666666666652
-      }
-    ]
-  },
+  "limitations": [
+    "This is functional and consistency testing against controlled fixtures, not a statistical accuracy study.",
+    "A passing result shows conformance to the recorded expected outputs; it does not establish clinical effectiveness.",
+    "The suite exercises the analytics engine directly and does not cover browser rendering, API transport, or a production database."
+  ],
   "failures": []
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
+import { mountGoogleIdentityButton } from '../googleIdentity.js'
 import '../public-theme.css'
 
 function DonorRegistration() {
@@ -87,27 +88,36 @@ function DonorRegistration() {
 
   useEffect(() => {
     if (!googleClientId) return
-    if (!window.google?.accounts?.id || !googleButtonRef.current) return
-
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: (response) => {
+    let cancelled = false
+    let unmountButton = () => {}
+    mountGoogleIdentityButton({
+      clientId: googleClientId,
+      container: googleButtonRef.current,
+      onCredential: response => {
+        if (cancelled) return
         if (!response?.credential) {
           setGoogleError('Google signup failed. Please try again.')
           return
         }
         handleGoogleSignup(response.credential)
       },
+      options: {
+        theme: 'outline',
+        size: 'large',
+        width: 320,
+        text: 'signup_with',
+        shape: 'pill',
+      },
+    }).then(cleanup => {
+      if (cancelled) cleanup()
+      else unmountButton = cleanup
+    }).catch(() => {
+      if (!cancelled) setGoogleError('Google signup is unavailable. Please use the registration form.')
     })
-
-    googleButtonRef.current.innerHTML = ''
-    window.google.accounts.id.renderButton(googleButtonRef.current, {
-      theme: 'outline',
-      size: 'large',
-      width: 320,
-      text: 'signup_with',
-      shape: 'pill',
-    })
+    return () => {
+      cancelled = true
+      unmountButton()
+    }
   }, [googleClientId, handleGoogleSignup])
 
   return (

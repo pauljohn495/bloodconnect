@@ -199,10 +199,17 @@ async function loginWithGoogle(req, res, next) {
       throw error
     }
 
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    })
+    let ticket
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      })
+    } catch {
+      const error = new Error('Invalid or expired Google credential')
+      error.statusCode = 401
+      throw error
+    }
 
     const payload = ticket.getPayload()
     const email = payload?.email ? payload.email.toLowerCase().trim() : ''

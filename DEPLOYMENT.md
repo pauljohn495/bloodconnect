@@ -133,6 +133,39 @@ dump on a disposable staging database first.
    so CORS permits it. Add Vercel preview URLs only deliberately; they are separate
    allowed origins.
 
+## 4. Enable Google authentication in production
+
+1. In Google Cloud Console, configure the OAuth consent screen/branding and create
+   an OAuth client with application type **Web application**. For a public
+   production deployment, use a production Google Cloud project rather than the
+   development project.
+2. Add the exact deployed frontend origin under **Authorized JavaScript origins**:
+
+   ```text
+   https://<your-vercel-project>.vercel.app
+   ```
+
+   The origin contains only the scheme and hostname: no path, query, or trailing
+   slash. Wildcards are not accepted. Add a custom production domain separately
+   if the application uses one. Callback-mode Google Identity Services does not
+   require an authorized redirect URI for this implementation.
+3. Set the same Web client ID in both deployment services:
+
+   - Vercel: `VITE_GOOGLE_CLIENT_ID=<client-id>.apps.googleusercontent.com`
+   - Render: `GOOGLE_CLIENT_ID=<client-id>.apps.googleusercontent.com`
+
+4. Confirm Vercel also has `VITE_API_URL=https://<your-render-service>.onrender.com`
+   and Render has `FRONTEND_URL=https://<your-vercel-project>.vercel.app`.
+5. Redeploy **both** services. Vite embeds `VITE_*` variables during its build, so
+   changing the Vercel variable without a new deployment does not update the app.
+6. Open the production site, choose the donor account type, and test both an
+   existing donor email and a new Google account. A new account must continue to
+   `/complete-google-donor-profile` to supply username, phone, and blood type.
+
+Use exact production URLs for production OAuth clients. Vercel preview deployments
+have different origins and will not be authorized unless each preview origin is
+added explicitly; use the stable production deployment for acceptance testing.
+
 ## Verification checklist
 
 ### Aiven

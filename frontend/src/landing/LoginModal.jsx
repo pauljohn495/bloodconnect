@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from '../api.js'
+import { mountGoogleIdentityButton } from '../googleIdentity.js'
 import { Icon, Modal } from './shared.jsx'
 
 export default function LoginModal({ onClose, canRegister }) {
@@ -48,24 +49,29 @@ export default function LoginModal({ onClose, canRegister }) {
   useEffect(() => {
     if (role !== 'donor' || !googleClientId) return
     let cancelled = false
-    const initialize = () => {
-      if (cancelled || !window.google?.accounts?.id || !googleButtonRef.current) return
-      window.google.accounts.id.initialize({ client_id: googleClientId, callback: response => {
+    let unmountButton = () => {}
+    const container = googleButtonRef.current
+    mountGoogleIdentityButton({
+      clientId: googleClientId,
+      container,
+      onCredential: response => {
         if (cancelled) return
         if (response?.credential) googleLogin(response.credential)
         else setGoogleError('Google sign-in failed. Please try again.')
-      } })
-      googleButtonRef.current.replaceChildren()
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        theme: 'outline', size: 'large', width: Math.min(320, googleButtonRef.current.clientWidth || 280), text: 'continue_with', shape: 'pill',
-      })
+      },
+      options: {
+        theme: 'outline', size: 'large', width: Math.min(320, container?.clientWidth || 280), text: 'continue_with', shape: 'pill',
+      },
+    }).then(cleanup => {
+      if (cancelled) cleanup()
+      else unmountButton = cleanup
+    }).catch(() => {
+      if (!cancelled) setGoogleError('Google sign-in is unavailable. Please use your account details.')
+    })
+    return () => {
+      cancelled = true
+      unmountButton()
     }
-    const failed = () => { if (!cancelled) setGoogleError('Google sign-in is unavailable. Please use your account details.') }
-    const script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]')
-    initialize()
-    script?.addEventListener('load', initialize)
-    script?.addEventListener('error', failed)
-    return () => { cancelled = true; script?.removeEventListener('load', initialize); script?.removeEventListener('error', failed) }
   }, [role, googleClientId, googleLogin])
 
   return <Modal title="Good to have you back." eyebrow="YOUR BLOODCONNECT PORTAL" onClose={onClose}>

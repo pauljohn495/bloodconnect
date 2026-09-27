@@ -1,0 +1,165 @@
+<div id="bloodconnect-testing-proof" aria-label="BloodConnect analytics testing evidence diagram">
+  <style>
+    #bloodconnect-testing-proof {
+      color: var(--foreground);
+      font-size: var(--font-size-base);
+    }
+    #bloodconnect-testing-proof .proof-metrics {
+      margin-bottom: 1rem;
+    }
+    #bloodconnect-testing-proof .proof-stage {
+      display: grid;
+      grid-template-columns: 7rem 1fr;
+      gap: 1rem;
+      align-items: start;
+      padding: 0.9rem 0;
+      border-top: 1px solid var(--border);
+    }
+    #bloodconnect-testing-proof .proof-stage:last-of-type {
+      border-bottom: 1px solid var(--border);
+    }
+    #bloodconnect-testing-proof .stage-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted-foreground);
+    }
+    #bloodconnect-testing-proof .stage-number {
+      display: inline-grid;
+      place-items: center;
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 999px;
+      color: var(--primary-foreground);
+      background: var(--primary);
+      font-weight: 500;
+    }
+    #bloodconnect-testing-proof .stage-content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+      gap: 0.75rem 1.25rem;
+    }
+    #bloodconnect-testing-proof .stage-content strong,
+    #bloodconnect-testing-proof .donor-label,
+    #bloodconnect-testing-proof .evidence-label {
+      font-weight: 500;
+    }
+    #bloodconnect-testing-proof .stage-content p,
+    #bloodconnect-testing-proof .evidence-note {
+      margin: 0;
+    }
+    #bloodconnect-testing-proof .proof-donor {
+      padding: 1rem 0;
+    }
+    #bloodconnect-testing-proof .donor-track {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.35rem;
+      margin: 0.65rem 0 0.4rem;
+    }
+    #bloodconnect-testing-proof .donor-mark {
+      min-height: 1.9rem;
+      display: grid;
+      place-items: center;
+      background: color-mix(in srgb, var(--viz-series-1) 22%, transparent);
+      color: var(--foreground);
+      border-bottom: 3px solid var(--viz-series-1);
+    }
+    #bloodconnect-testing-proof .donor-mark.future {
+      background: color-mix(in srgb, var(--viz-series-2) 22%, transparent);
+      border-bottom-color: var(--viz-series-2);
+    }
+    #bloodconnect-testing-proof .donor-mark.outside {
+      background: var(--muted);
+      border-bottom-color: var(--border);
+      color: var(--muted-foreground);
+    }
+    #bloodconnect-testing-proof .proof-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--border);
+    }
+    #bloodconnect-testing-proof .hash {
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 560px) {
+      #bloodconnect-testing-proof .proof-stage,
+      #bloodconnect-testing-proof .stage-content {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <div class="viz-grid proof-metrics" aria-label="Automated test results">
+    <div class="card viz-stat">
+      <div class="text-muted">Unit logic</div>
+      <div class="viz-stat-value">19/19</div>
+      <div>PASS</div>
+    </div>
+    <div class="card viz-stat">
+      <div class="text-muted">Controlled analytics</div>
+      <div class="viz-stat-value">128/128</div>
+      <div>PASS</div>
+    </div>
+    <div class="card viz-stat">
+      <div class="text-muted">API integration</div>
+      <div class="viz-stat-value">6/6</div>
+      <div>PASS</div>
+    </div>
+  </div>
+
+  <div class="proof-stage">
+    <div class="stage-label"><span class="stage-number">1</span><span>Test input</span></div>
+    <div class="stage-content">
+      <p><strong>Controlled fixture</strong><br><span class="text-muted">Fixed clock: Sep 1, 2026</span></p>
+      <p>4 donor records, 11 inventory records, 32 blood requests, and 2 hospitals.</p>
+    </div>
+  </div>
+
+  <div class="proof-stage">
+    <div class="stage-label"><span class="stage-number">2</span><span>Processing</span></div>
+    <div class="stage-content">
+      <p><strong>Shared analytics engine</strong><br><span class="text-muted">Same functions used by the Reports page</span></p>
+      <p>Shortage forecast, usage trend, donor availability, donor campaign recommendation, and inventory-transfer recommendation.</p>
+    </div>
+  </div>
+
+  <div class="proof-stage">
+    <div class="stage-label"><span class="stage-number">3</span><span>Verification</span></div>
+    <div class="stage-content">
+      <p><strong>Exact expected-output assertions</strong><br><span class="text-muted">120/120 correctness checks passed</span></p>
+      <p>Five repeat runs matched exactly, cloned input matched, and processing did not mutate the source records.</p>
+    </div>
+  </div>
+
+  <div class="proof-stage">
+    <div class="stage-label"><span class="stage-number">4</span><span>System smoke</span></div>
+    <div class="stage-content">
+      <p><strong>Application delivery checks</strong><br><span class="text-muted">Lint, production build, and HTTP route passed</span></p>
+      <p><code>/admin/reports</code> returned HTTP 200 and served the donor-availability module. Visual browser interaction was not executed.</p>
+    </div>
+  </div>
+
+  <div class="proof-donor" aria-label="Controlled donor availability result: two eligible now, one eligible within 30 days, and one outside the 30-day window">
+    <div class="donor-label">Controlled donor result: 3 of 4 available within 30 days (75%) - High Availability</div>
+    <div class="donor-track" aria-hidden="true">
+      <div class="donor-mark">Eligible now</div>
+      <div class="donor-mark">Eligible now</div>
+      <div class="donor-mark future">Within 30d</div>
+      <div class="donor-mark outside">Outside 30d</div>
+    </div>
+    <div class="text-small text-muted">Peak eligibility month: September | Validated action: schedule a September donation drive</div>
+  </div>
+
+  <div class="proof-footer">
+    <div>
+      <div class="evidence-label">Reproducibility fingerprint</div>
+      <code class="hash">728d5cca06d8f198340417d77d726015c960fcd6ccb6b8c1aa3563f88e91c73d</code>
+    </div>
+    <div class="evidence-note text-small text-muted">Controlled software verification, not clinical validation or live-database totals.</div>
+  </div>
+</div>
