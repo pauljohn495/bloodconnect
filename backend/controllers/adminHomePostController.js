@@ -5,6 +5,8 @@ const IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base64,/i
 const MAX_IMAGES = 8
 const MAX_IMAGE_LENGTH = 3_000_000
 const MAX_TOTAL_IMAGE_LENGTH = 12_000_000
+const PUBLIC_POST_CACHE = 'public, max-age=60, stale-while-revalidate=300'
+const PUBLIC_IMAGE_CACHE = 'public, max-age=3600, stale-while-revalidate=86400'
 
 function validateImageUrls(raw) {
   if (raw === undefined) return []
@@ -48,6 +50,28 @@ const mapPost = (row) => ({
   updated_at: row.updated_at,
 })
 
+function getPublicImageUrl(req, postId, imageIndex, updatedAt) {
+  const origin = `${req.protocol}://${req.get('host')}`
+  const version = new Date(updatedAt).getTime()
+  const versionQuery = Number.isFinite(version) ? `?v=${version}` : ''
+  return `${origin}/api/home-posts/${postId}/images/${imageIndex}${versionQuery}`
+}
+
+function mapPublicPost(req, row) {
+  const rawCount = Number(row.image_count || 0)
+  const imageCount = Number.isFinite(rawCount) ? Math.min(Math.max(Math.trunc(rawCount), 0), MAX_IMAGES) : 0
+  return {
+    id: row.id,
+    category: row.category,
+    title: row.title,
+    body: row.body,
+    image_urls: Array.from({ length: imageCount }, (_, index) => getPublicImageUrl(req, row.id, index, row.updated_at)),
+    is_published: true,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }
+}
+
 const getHomePostsController = async (req, res) => {
   try {
     const [rows] = await pool.query(
@@ -88,10 +112,10 @@ const createHomePostController = async (req, res) => {
   try {
     const [result] = await pool.query(
       `
-      INSERT INTO home_posts (category, title, body, image_urls, is_published)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO home_posts (category, title, body, image_urls, image_count, is_published)
+      VALUES (?, ?, ?, ?, ?, ?)
     `,
-      [category, title, body, imageUrlsJson, isPublished],
+      [category, title, body, imageUrlsJson, imageUrls.length, isPublished],
     )
     const [rows] = await pool.query(
       `
@@ -145,6 +169,8 @@ const updateHomePostController = async (req, res) => {
     if (!imageUrls) return res.status(400).json({ message: `imageUrls must contain at most ${MAX_IMAGES} supported images` })
     fields.push('image_urls = ?')
     values.push(imageUrls.length > 0 ? JSON.stringify(imageUrls) : null)
+    fields.push('image_count = ?')
+    values.push(imageUrls.length)
   }
 
   if (req.body?.isPublished !== undefined) {
@@ -197,7 +223,7 @@ const getPublicHomePostsController = async (req, res) => {
     const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 6, 1), 20)
     const [rows] = await pool.query(
       `
-      SELECT id, category, title, body, image_urls, is_published, created_at, updated_at
+      SELECT id, category, title, body, image_count, is_published, created_at, updated_at
       FROM home_posts
       WHERE is_published = 1
       ORDER BY created_at DESC
@@ -205,7 +231,8 @@ const getPublicHomePostsController = async (req, res) => {
     `,
       [limit],
     )
-    return res.json(rows.map(mapPost))
+    res.set('Cache-Control', PUBLIC_POST_CACHE)
+    return res.json(rows.map((row) => mapPublicPost(req, row)))
   } catch (error) {
     if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
       return res.json([])
@@ -215,10 +242,63 @@ const getPublicHomePostsController = async (req, res) => {
   }
 }
 
+const getPublicHomePostImageController = async (req, res) => {
+  const postId = Number(req.params.id)
+  const imageIndex = Number(req.params.index)
+  if (!Number.isSafeInteger(postId) || postId < 1 || !Number.isSafeInteger(imageIndex) || imageIndex < 0 || imageIndex >= MAX_IMAGES) {
+    return res.status(400).json({ message: 'Invalid post image' })
+  }
+
+  try {
+    const jsonPath = `$[${imageIndex}]`
+    const [rows] = await pool.query(
+      `
+      SELECT CASE
+               WHEN image_urls IS NOT NULL AND JSON_VALID(image_urls)
+                 THEN JSON_UNQUOTE(JSON_EXTRACT(image_urls, ?))
+               ELSE NULL
+             END AS image_url
+      FROM home_posts
+      WHERE id = ? AND is_published = 1
+      LIMIT 1
+    `,
+      [jsonPath, postId],
+    )
+    const imageUrl = rows[0]?.image_url
+    if (!imageUrl) return res.status(404).json({ message: 'Post image not found' })
+
+    if (/^https?:\/\//i.test(imageUrl)) {
+      res.set('Cache-Control', PUBLIC_IMAGE_CACHE)
+      return res.redirect(302, imageUrl)
+    }
+
+    const match = /^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=\r\n]+)$/i.exec(imageUrl)
+    if (!match) return res.status(404).json({ message: 'Post image is unavailable' })
+
+    const image = Buffer.from(match[2], 'base64')
+    if (image.length === 0) return res.status(404).json({ message: 'Post image is unavailable' })
+
+    const contentType = match[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : match[1].toLowerCase()
+    res.set({
+      'Cache-Control': PUBLIC_IMAGE_CACHE,
+      'Content-Type': contentType,
+      'Content-Length': String(image.length),
+    })
+    return res.send(image)
+  } catch (error) {
+    if (error && (error.code === 'ER_NO_SUCH_TABLE' || error.errno === 1146)) {
+      return res.status(404).json({ message: 'Post image not found' })
+    }
+    console.error('Public home post image error:', error)
+    return res.status(500).json({ message: 'Failed to fetch post image' })
+  }
+}
+
 module.exports = {
   getHomePostsController,
   createHomePostController,
   updateHomePostController,
   deleteHomePostController,
   getPublicHomePostsController,
+  getPublicHomePostImageController,
 }

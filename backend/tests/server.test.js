@@ -2,6 +2,7 @@ const { after, before, test } = require('node:test')
 const assert = require('node:assert/strict')
 const jwt = require('jsonwebtoken')
 const { app } = require('../server')
+const { pool } = require('../db')
 
 let server
 let baseUrl
@@ -117,4 +118,55 @@ test('profile and hospital request validators reject unsafe payloads before data
 
   assert.equal(profileResponse.status, 400)
   assert.equal(requestResponse.status, 400)
+})
+
+test('public home-post feed returns lightweight image URLs instead of embedded image data', async () => {
+  const originalQuery = pool.query
+  pool.query = async (sql) => {
+    assert.match(String(sql), /body, image_count, is_published/)
+    assert.doesNotMatch(String(sql), /JSON_(?:LENGTH|EXTRACT)\(image_urls/)
+    return [[{
+      id: 9,
+      category: 'top_donors',
+      title: 'Test post',
+      body: 'Test body',
+      is_published: 1,
+      image_count: 2,
+      created_at: new Date('2026-01-01T00:00:00Z'),
+      updated_at: new Date('2026-01-01T00:00:00Z'),
+    }]]
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/api/home-posts?limit=6`)
+    const body = await response.json()
+
+    assert.equal(response.status, 200)
+    assert.match(response.headers.get('cache-control'), /max-age=60/)
+    assert.equal(body[0].image_urls.length, 2)
+    assert.match(body[0].image_urls[0], /\/api\/home-posts\/9\/images\/0\?v=\d+$/)
+    assert.ok(JSON.stringify(body).length < 1000)
+  } finally {
+    pool.query = originalQuery
+  }
+})
+
+test('public home-post images are decoded and served with cache headers', async () => {
+  const originalQuery = pool.query
+  const expected = Buffer.from('small image fixture')
+  pool.query = async () => [[{
+    image_url: `data:image/png;base64,${expected.toString('base64')}`,
+  }]]
+
+  try {
+    const response = await fetch(`${baseUrl}/api/home-posts/9/images/0`)
+    const body = Buffer.from(await response.arrayBuffer())
+
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-type'), 'image/png')
+    assert.match(response.headers.get('cache-control'), /max-age=3600/)
+    assert.deepEqual(body, expected)
+  } finally {
+    pool.query = originalQuery
+  }
 })

@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require('cors')
+const compression = require('compression')
 const dotenv = require('dotenv')
 
 dotenv.config()
@@ -23,7 +24,10 @@ const {
   ensureRequestGroupsAndEventNotifications,
 } = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
-const { getPublicHomePostsController } = require('./controllers/adminHomePostController')
+const {
+  getPublicHomePostsController,
+  getPublicHomePostImageController,
+} = require('./controllers/adminHomePostController')
 const { getPublicFeatureFlagsController } = require('./controllers/featureFlagController')
 const {
   getDonorDonationRankingController,
@@ -69,6 +73,7 @@ const allowedOrigins = [...new Set([...developmentOrigins, ...envOrigins])]
 app.disable('x-powered-by')
 app.set('trust proxy', 1)
 app.use(applySecurityHeaders)
+app.use(compression({ threshold: 1024 }))
 app.use(
   cors({
     origin(origin, callback) {
@@ -115,6 +120,7 @@ app.get('/api/health', async (req, res) => {
 // Public announcements (donors / landing — no auth)
 app.get('/api/announcements', getPublicAnnouncementsController)
 app.get('/api/home-posts', getPublicHomePostsController)
+app.get('/api/home-posts/:id/images/:index', getPublicHomePostImageController)
 app.get('/api/rankings/donors', getDonorDonationRankingController)
 app.get('/api/rankings/organizations', getOrganizationDonationRankingController)
 app.get('/api/rankings/municipalities', getMunicipalityDonationRankingController)

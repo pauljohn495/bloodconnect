@@ -360,6 +360,8 @@ async function ensureHomePostsTable() {
       category ENUM('top_donors', 'top_organizers', 'top_municipality') NOT NULL,
       title VARCHAR(255) NOT NULL,
       body MEDIUMTEXT NOT NULL,
+      image_urls LONGTEXT NULL,
+      image_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
       is_published TINYINT(1) NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -374,6 +376,17 @@ async function ensureHomePostsTable() {
   if (!(await columnExists('home_posts', 'image_urls'))) {
     await pool.query('ALTER TABLE home_posts ADD COLUMN image_urls LONGTEXT NULL AFTER body')
     console.log('Schema: added home_posts.image_urls')
+  }
+  if (!(await columnExists('home_posts', 'image_count'))) {
+    await pool.query('ALTER TABLE home_posts ADD COLUMN image_count TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER image_urls')
+    await pool.query(`
+      UPDATE home_posts
+      SET image_count = CASE
+        WHEN image_urls IS NOT NULL AND JSON_VALID(image_urls) THEN LEAST(JSON_LENGTH(image_urls), 8)
+        ELSE 0
+      END
+    `)
+    console.log('Schema: added and backfilled home_posts.image_count')
   }
 }
 
