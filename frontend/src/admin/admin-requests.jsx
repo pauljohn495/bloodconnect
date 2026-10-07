@@ -149,7 +149,10 @@ function AdminRequests() {
       const db = b.request_date ? new Date(b.request_date) : 0
       return da - db // older requests first within same priority
     })
-  const allRequests = requests
+  const historyRequests = requests.filter((request) => {
+    const status = (request.status || '').toLowerCase()
+    return ['approved', 'partially_fulfilled', 'delivered', 'received', 'fulfilled', 'completed'].includes(status)
+  })
 
   return (
     <AdminLayout
@@ -375,7 +378,7 @@ function AdminRequests() {
               <h3 id="requests-history-title" className="text-base font-semibold text-slate-900">
                 Request history
               </h3>
-              <p className="mt-1 text-sm text-slate-500">All hospital requests including completed statuses</p>
+              <p className="mt-1 text-sm text-slate-500">Approved and completed hospital requests</p>
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto px-2">
@@ -404,14 +407,14 @@ function AdminRequests() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {allRequests.length === 0 ? (
+                  {historyRequests.length === 0 ? (
                     <tr>
                       <td className="px-3 py-4 text-center text-slate-500" colSpan={7}>
                         No request history available.
                       </td>
                     </tr>
                   ) : (
-                    allRequests.map((request) => (
+                    historyRequests.map((request) => (
                       <tr key={request.id} className="hover:bg-slate-50/60">
                         <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-slate-900">
                           {request.hospital_name}

@@ -16,7 +16,7 @@ function HospitalTransactionHistory() {
       setIsLoading(true)
       setError('')
       const data = await apiRequest('/api/hospital/requests')
-      setRequests(data)
+      setRequests(data || [])
     } catch (err) {
       setError(err.message || 'Failed to load request history')
       console.error('Failed to load request history', err)
@@ -30,18 +30,14 @@ function HospitalTransactionHistory() {
   }, [])
 
   const normalizedStatus = (status) => (status || '').toLowerCase()
-  const historyRequests = requests.filter((request) => {
-    const status = normalizedStatus(request.status)
-    return (
-      status === 'rejected' ||
-      status === 'cancelled' ||
-      status === 'received' ||
-      status === 'fulfilled'
-    )
-  })
-
   const getStatusColor = (status) => {
     switch (normalizedStatus(status)) {
+      case 'pending':
+        return 'bg-yellow-50 text-yellow-700 ring-yellow-100'
+      case 'approved':
+        return 'bg-green-50 text-green-700 ring-green-100'
+      case 'delivered':
+        return 'bg-blue-50 text-blue-700 ring-blue-100'
       case 'received':
       case 'fulfilled':
         return 'bg-emerald-50 text-emerald-700 ring-emerald-100'
@@ -145,7 +141,7 @@ function HospitalTransactionHistory() {
   return (
     <HospitalLayout
       pageTitle="Transaction History"
-      pageDescription="View completed blood request transactions."
+      pageDescription="View and track all submitted blood request transactions."
     >
       <section className="mt-2">
         <div className={adminPanel.amber.outer}>
@@ -153,7 +149,7 @@ function HospitalTransactionHistory() {
             <div>
               <h2 className={adminPanel.amber.title}>Request history</h2>
               <p className={adminPanel.amber.subtitle}>
-                Rejected, cancelled, and completed requests.
+                All submitted requests, including active and completed transactions.
               </p>
             </div>
           </div>
@@ -203,7 +199,7 @@ function HospitalTransactionHistory() {
                     </td>
                   </tr>
                 )}
-                {!isLoading && !error && historyRequests.length === 0 && (
+                {!isLoading && !error && requests.length === 0 && (
                   <tr>
                     <td className="px-4 py-10 text-center text-xs text-slate-500" colSpan={8}>
                       No request history yet.
@@ -212,7 +208,7 @@ function HospitalTransactionHistory() {
                 )}
                 {!isLoading &&
                   !error &&
-                  historyRequests.map((request) => (
+                  requests.map((request) => (
                     <tr key={request.id} className="hover:bg-slate-50/60">
                       <td className="whitespace-nowrap px-4 py-2 text-xs font-semibold text-slate-900">
                         <BloodTypeBadge type={request.blood_type} />

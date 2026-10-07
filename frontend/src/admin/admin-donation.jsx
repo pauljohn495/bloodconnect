@@ -135,12 +135,6 @@ function AdminDonation() {
   const [isSavingOrgDonation, setIsSavingOrgDonation] = useState(false)
 
   const [donorBroadcastOpen, setDonorBroadcastOpen] = useState(false)
-  const [isDonationRankingModalOpen, setIsDonationRankingModalOpen] = useState(false)
-  const [rankingTab, setRankingTab] = useState('organizations') // 'organizations' | 'donors'
-  const [orgRanking, setOrgRanking] = useState([])
-  const [donorRanking, setDonorRanking] = useState([])
-  const [isRankingLoading, setIsRankingLoading] = useState(false)
-  const [rankingError, setRankingError] = useState('')
 
   const [rc143Volunteers, setRc143Volunteers] = useState([])
   const [isRc143VolunteerModalOpen, setIsRc143VolunteerModalOpen] = useState(false)
@@ -508,30 +502,6 @@ function AdminDonation() {
       showNotification(err.message || 'Failed to save donation entry', 'destructive')
       setIsSavingOrgDonation(false)
     }
-  }
-
-  const handleOpenDonationRankingModal = async () => {
-    setIsDonationRankingModalOpen(true)
-    setRankingError('')
-    setIsRankingLoading(true)
-    try {
-      const [orgs, donors] = await Promise.all([
-        apiRequest('/api/admin/donation-rankings/organizations?limit=50'),
-        apiRequest('/api/admin/donation-rankings/donors?limit=50'),
-      ])
-      setOrgRanking(orgs || [])
-      setDonorRanking(donors || [])
-    } catch (err) {
-      setRankingError(err.message || 'Failed to load donation rankings')
-    } finally {
-      setIsRankingLoading(false)
-    }
-  }
-
-  const handleCloseDonationRankingModal = () => {
-    setIsDonationRankingModalOpen(false)
-    setRankingError('')
-    setIsRankingLoading(false)
   }
 
   const handleCloseAddOrganizationModal = () => {
@@ -1257,7 +1227,7 @@ function AdminDonation() {
                           Occupation
                         </th>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
-                          Contact
+                          Email Address
                         </th>
                         <th className={`whitespace-nowrap px-4 py-2 text-left text-[13px] ${adminPanel.emerald.th}`}>
                           Address
@@ -1489,13 +1459,6 @@ function AdminDonation() {
                 <>
                   <button
                     type="button"
-                    onClick={handleOpenDonationRankingModal}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                  >
-                    Donation Ranking
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleOpenScheduleRequests}
                     className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                   >
@@ -1534,13 +1497,6 @@ function AdminDonation() {
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={handleOpenDonationRankingModal}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                  >
-                    Donation Ranking
-                  </button>
                   <button
                     type="button"
                     onClick={handleOpenOrgDonationModal}
@@ -2022,19 +1978,6 @@ function AdminDonation() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700">
-                  Email Address <span className="font-normal text-slate-500">(optional)</span>
-                </label>
-                <input
-                  type="email"
-                  value={editDonorEmail}
-                  onChange={(e) => setEditDonorEmail(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
-                  placeholder="donor@example.com"
-                />
-              </div>
-
-              <div>
                 <label className="block text-xs font-medium text-slate-700">Email Address</label>
                 <input
                   type="email"
@@ -2374,118 +2317,6 @@ function AdminDonation() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {isDonationRankingModalOpen && (
-        <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Donation Ranking</h3>
-                <p className="mt-0.5 text-xs text-slate-500">Total units donated leaderboard.</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseDonationRankingModal}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="px-5 pt-4">
-              <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setRankingTab('organizations')}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    rankingTab === 'organizations'
-                      ? 'bg-red-600 text-white shadow-sm'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  Organizations
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRankingTab('donors')}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    rankingTab === 'donors'
-                      ? 'bg-red-600 text-white shadow-sm'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  Donors
-                </button>
-              </div>
-            </div>
-
-            <div className="px-5 pb-5 pt-4">
-              {isRankingLoading ? (
-                <div className="py-10 text-center text-sm text-slate-500">Loading rankings...</div>
-              ) : rankingError ? (
-                <div className="py-10 text-center text-sm text-red-600">{rankingError}</div>
-              ) : (
-                <div className="max-h-[65vh] overflow-y-auto rounded-2xl border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-100 text-sm">
-                    <thead className="bg-slate-50/60">
-                      <tr>
-                        <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                          Rank
-                        </th>
-                        <th className="px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                          {rankingTab === 'organizations' ? 'Organization' : 'Donor'}
-                        </th>
-                        {rankingTab === 'donors' && (
-                          <th className="whitespace-nowrap px-4 py-2 text-left text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                            Blood Type
-                          </th>
-                        )}
-                        <th className="whitespace-nowrap px-4 py-2 text-right text-[13px] font-semibold text-slate-600 uppercase tracking-wide">
-                          Total Units
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {(rankingTab === 'organizations' ? orgRanking : donorRanking).map((row, index) => (
-                        <tr key={(row.organizationId || row.donorId || index) + '_' + index} className="hover:bg-slate-50/60">
-                          <td className="whitespace-nowrap px-4 py-2 text-sm font-semibold text-slate-900">
-                            #{index + 1}
-                          </td>
-                          <td className="px-4 py-2 text-sm font-semibold text-slate-900">
-                            {rankingTab === 'organizations' ? row.organizationName : row.donorName}
-                          </td>
-                          {rankingTab === 'donors' && (
-                            <td className="whitespace-nowrap px-4 py-2 text-sm text-slate-700">
-                              <BloodTypeBadge type={row.bloodType} className="text-[13px]" />
-                            </td>
-                          )}
-                          <td className="whitespace-nowrap px-4 py-2 text-right text-sm font-semibold text-slate-900">
-                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-red-50 px-2 py-1 text-[13px] font-semibold text-red-700 ring-1 ring-red-100">
-                              {row.totalUnitsDonated ?? 0}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                      {(rankingTab === 'organizations' ? orgRanking : donorRanking).length === 0 && (
-                        <tr>
-                          <td
-                            className="px-4 py-10 text-center text-sm text-slate-500"
-                            colSpan={rankingTab === 'donors' ? 4 : 3}
-                          >
-                            No ranking data yet.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
