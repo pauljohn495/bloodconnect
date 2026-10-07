@@ -2102,7 +2102,7 @@ function AdminDonation() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700">Contact</label>
+                <label className="block text-xs font-medium text-slate-700">Email Address</label>
                 <input
                   type="text"
                   value={rc143VolContact}
