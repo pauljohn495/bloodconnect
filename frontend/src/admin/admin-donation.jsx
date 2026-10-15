@@ -1090,8 +1090,9 @@ function AdminDonation() {
     }
   }
 
-  const openRc143HistoryModal = () => {
+  const openRc143HistoryModal = async () => {
     setIsRc143HistoryModalOpen(true)
+    await loadRc143ActivityRequests()
   }
 
   const closeRc143HistoryModal = () => {
