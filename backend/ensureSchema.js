@@ -228,28 +228,6 @@ async function tableExists(tableName) {
   return Number(rows[0]?.c || 0) > 0
 }
 
-async function ensureRc143ActivityRequestsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS rc143_activity_requests (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      volunteer_user_id INT NOT NULL,
-      title VARCHAR(255) NOT NULL,
-      details TEXT NULL,
-      location VARCHAR(512) NOT NULL,
-      status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
-      reviewed_by INT NULL,
-      reviewed_at DATETIME NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_rc143_activity_volunteer_created (volunteer_user_id, created_at),
-      INDEX idx_rc143_activity_status_created (status, created_at),
-      CONSTRAINT fk_rc143_activity_volunteer FOREIGN KEY (volunteer_user_id) REFERENCES users(id) ON DELETE CASCADE,
-      CONSTRAINT fk_rc143_activity_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-  `)
-  console.log('Schema: ensured rc143_activity_requests table')
-}
-
 /**
  * Donor schedule completion: actual donation time, units, recorder;
  * links donations row to inventory for audit.
@@ -658,7 +636,6 @@ async function ensureRequestGroupsAndEventNotifications() {
 }
 
 module.exports = {
-  ensureRc143ActivityRequestsTable,
   ensureUserRoleEnumIncludesSuperAdmin,
   ensureDonorProfileColumns,
   ensureHospitalLocationColumns,

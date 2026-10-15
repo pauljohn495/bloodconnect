@@ -97,7 +97,6 @@ const {
 } = require('../controllers/adminMbdController')
 const { listMbdRequestsController, updateMbdRequestStatusController } = require('../controllers/mbdRequestController')
 const { listRc143VolunteersController, createRc143VolunteerController, updateRc143VolunteerController, deleteRc143VolunteerController } = require('../controllers/rc143VolunteerController')
-const { listRc143ActivityRequests, updateRc143ActivityRequestStatus } = require('../controllers/rc143ActivityRequestController')
 const { listMunicipalitiesController, createMunicipalityController } = require('../controllers/municipalityController')
 const {
   listPrcActivitiesController,
@@ -299,8 +298,6 @@ router.get('/rc143-volunteers', listRc143VolunteersController)
 router.post('/rc143-volunteers', createRc143VolunteerController)
 router.put('/rc143-volunteers/:id', updateRc143VolunteerController)
 router.delete('/rc143-volunteers/:id', deleteRc143VolunteerController)
-router.get('/rc143-activity-requests', listRc143ActivityRequests)
-router.patch('/rc143-activity-requests/:id/status', updateRc143ActivityRequestStatus)
 router.get('/municipalities', listMunicipalitiesController)
 router.post('/municipalities', createMunicipalityController)
 

@@ -43,7 +43,8 @@ function maxExpirationYmdFromToday() {
   return `${y}-${m}-${day}`
 }
 
-const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = true
+// RC143 volunteer MBD requests are reviewed in /admin/mbd, not in Donations.
+const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = false
 
 function AdminDonation() {
   const WHOLE_BLOOD_COOLDOWN_DAYS = 90
@@ -260,7 +261,6 @@ function AdminDonation() {
   useEffect(() => {
     if (activeSection === 'rc143') {
       loadRc143Volunteers()
-      loadRc143ActivityRequests()
     }
   }, [activeSection, loadRc143Volunteers, loadRc143ActivityRequests])
   useEffect(() => {
@@ -1208,13 +1208,7 @@ function AdminDonation() {
                 >
                   Register New Volunteer
                 </button>
-                <button
-                  type="button"
-                  onClick={openRc143HistoryModal}
-                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-0"
-                >
-                  History
-                </button>
+                {/* MBD request review and history are available in /admin/mbd. */}
               </div>
             </div>
 

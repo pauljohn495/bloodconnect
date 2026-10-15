@@ -22,7 +22,6 @@ const {
   ensureDonorNotificationBroadcastsTable,
   ensurePrcActivitiesTable,
   ensureRequestGroupsAndEventNotifications,
-  ensureRc143ActivityRequestsTable,
 } = require('./ensureSchema')
 const { getPublicAnnouncementsController } = require('./controllers/adminAnnouncementController')
 const {
@@ -163,7 +162,6 @@ async function start() {
         await ensureFeatureFlagTables()
         await ensureHomePostsTable()
         await ensureRc143VolunteersTable()
-        await ensureRc143ActivityRequestsTable()
         await ensureMbdTables()
         await ensureMbdRequestsTable()
         await ensureDonorNotificationBroadcastsTable()

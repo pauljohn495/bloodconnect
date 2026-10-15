@@ -9,8 +9,8 @@ import { DashboardAnnouncementsPanel } from '../AnnouncementFeed.jsx'
 import { useFeatureFlags } from '../featureFlags.js'
 
 const SCHEDULE_BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-// Activity requests are database-backed; retain this name only to avoid changing the surrounding UI condition.
-const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = true
+// RC143 volunteers submit MBD requests, which administrators review in /admin/mbd.
+const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = false
 
 function UserDashboard() {
   const navigate = useNavigate()
@@ -85,7 +85,7 @@ function UserDashboard() {
           notificationsData,
           eligibilityData,
           mbdRequestsData,
-          rc143VolunteerStatus, rc143ActivityRequests,
+          rc143VolunteerStatus,
         ] = await Promise.all([
           apiRequest('/api/user/me'),
           apiRequest('/api/user/donations'),
@@ -94,7 +94,6 @@ function UserDashboard() {
           apiRequest('/api/user/donation-eligibility').catch(() => null),
           apiRequest('/api/user/mbd-requests').catch(() => []),
           apiRequest('/api/user/rc143-volunteer-status').catch(() => ({ isRc143Volunteer: false })),
-          apiRequest('/api/user/rc143-activity-requests').catch(() => []),
         ])
 
         const username = (me.username || '').toLowerCase()
@@ -172,7 +171,6 @@ function UserDashboard() {
         setMyMbdRequests(Array.isArray(mbdRequestsData) ? mbdRequestsData : [])
 
         setIsRc143Volunteer(Boolean(rc143VolunteerStatus?.isRc143Volunteer))
-        setRc143MyRequests(Array.isArray(rc143ActivityRequests) ? rc143ActivityRequests : [])
 
         // Set latest schedule request (including pending)
         if (scheduleRequests && scheduleRequests.length > 0) {
