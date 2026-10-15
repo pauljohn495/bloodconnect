@@ -9,7 +9,8 @@ import { DashboardAnnouncementsPanel } from '../AnnouncementFeed.jsx'
 import { useFeatureFlags } from '../featureFlags.js'
 
 const SCHEDULE_BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = false
+// Activity requests are database-backed; retain this name only to avoid changing the surrounding UI condition.
+const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = true
 
 function UserDashboard() {
   const navigate = useNavigate()
