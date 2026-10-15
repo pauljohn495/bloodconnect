@@ -43,7 +43,7 @@ function maxExpirationYmdFromToday() {
   return `${y}-${m}-${day}`
 }
 
-const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = false
+const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = true
 
 function AdminDonation() {
   const WHOLE_BLOOD_COOLDOWN_DAYS = 90
@@ -238,6 +238,14 @@ function AdminDonation() {
       showNotification(err.message || 'Failed to load RC143 volunteers', 'destructive')
     }
   }, [showNotification])
+  const loadRc143ActivityRequests = useCallback(async () => {
+    try {
+      const data = await apiRequest('/api/admin/rc143-activity-requests')
+      setRc143Requests(Array.isArray(data) ? data : [])
+    } catch (err) {
+      showNotification(err.message || 'Failed to load RC143 activity requests', 'destructive')
+    }
+  }, [showNotification])
 
   useEffect(() => {
     loadDonors()
@@ -252,8 +260,9 @@ function AdminDonation() {
   useEffect(() => {
     if (activeSection === 'rc143') {
       loadRc143Volunteers()
+      loadRc143ActivityRequests()
     }
-  }, [activeSection, loadRc143Volunteers])
+  }, [activeSection, loadRc143Volunteers, loadRc143ActivityRequests])
   useEffect(() => {
     if (activeSection === 'municipalities') loadMunicipalities()
   }, [activeSection, loadMunicipalities])
@@ -1024,15 +1033,16 @@ function AdminDonation() {
     }
   }
 
-  const handleUpdateRc143RequestStatus = (requestId, nextStatus) => {
-    setRc143Requests((prev) =>
-      prev.map((r) =>
-        String(r.id) === String(requestId)
-          ? { ...r, status: nextStatus, reviewedAt: new Date().toISOString() }
-          : r,
-      ),
-    )
-    showNotification(`Request marked as ${nextStatus}.`, 'primary')
+  const handleUpdateRc143RequestStatus = async (requestId, nextStatus) => {
+    try {
+      await apiRequest(`/api/admin/rc143-activity-requests/${requestId}/status`, {
+        method: 'PATCH', body: JSON.stringify({ status: nextStatus }),
+      })
+      await loadRc143ActivityRequests()
+      showNotification(`Request marked as ${nextStatus}.`, 'primary')
+    } catch (err) {
+      showNotification(err.message || 'Failed to update RC143 activity request.', 'destructive')
+    }
   }
 
   const handleSubmitRc143Volunteer = async (e) => {

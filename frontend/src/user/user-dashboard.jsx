@@ -8,8 +8,6 @@ import { responsiveTableContainer } from '../admin/admin-ui.jsx'
 import { DashboardAnnouncementsPanel } from '../AnnouncementFeed.jsx'
 import { useFeatureFlags } from '../featureFlags.js'
 
-const RC143_VOLUNTEERS_KEY = 'bloodconnect_rc143_volunteers'
-const RC143_REQUESTS_KEY = 'bloodconnect_rc143_activity_requests'
 const SCHEDULE_BLOOD_TYPE_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 const SHOW_LEGACY_RC143_ACTIVITY_REQUESTS = false
 
@@ -86,7 +84,7 @@ function UserDashboard() {
           notificationsData,
           eligibilityData,
           mbdRequestsData,
-          rc143VolunteerStatus,
+          rc143VolunteerStatus, rc143ActivityRequests,
         ] = await Promise.all([
           apiRequest('/api/user/me'),
           apiRequest('/api/user/donations'),
@@ -95,6 +93,7 @@ function UserDashboard() {
           apiRequest('/api/user/donation-eligibility').catch(() => null),
           apiRequest('/api/user/mbd-requests').catch(() => []),
           apiRequest('/api/user/rc143-volunteer-status').catch(() => ({ isRc143Volunteer: false })),
+          apiRequest('/api/user/rc143-activity-requests').catch(() => []),
         ])
 
         const username = (me.username || '').toLowerCase()
@@ -171,33 +170,8 @@ function UserDashboard() {
         setCurrentUserId(meId)
         setMyMbdRequests(Array.isArray(mbdRequestsData) ? mbdRequestsData : [])
 
-        // RC143 membership is stored server-side so it follows this account on every device.
-        let volunteerEntries = []
-        let allRequests = []
-        try {
-          const rawVolunteers = localStorage.getItem(RC143_VOLUNTEERS_KEY)
-          const parsedVolunteers = rawVolunteers ? JSON.parse(rawVolunteers) : []
-          volunteerEntries = Array.isArray(parsedVolunteers) ? parsedVolunteers : []
-        } catch {
-          volunteerEntries = []
-        }
-        try {
-          const rawRequests = localStorage.getItem(RC143_REQUESTS_KEY)
-          const parsedRequests = rawRequests ? JSON.parse(rawRequests) : []
-          allRequests = Array.isArray(parsedRequests) ? parsedRequests : []
-        } catch {
-          allRequests = []
-        }
-        const matchedVolunteer = volunteerEntries.find((v) => String(v.sourceUserId || '') === meId)
         setIsRc143Volunteer(Boolean(rc143VolunteerStatus?.isRc143Volunteer))
-        if (matchedVolunteer) {
-          const mine = allRequests
-            .filter((r) => String(r.volunteerId) === String(matchedVolunteer.id))
-            .sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0))
-          setRc143MyRequests(mine)
-        } else {
-          setRc143MyRequests([])
-        }
+        setRc143MyRequests(Array.isArray(rc143ActivityRequests) ? rc143ActivityRequests : [])
 
         // Set latest schedule request (including pending)
         if (scheduleRequests && scheduleRequests.length > 0) {
@@ -220,44 +194,6 @@ function UserDashboard() {
 
     loadData()
   }, [navigate])
-
-  useEffect(() => {
-    const syncMyRc143Requests = () => {
-      if (!currentUserId) return
-      let volunteerEntries = []
-      let allRequests = []
-      try {
-        const rawVolunteers = localStorage.getItem(RC143_VOLUNTEERS_KEY)
-        const parsedVolunteers = rawVolunteers ? JSON.parse(rawVolunteers) : []
-        volunteerEntries = Array.isArray(parsedVolunteers) ? parsedVolunteers : []
-      } catch {
-        volunteerEntries = []
-      }
-      try {
-        const rawRequests = localStorage.getItem(RC143_REQUESTS_KEY)
-        const parsedRequests = rawRequests ? JSON.parse(rawRequests) : []
-        allRequests = Array.isArray(parsedRequests) ? parsedRequests : []
-      } catch {
-        allRequests = []
-      }
-      const matchedVolunteer = volunteerEntries.find((v) => String(v.sourceUserId || '') === String(currentUserId))
-      if (!matchedVolunteer) {
-        setRc143MyRequests([])
-        return
-      }
-      const mine = allRequests
-        .filter((r) => String(r.volunteerId) === String(matchedVolunteer.id))
-        .sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0))
-      setRc143MyRequests(mine)
-    }
-
-    window.addEventListener('storage', syncMyRc143Requests)
-    window.addEventListener('focus', syncMyRc143Requests)
-    return () => {
-      window.removeEventListener('storage', syncMyRc143Requests)
-      window.removeEventListener('focus', syncMyRc143Requests)
-    }
-  }, [currentUserId])
 
   // Keep the whole-blood eligibility countdown current.
   useEffect(() => {
@@ -438,53 +374,28 @@ function UserDashboard() {
     setIsRequestHistoryModalOpen(false)
   }
 
-  const handleSubmitActivityRequest = (e) => {
+  const handleSubmitActivityRequest = async (e) => {
     e.preventDefault()
     const title = activityRequestForm.title.trim()
     if (!title) {
       setError('Please provide a request title.')
       return
     }
-    let volunteerEntries = []
-    try {
-      const rawVolunteers = localStorage.getItem(RC143_VOLUNTEERS_KEY)
-      const parsedVolunteers = rawVolunteers ? JSON.parse(rawVolunteers) : []
-      volunteerEntries = Array.isArray(parsedVolunteers) ? parsedVolunteers : []
-    } catch {
-      volunteerEntries = []
-    }
-    const matchedVolunteer = volunteerEntries.find((v) => String(v.sourceUserId || '') === String(currentUserId))
-    if (!matchedVolunteer) {
+    if (!isRc143Volunteer) {
       setError('Your account is not currently assigned as RC143 volunteer.')
       return
     }
-    let allRequests = []
     try {
-      const rawRequests = localStorage.getItem(RC143_REQUESTS_KEY)
-      const parsedRequests = rawRequests ? JSON.parse(rawRequests) : []
-      allRequests = Array.isArray(parsedRequests) ? parsedRequests : []
-    } catch {
-      allRequests = []
+      await apiRequest('/api/user/rc143-activity-requests', {
+        method: 'POST', body: JSON.stringify({ title, details: activityRequestForm.details.trim(), location: activityRequestForm.location.trim() }),
+      })
+      const requests = await apiRequest('/api/user/rc143-activity-requests')
+      setRc143MyRequests(Array.isArray(requests) ? requests : [])
+      setError('')
+      closeRequestActivityModal()
+    } catch (err) {
+      setError(err.message || 'Failed to submit RC143 activity request.')
     }
-    const requestId =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `rq-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    const nextRequest = {
-      id: requestId,
-      volunteerId: matchedVolunteer.id,
-      volunteerName: matchedVolunteer.fullName || userData.name,
-      title,
-      details: activityRequestForm.details.trim(),
-      location: activityRequestForm.location.trim(),
-      status: 'pending',
-      requestedAt: new Date().toISOString(),
-    }
-    const updatedRequests = [nextRequest, ...allRequests]
-    localStorage.setItem(RC143_REQUESTS_KEY, JSON.stringify(updatedRequests))
-    setRc143MyRequests((prev) => [nextRequest, ...prev])
-    setError('')
-    closeRequestActivityModal()
   }
 
   const rc143RequestHistory = rc143MyRequests

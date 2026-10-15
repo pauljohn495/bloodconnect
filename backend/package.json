@@ -11,6 +11,7 @@
     "test:analytics-processing": "node simulation/validateSimulation.mjs",
     "test:analytics-simulation": "npm run test:analytics-processing",
     "test:analytics-logic": "node simulation/validateAnalyticsLogic.mjs",
+    "test:simulation-integration": "node --test tests/simulation.integration.test.js",
     "simulation:db:create": "node scripts/createAnalyticsSimulationDb.js",
     "simulation:db:test": "node scripts/validateAnalyticsSimulationDb.mjs",
     "simulation:db:import-controlled-2025": "node scripts/importControlledDataset2025ToTestDb.js",
